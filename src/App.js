@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { loadGangData, saveGangData, subscribeGangData } from "./firebase";
+import { useState, useEffect } from "react";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure } from "./firebase";
 
 const ADMIN_CREDENTIALS = [
   { login: "admin", haslo: "Twojastara00", rola: "admin" },
@@ -109,9 +109,8 @@ export default function App() {
   const [wynik, setWynik] = useState(null);
   const [trybWymiany, setTrybWymiany] = useState("priorytet");
   const [statusZapisu, setStatusZapisu] = useState("");
-  const blokadaZapisuRef = useRef(false);
 
-  // Subskrypcja na żywo z Firebase
+  // Subskrypcja na żywo z Firebase — zawsze ufamy serwerowi
   useEffect(() => {
     let unsub = null;
     (async () => {
@@ -120,25 +119,41 @@ export default function App() {
         await saveGangData(DOMYSLNE_DANE);
         setDane(DOMYSLNE_DANE);
       } else {
-        setDane({ ...DOMYSLNE_DANE, ...start });
+        // Połącz domyślne dane (jeśli brak pól) z tym co jest w bazie
+        setDane({
+          talie: start.talie || DOMYSLNE_DANE.talie,
+          czlonkowie: start.czlonkowie || DOMYSLNE_DANE.czlonkowie,
+          posiadane: start.posiadane || {},
+          duplikaty: start.duplikaty || {},
+        });
       }
       unsub = subscribeGangData((d) => {
-        if (blokadaZapisuRef.current) return;
-        setDane(prev => ({ ...prev, ...d }));
+        // ZAWSZE aktualizuj — nawet po własnym zapisie. Server jest źródłem prawdy.
+        setDane({
+          talie: d.talie || DOMYSLNE_DANE.talie,
+          czlonkowie: d.czlonkowie || DOMYSLNE_DANE.czlonkowie,
+          posiadane: d.posiadane || {},
+          duplikaty: d.duplikaty || {},
+        });
       });
     })();
     return () => { if (unsub) unsub(); };
   }, []);
 
-  // Zapis do Firebase przy zmianach (z opóźnieniem)
-  const zapiszDane = (nowe) => {
-    blokadaZapisuRef.current = true;
+  // Atomowy zapis pojedynczej karty (bez nadpisywania innych zmian)
+  const zapiszKarte = async (typ, key, value) => {
     setStatusZapisu("⏳ Zapisywanie...");
-    setDane(nowe);
-    saveGangData(nowe).then(ok => {
-      setStatusZapisu(ok ? "✓ Zapisano" : "❌ Błąd zapisu");
-      setTimeout(() => { blokadaZapisuRef.current = false; setStatusZapisu(""); }, 1500);
-    });
+    const ok = await setCardField(typ, key, value);
+    setStatusZapisu(ok ? "✓ Zapisano" : "❌ Błąd");
+    setTimeout(() => setStatusZapisu(""), 1200);
+  };
+
+  // Zapis strukturalny (talie, członkowie)
+  const zapiszStrukture = async (pole, wartosc) => {
+    setStatusZapisu("⏳ Zapisywanie...");
+    const ok = await setStructure(pole, wartosc);
+    setStatusZapisu(ok ? "✓ Zapisano" : "❌ Błąd");
+    setTimeout(() => setStatusZapisu(""), 1200);
   };
 
   // Zapis loginu
@@ -198,7 +213,7 @@ export default function App() {
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           typWymiany={typWymiany} zalogowany={zalogowany}
-          zapisz={(nowePosiadane,noweDuplikaty)=>zapiszDane({...dane,posiadane:nowePosiadane,duplikaty:noweDuplikaty})}
+          zapiszKarte={zapiszKarte}
         />}
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
         {zakładka==="wynik"&&isAdmin&&<WynikView
@@ -208,10 +223,10 @@ export default function App() {
           trybWymiany={trybWymiany} setTrybWymiany={setTrybWymiany}
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
-          talie={dane.talie} zapisz={(noweTalie)=>zapiszDane({...dane,talie:noweTalie})}
+          talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
         />}
         {zakładka==="czlonkowie"&&isAdmin&&<EdycjaCzlonkow
-          czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszDane({...dane,czlonkowie:now})}
+          czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszStrukture("czlonkowie",now)}
         />}
       </div>
     </div>
@@ -261,7 +276,7 @@ function LoginScreen({onLogin}) {
   );
 }
 
-function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapisz,zalogowany}) {
+function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapiszKarte,zalogowany}) {
   const isAdmin = zalogowany.rola==="admin"||zalogowany.rola==="zastepca";
 
   // Członek może edytować tylko swoje (po nazwie)
@@ -271,19 +286,19 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapisz,zalogo
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
-    let nowePosiadane={...posiadane}, noweDuplikaty={...duplikaty};
     if(tryb==="posiadane"){
       if(posiadane[key]){
-        delete nowePosiadane[key];
-        delete noweDuplikaty[key];
+        // Odznacz kartę i równocześnie usuń ją z duplikatów
+        zapiszKarte("posiadane", key, null);
+        if(duplikaty[key]) zapiszKarte("duplikaty", key, null);
       } else {
-        nowePosiadane[key]=true;
+        zapiszKarte("posiadane", key, true);
       }
     } else {
-      if(duplikaty[key]) delete noweDuplikaty[key];
-      else noweDuplikaty[key]=true;
+      // duplikat
+      if(duplikaty[key]) zapiszKarte("duplikaty", key, null);
+      else zapiszKarte("duplikaty", key, true);
     }
-    zapisz(nowePosiadane,noweDuplikaty);
   };
 
   const osoba=czlonkowie[wybranaOsoba];
