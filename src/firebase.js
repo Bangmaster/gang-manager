@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -13,7 +13,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-// Główny dokument z danymi gangu
 const GANG_DOC = doc(db, "gang", "main");
 
 export async function loadGangData() {
@@ -27,12 +26,43 @@ export async function loadGangData() {
   }
 }
 
+// Zapisuje cały obiekt (do inicjalizacji)
 export async function saveGangData(data) {
   try {
     await setDoc(GANG_DOC, data, { merge: true });
     return true;
   } catch (e) {
     console.error("Błąd zapisu:", e);
+    return false;
+  }
+}
+
+// Zaznacz lub odznacz pojedynczą kartę (atomowa operacja — nie nadpisuje innych zmian)
+export async function setCardField(typ, key, value) {
+  // typ = "posiadane" lub "duplikaty"
+  // key = "osobaId_taliaId_kartaNazwa"
+  // value = true (zaznacz) lub null (odznacz)
+  try {
+    const fieldPath = `${typ}.${key}`;
+    if (value === null) {
+      await updateDoc(GANG_DOC, { [fieldPath]: deleteField() });
+    } else {
+      await updateDoc(GANG_DOC, { [fieldPath]: value });
+    }
+    return true;
+  } catch (e) {
+    console.error("Błąd ustawienia karty:", e);
+    return false;
+  }
+}
+
+// Zapis strukturalny (talie, członkowie) — całe pole naraz
+export async function setStructure(pole, wartosc) {
+  try {
+    await updateDoc(GANG_DOC, { [pole]: wartosc });
+    return true;
+  } catch (e) {
+    console.error("Błąd zapisu struktury:", e);
     return false;
   }
 }
