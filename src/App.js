@@ -501,7 +501,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         if(brakPrzed.length>0&&brakPo.length===0) zamknieteTalie.push({osoba:osoba.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja||0});
       });
     });
-    return {planoweWymiany,nieobsluzone,zamknieteTalie};
+    return {planoweWymiany,nieobsluzone,zamknieciaInfo:zamknieteTalie};
   }
 
   // Zbierz stan każdej talii dla każdej osoby
