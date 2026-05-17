@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure } from "./firebase";
+import OcrView from "./OcrView";
 
 const ADMIN_CREDENTIALS = [
   { login: "admin", haslo: "Twojastara00", rola: "admin" },
@@ -173,7 +174,7 @@ export default function App() {
   const tabs = [
     {id:"dane",label:"📋 Dane gangu"},
     {id:"wynik",label:"⚡ Wymiana"},
-    ...(isAdmin?[{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
+    ...(isAdmin?[{id:"ocr",label:"📸 OCR screeny"},{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
   ];
 
   return (
@@ -224,6 +225,11 @@ export default function App() {
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
+        />}
+        {zakładka==="ocr"&&isAdmin&&<OcrView
+          talie={talieSorted} czlonkowie={dane.czlonkowie}
+          posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
+          zapiszKarte={zapiszKarte}
         />}
         {zakładka==="czlonkowie"&&isAdmin&&<EdycjaCzlonkow
           czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszStrukture("czlonkowie",now)}
@@ -442,7 +448,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb})
     }
     if(dawca){
       wysylajacy.add(dawca.id);
-      planoweWymiany.push({od:dawca.nazwa,do:k.osoba.nazwa,karta:k.karta.nazwa,talia:k.talia.nazwa,nagroda:k.nagroda,faza:k.faza,brakTCount:k.brakTCount,trudna:k.trudna});
+      planoweWymiany.push({od:dawca.nazwa,do:k.osoba.nazwa,karta:k.karta.nazwa,talia:k.talia.nazwa,nagroda:k.nagroda,faza:k.faza,brakTCount:k.brakTCount,brakOCount:k.brakOCount,trudna:k.trudna});
     } else if(k.brakTCount<=2){
       nieobsluzone.push(k);
     }
@@ -467,10 +473,16 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb})
 }
 
 function obliczFaze(brakT,brakO){
-  if(brakT===1&&brakO===0) return 1;
-  if(brakT===2&&brakO===0) return 2;
-  if(brakT===1&&brakO>0) return 3;
-  if(brakT===2&&brakO>0) return 4;
+  // FAZA 1-2: Talia może zostać ZAMKNIĘTA tą wymianą (komplet drugiego typu już zebrany)
+  if(brakT===1&&brakO===0) return 1; // Wymiana zamknie talię! NAJWYŻSZY PRIORYTET
+  if(brakT===2&&brakO===0) return 2; // Brakuje 2, ale druga karta przyjdzie w kolejnej wymianie
+
+  // FAZA 3-4: Talia BLISKO zamknięcia (brakuje też 1-2 drugiego typu)
+  // Osoba może domknąć talię gdy dostanie też brakujące diamentowe innym dniem
+  if(brakT===1&&brakO>=1&&brakO<=2) return 3;
+  if(brakT===2&&brakO>=1&&brakO<=2) return 4;
+
+  // FAZA 5: Daleko od zamknięcia (brakuje też 3+ drugiego typu lub brakuje 3+ tego typu)
   return 5;
 }
 
@@ -488,12 +500,12 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   };
 
   const etykietyFaz={
-    1:{t:"🔴 FAZA 1 — brakuje 1 karty, talia prawie zamknięta!",k:"#f55"},
-    2:{t:"🟠 FAZA 2 — brakuje 2 kart, brak tylko tego typu!",k:"#ff7a00"},
-    3:{t:"🟡 FAZA 3 — brakuje 1 karty (brak też kart opp)",k:"#fa0"},
-    4:{t:"🟡 FAZA 4 — brakuje 2 kart (brak też kart opp)",k:"#d4b800"},
-    5:{t:"🔵 FAZA 5 — brakuje 3+ kart",k:"#6af"},
-    10:{t:"🔓 Tryb: zamknij cokolwiek",k:"#bb88ff"},
+    1:{t:"🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 karty + komplet innych typów",k:"#f55"},
+    2:{t:"🟠 FAZA 2 — Brakuje 2 kart + komplet innych typów (talia blisko)",k:"#ff7a00"},
+    3:{t:"🟡 FAZA 3 — Brakuje 1 karty + 1-2 innych typów do uzupełnienia",k:"#fa0"},
+    4:{t:"🟡 FAZA 4 — Brakuje 2 kart + 1-2 innych typów do uzupełnienia",k:"#d4b800"},
+    5:{t:"🔵 FAZA 5 — Talia daleka od zamknięcia (3+ braków)",k:"#6af"},
+    10:{t:"🔓 Tryb: zamknij cokolwiek (koniec sezonu)",k:"#bb88ff"},
   };
 
   return (
@@ -567,6 +579,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   <span style={{background:`${e.k}18`,border:`1px solid ${e.k}`,padding:"2px 8px",borderRadius:20,fontSize:12,color:e.k,fontWeight:"bold"}}>{x.do}</span>
                   <span style={{fontSize:12,color:"#ddd"}}><strong>{x.karta}</strong></span>
                   <span style={{fontSize:11,color:"#555"}}>[{x.talia}]</span>
+                  {x.brakOCount>0&&<span style={{fontSize:10,color:"#87CEEB",background:"rgba(65,105,225,0.12)",padding:"1px 6px",borderRadius:10}}>jeszcze brak {x.brakOCount} {typWymiany==="złote"?"💎":"⭐"}</span>}
                   {x.trudna&&<span style={{fontSize:10,color:"#f55"}}>⚠️trudna</span>}
                   <span style={{marginLeft:"auto",fontSize:11,color:"#fa0"}}>🎯{x.nagroda?.toLocaleString()}</span>
                 </div>
