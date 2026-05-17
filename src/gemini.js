@@ -4,6 +4,7 @@
 const KLUCZE_API = [
   process.env.REACT_APP_GEMINI_API_KEY || "",
   process.env.REACT_APP_GEMINI_API_KEY_2 || "",
+  process.env.REACT_APP_GEMINI_API_KEY_3 || "",
 ].filter(k => k.length > 0);
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
