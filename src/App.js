@@ -411,9 +411,98 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapiszKarte,z
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb}) {
+function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[]}) {
   const typ=typWymiany==="złote"?"złota":"diamentowa";
   const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
+
+  // TRYB VIP — kolejka priorytetów
+  if(tryb==="vip" && vipKolejka.length>0) {
+    const planoweWymiany=[];
+    const nieobsluzone=[];
+    const wysylajacy=new Set();
+
+    // Obsługuj osoby po kolei wg kolejki
+    for(const vipId of vipKolejka){
+      const vip=czlonkowie.find(c=>c.id===vipId);
+      if(!vip) continue;
+      const potrzeby=[];
+      talie.forEach(talia=>{
+        const brakT=talia.karty.filter(k=>k.typ===typ&&!posiadane[`${vipId}_${talia.id}_${k.nazwa}`]);
+        brakT.forEach(karta=>{
+          potrzeby.push({talia,karta,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer)});
+        });
+      });
+      potrzeby.sort((a,b)=>{
+        if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
+        return (a.trudna?1:0)-(b.trudna?1:0);
+      });
+      potrzeby.forEach(({talia,karta,nagroda,trudna})=>{
+        let dawca=null;
+        for(const o2 of czlonkowie){
+          if(o2.id===vipId||wysylajacy.has(o2.id)) continue;
+          if(duplikaty[`${o2.id}_${talia.id}_${karta.nazwa}`]){dawca=o2;break;}
+        }
+        if(dawca){
+          wysylajacy.add(dawca.id);
+          planoweWymiany.push({od:dawca.nazwa,do:vip.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda,faza:20,brakTCount:1,brakOCount:0,trudna});
+        } else {
+          nieobsluzone.push({osoba:vip,talia,karta,brakTCount:1});
+        }
+      });
+    }
+
+    // Po kolejce — pozostali dawcy do reszty gangu (fazy 1-2)
+    const vipSet=new Set(vipKolejka);
+    const kandydaciReszta=[];
+    czlonkowie.filter(c=>!vipSet.has(c.id)).forEach(osoba=>{
+      talie.forEach(talia=>{
+        const kartyT=talia.karty.filter(k=>k.typ===typ);
+        const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
+        if(!kartyT.length) return;
+        const brakT=kartyT.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        const brakO=kartyO.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        if(!brakT.length) return;
+        const faza=obliczFaze(brakT.length,brakO.length);
+        if(faza>2) return;
+        brakT.forEach(karta=>{
+          kandydaciReszta.push({osoba,talia,karta,faza,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
+        });
+      });
+    });
+    kandydaciReszta.sort((a,b)=>{
+      if(a.faza!==b.faza) return a.faza-b.faza;
+      if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
+      return (a.trudna?1:0)-(b.trudna?1:0);
+    });
+    for(const k of kandydaciReszta){
+      let dawca=null;
+      for(const o2 of czlonkowie){
+        if(o2.id===k.osoba.id||wysylajacy.has(o2.id)) continue;
+        if(duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]){dawca=o2;break;}
+      }
+      if(dawca){
+        wysylajacy.add(dawca.id);
+        planoweWymiany.push({od:dawca.nazwa,do:k.osoba.nazwa,karta:k.karta.nazwa,talia:k.talia.nazwa,nagroda:k.nagroda,faza:21,brakTCount:k.brakTCount,brakOCount:k.brakOCount,trudna:k.trudna});
+      }
+    }
+
+    // Zamknięte talie
+    const symPos={...posiadane};
+    planoweWymiany.forEach(w=>{
+      const o=czlonkowie.find(c=>c.nazwa===w.do);
+      const t=talie.find(t=>t.nazwa===w.talia);
+      if(o&&t) symPos[`${o.id}_${t.id}_${w.karta}`]=true;
+    });
+    const zamknieteTalie=[];
+    talie.forEach(talia=>{
+      czlonkowie.forEach(osoba=>{
+        const brakPrzed=talia.karty.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        const brakPo=talia.karty.filter(k=>!symPos[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        if(brakPrzed.length>0&&brakPo.length===0) zamknieteTalie.push({osoba:osoba.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja||0});
+      });
+    });
+    return {planoweWymiany,nieobsluzone,zamknieteTalie};
+  }
 
   // Zbierz stan każdej talii dla każdej osoby
   const staneTalii = []; // {osoba, talia, brakT, brakO, nagroda, trudna, kompletOpp}
@@ -603,6 +692,7 @@ function obliczFaze(brakT,brakO){
 function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany}) {
   const [skopiowano,setSkopiowano]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
+  const [vipKolejka,setVipKolejka]=useState([]); // lista id osób w kolejności priorytetu
 
   const toggleTalia=(id)=>{
     setWylaczoneTalie(prev=>{
@@ -612,9 +702,28 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     });
   };
 
+  const toggleVip=(id)=>{
+    setVipKolejka(prev=>{
+      if(prev.includes(id)) return prev.filter(x=>x!==id);
+      return [...prev,id];
+    });
+  };
+
+  const przesunVip=(id,kierunek)=>{
+    setVipKolejka(prev=>{
+      const idx=prev.indexOf(id);
+      if(idx===-1) return prev;
+      const n=[...prev];
+      const nowyIdx=idx+kierunek;
+      if(nowyIdx<0||nowyIdx>=n.length) return prev;
+      [n[idx],n[nowyIdx]]=[n[nowyIdx],n[idx]];
+      return n;
+    });
+  };
+
   const generuj=()=>{
     const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany}));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[]}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -631,6 +740,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     5:{t:"🔵 FAZA 5 — Talia daleka od zamknięcia (3+ braków)",k:"#6af"},
     10:{t:"🔓 ZAMKNIE TALIĘ — pakiet kart na zamknięcie talii (komplet innych typów już ma)",k:"#bb88ff"},
     11:{t:"🔓 Dodatkowo — brakuje też kart innego typu, ale wysyłamy bo nie ma lepszych",k:"#888bff"},
+    20:{t:"👑 VIP — karty dla wybranej osoby priorytetowej",k:"#ffd700"},
+    21:{t:"👥 Reszta gangu — pozostali dawcy po obsłudze VIP-a",k:"#aaa"},
   };
 
   return (
@@ -639,6 +750,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         {[
           {id:"priorytet",label:"🎯 Priorytet (1-2 brakujące)"},
           {id:"zamknij",label:"🔓 Zamknij cokolwiek"},
+          {id:"vip",label:"👑 VIP — dobij jedną osobę"},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTrybWymiany(t.id)} style={{
             padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
@@ -648,6 +760,68 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           }}>{t.label}</button>
         ))}
       </div>
+
+      {/* Panel VIP — kolejka priorytetów */}
+      {trybWymiany==="vip"&&(
+        <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70044",borderRadius:10,padding:12,marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
+            👑 Kolejka priorytetów — zaznacz osoby i ustaw kolejność
+          </div>
+          <div style={{fontSize:11,color:"#888",marginBottom:10}}>
+            Pierwsza osoba dostaje ile możliwe, potem druga, potem trzecia... Reszta dawców idzie do gangu normalnie.
+          </div>
+
+          {/* Przyciski wyboru */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+            {czlonkowie.map(c=>{
+              const pos=vipKolejka.indexOf(c.id);
+              const wKolejce=pos!==-1;
+              return (
+                <button key={c.id} onClick={()=>toggleVip(c.id)} style={{
+                  padding:"6px 12px",borderRadius:20,fontSize:12,cursor:"pointer",
+                  background:wKolejce?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
+                  border:wKolejce?"none":"1px solid #2a2a3a",
+                  color:wKolejce?"#000":"#888",
+                  fontWeight:wKolejce?"bold":"normal",
+                }}>
+                  {wKolejce&&<span style={{marginRight:4,background:"rgba(0,0,0,0.3)",borderRadius:"50%",padding:"0 5px",fontSize:10}}>{pos+1}</span>}
+                  {c.nazwa}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Kolejka z możliwością przestawienia */}
+          {vipKolejka.length>0&&(
+            <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:10}}>
+              <div style={{fontSize:11,color:"#ffd700",marginBottom:6}}>📋 Kolejność obsługi:</div>
+              {vipKolejka.map((id,idx)=>{
+                const osoba=czlonkowie.find(c=>c.id===id);
+                const typ=typWymiany==="złote"?"złota":"diamentowa";
+                const brakCount=talie.filter(t=>!wylaczoneTalie.has(t.id)).reduce((s,talia)=>
+                  s+talia.karty.filter(k=>k.typ===typ&&!posiadane[`${id}_${talia.id}_${k.nazwa}`]).length
+                ,0);
+                return (
+                  <div key={id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(255,215,0,0.06)",borderRadius:6,marginBottom:4}}>
+                    <span style={{fontSize:14,fontWeight:"bold",color:"#ffd700",width:20}}>{idx+1}.</span>
+                    <span style={{flex:1,fontSize:12,color:"#ddd"}}>{osoba?.nazwa}</span>
+                    <span style={{fontSize:11,color:"#f55"}}>−{brakCount} kart</span>
+                    <div style={{display:"flex",gap:2}}>
+                      <button onClick={()=>przesunVip(id,-1)} disabled={idx===0}
+                        style={{padding:"2px 7px",background:"rgba(255,255,255,0.07)",border:"none",borderRadius:3,color:idx===0?"#333":"#aaa",cursor:idx===0?"default":"pointer",fontSize:11}}>▲</button>
+                      <button onClick={()=>przesunVip(id,1)} disabled={idx===vipKolejka.length-1}
+                        style={{padding:"2px 7px",background:"rgba(255,255,255,0.07)",border:"none",borderRadius:3,color:idx===vipKolejka.length-1?"#333":"#aaa",cursor:idx===vipKolejka.length-1?"default":"pointer",fontSize:11}}>▼</button>
+                      <button onClick={()=>toggleVip(id)}
+                        style={{padding:"2px 7px",background:"rgba(255,50,50,0.1)",border:"none",borderRadius:3,color:"#f5544488",cursor:"pointer",fontSize:11}}>✕</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {vipKolejka.length===0&&<div style={{fontSize:11,color:"#555",marginTop:4}}>← Kliknij osoby powyżej żeby dodać do kolejki</div>}
+        </div>
+      )}
 
       {/* Panel wyłączania talii */}
       <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
@@ -726,7 +900,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           {wynik.nieobsluzone.length>0&&<span style={{color:"#fa0",marginLeft:12}}>⚠️ {wynik.nieobsluzone.length} bez dawcy</span>}
         </div>
 
-        {[1,2,3,4,5,10,11].map(faza=>{
+        {[1,2,3,4,5,10,11,20,21].map(faza=>{
           const w=wynik.planoweWymiany.filter(x=>x.faza===faza);
           if(!w.length) return null;
           const e=etykietyFaz[faza]||{t:`Faza ${faza}`,k:"#aaa"};
