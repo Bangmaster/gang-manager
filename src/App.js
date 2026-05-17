@@ -924,7 +924,9 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
     talia.karty.forEach(karta=>{
       const posiadacze=[];
       czlonkowie.forEach(czl=>{
-        const ile=parseInt(duplikaty[`${czl.id}_${talia.id}_${karta.nazwa}`])||0;
+        const val=duplikaty[`${czl.id}_${talia.id}_${karta.nazwa}`];
+        // Duplikaty mogą być zapisane jako true (1 dup) lub liczba (2,3...)
+        const ile = val===true ? 1 : (parseInt(val)||0);
         if(ile>0) posiadacze.push({nick:czl.nazwa,ile});
       });
       if(posiadacze.length>0){
