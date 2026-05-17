@@ -216,7 +216,7 @@ export function matchKarta(nazwaOCR, talia) {
   const norm = (nazwaOCR || "").toLowerCase().trim();
   if (!norm) return null;
   let k = talia.karty.find(k => k.nazwa.toLowerCase() === norm);
-  if (k) return k
+  if (k) return k;
   let best = null, bestScore = 0;
   talia.karty.forEach(kk => {
     const kn = kk.nazwa.toLowerCase();
