@@ -172,9 +172,9 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
         📸 <strong>Tryb OCR (Gemini 2.5 Flash-Lite)</strong> — wgraj screeny talii osoby, AI rozpozna karty automatycznie
         <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>Każdy screen = jedna talia. Możesz wgrać 1-14 screenów dla osoby.</div>
         <div style={{ fontSize: 10, color: "#888", marginTop: 4, lineHeight: 1.5 }}>
-          ⚙️ Limity Google (darmowe): 15 zapytań/min, 250k tokenów/min, 1000/dzień.<br/>
-          ⏱️ Pauza 6 sek między obrazami. Po błędzie limitu apka czeka i ponawia automatycznie.<br/>
-          💡 <strong>Jeśli wciąż dostajesz limit:</strong> Google nakłada cool-down ~15-30 min. Odczekaj i wróć później.
+          ⚙️ Każdy screen analizowany osobno — pełna dokładność.<br/>
+          🔑 Klucze API rotują między screenami — krótsze przerwy przy 2-3 kluczach.<br/>
+          💡 Po błędzie limitu apka automatycznie zmienia klucz i ponawia.
         </div>
       </div>
 
