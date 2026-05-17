@@ -157,8 +157,9 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
     }
 
     if (i < files.length - 1) {
-      onProgress?.(i + 1, files.length, `⏱️ Pauza ${pauzaSekund}s...`);
-      await new Promise(r => setTimeout(r, pauzaSekund * 1000));
+      const aktualnaPauza = pauzaSekund; // stała w obrębie iteracji - bezpieczna dla closure
+      onProgress?.(i + 1, files.length, `⏱️ Pauza ${aktualnaPauza}s...`);
+      await new Promise(r => setTimeout(r, aktualnaPauza * 1000));
     }
   }
   onProgress?.(files.length, files.length, "✓ Zakończono");
