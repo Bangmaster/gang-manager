@@ -22,46 +22,28 @@ function fileToBase64(file) {
 // Generuje prompt dla Gemini z listą oczekiwanych kart
 function buildPrompt(wszystkieTalie) {
   const taliaInfo = wszystkieTalie.map(t => {
-    const karty = t.karty.map(k => `"${k.nazwa}" (${k.typ})`).join(", ");
-    return `- Talia "${t.nazwa}" (#${t.numer}) zawiera karty: ${karty}`;
+    const karty = t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",");
+    return `${t.nazwa}: ${karty}`;
   }).join("\n");
 
-  return `Jesteś ekspertem od rozpoznawania kart z gry The Gang. Analizujesz screen jednej talii.
+  return `Rozpoznaj karty z gry The Gang na screenie talii.
 
-Na screenie widzisz 9 slotów karty (siatka 3x3) z konkretnej talii. Każda karta ma jeden z trzech stanów:
-1. POSIADANA - karta jest kolorowa, ma obrazek/grafikę i widoczną nazwę u dołu w kolorowym pasku
-2. DUPLIKAT - karta jest posiadana ORAZ w prawym dolnym rogu jest mała żółta cyfra "+1", "+2", "+3" itp. (oznaczająca liczbę duplikatów)
-3. BRAK - karta jest szara/wyblakła z napisem "GANG" w środku, gwiazdki w nagłówku są szare
+Stan karty:
+- POSIADANA: kolorowa z grafiką i nazwą
+- DUPLIKAT: posiadana + cyfra "+1/+2/+3" w prawym dolnym rogu
+- BRAK: szara z napisem GANG
 
-WAŻNE ROZRÓŻNIENIE:
-- Karta ZŁOTA - ma żółto-pomarańczową ramkę i tło, pasek nazwy zielony lub pomarańczowy
-- Karta DIAMENTOWA - ma biało-niebieską ramkę z efektem holograficznym, pasek nazwy jasny błękit
+Typy: złota = żółta ramka, diamentowa = niebiesko-biała holograficzna ramka.
 
-Lista wszystkich znanych talii i ich kart:
+Znane talie (format: nazwa: "karta"(z=złota/d=diamentowa)):
 ${taliaInfo}
 
-Najpierw zidentyfikuj NAZWĘ TALII z górnego paska screenu (po napisie "TALIA WYDARZENIA:" lub "TALIA WYDARZENIA").
+Zidentyfikuj nazwę talii z górnego paska (po "TALIA WYDARZENIA:"). Dla każdej z 9 kart określ stan.
 
-Następnie dla każdej z 9 kart w siatce 3x3 określ:
-- nazwa karty (z paska na dole karty, jeśli widoczna)
-- czy karta jest posiadana
-- jeśli posiadana - czy ma duplikaty i ile
-- typ karty (złota/diamentowa) - po kolorze ramki
+Zwróć WYŁĄCZNIE JSON (bez markdown, bez tekstu poza JSON):
+{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}
 
-Zwróć WYŁĄCZNIE poprawny JSON w tym formacie (BEZ żadnego dodatkowego tekstu, BEZ markdown):
-{
-  "talia": "nazwa talii rozpoznana z screenu",
-  "karty": [
-    {"nazwa": "Nazwa karty", "typ": "złota|diamentowa", "posiadana": true|false, "duplikaty": 0|1|2|3, "pewnosc": "wysoka|srednia|niska"}
-  ]
-}
-
-Pole "pewnosc":
-- "wysoka" - jesteś pewien stanu karty
-- "srednia" - karta jest na granicy, mała wątpliwość
-- "niska" - tekst nieczytelny lub karta zasłonięta - wtedy oznacz jako wymagająca weryfikacji
-
-Dopasuj nazwy kart do listy z talii (jeśli rozpoznasz część nazwy, znajdź najbliższe dopasowanie z listy). Zwróć WSZYSTKIE 9 kart z talii, nawet jeśli niektóre są w stanie BRAK.`;
+Dopasuj nazwy do znanych. Zwróć wszystkie 9 kart talii. Pewność "niska" gdy tekst nieczytelny.`;
 }
 
 // Analizuje jeden screen
@@ -136,22 +118,50 @@ export async function analyzeImage(file, wszystkieTalie) {
   }
 }
 
-// Analizuje wiele obrazów po kolei z opóźnieniem dla limitu 15/min (~4 sek odstęp)
+// Analizuje wiele obrazów po kolei z adaptacyjnym opóźnieniem
+// Limit Flash-Lite: 15 RPM, ale przy obrazach głównie problemem jest 250K TPM (tokenów/min)
+// Jeden screen ~15-20K tokenów, więc bezpieczna pauza to ~6 sek
 export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
   const wyniki = [];
+  let pauzaSekund = 6; // domyślna pauza
+  let kolejneBledy429 = 0;
+
   for (let i = 0; i < files.length; i++) {
     onProgress?.(i, files.length, files[i].name);
     const wynik = await analyzeImage(files[i], wszystkieTalie);
-    wyniki.push(wynik);
-    // Jeśli błąd 429 (rate limit) — zatrzymaj i zwróć co już mamy
-    if (!wynik.sukces && wynik.blad?.includes("limit")) {
-      onProgress?.(files.length, files.length, "Przerwano przez limit");
-      break;
+
+    // Jeśli błąd rate limit — backoff adaptacyjny
+    if (!wynik.sukces && (wynik.blad?.includes("limit") || wynik.blad?.includes("⏳") || wynik.blad?.includes("⏰"))) {
+      kolejneBledy429++;
+      const pauzaPoBledzie = Math.min(60, 15 * kolejneBledy429); // 15, 30, 45, max 60 sek
+      onProgress?.(i, files.length, `⏳ Limit Google — czekam ${pauzaPoBledzie}s i próbuję ponownie...`);
+      await new Promise(r => setTimeout(r, pauzaPoBledzie * 1000));
+
+      // Spróbuj jeszcze raz
+      const ponownie = await analyzeImage(files[i], wszystkieTalie);
+      if (ponownie.sukces) {
+        wyniki.push(ponownie);
+        kolejneBledy429 = 0;
+        pauzaSekund = Math.min(15, pauzaSekund + 2); // zwiększ stałą pauzę
+      } else {
+        // Drugi błąd z rzędu — zatrzymaj
+        wyniki.push(ponownie);
+        if (kolejneBledy429 >= 2) {
+          onProgress?.(files.length, files.length, "❌ Wyczerpany limit — przerywam");
+          break;
+        }
+      }
+    } else {
+      wyniki.push(wynik);
+      if (wynik.sukces) kolejneBledy429 = 0;
     }
-    // Pauza ~4 sek między requestami (limit 15/min Flash-Lite)
-    if (i < files.length - 1) await new Promise(r => setTimeout(r, 4000));
+
+    if (i < files.length - 1) {
+      onProgress?.(i + 1, files.length, `⏱️ Pauza ${pauzaSekund}s...`);
+      await new Promise(r => setTimeout(r, pauzaSekund * 1000));
+    }
   }
-  onProgress?.(files.length, files.length, "Zakończono");
+  onProgress?.(files.length, files.length, "✓ Zakończono");
   return wyniki;
 }
 
