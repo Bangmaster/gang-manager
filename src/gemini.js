@@ -1,204 +1,223 @@
 // Logika rozpoznawania kart z screenów przez Google Gemini Vision API
+// Wersja 3.0 — kolaż (wiele talii w 1 zapytaniu) + 2 klucze API naprzemiennie
 
-// Klucz API z zmiennej środowiskowej Vercel (bezpieczne!)
-const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
+const KLUCZE_API = [
+  process.env.REACT_APP_GEMINI_API_KEY || "",
+  process.env.REACT_APP_GEMINI_API_KEY_2 || "",
+].filter(k => k.length > 0);
+
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+let aktualnyKluczIdx = 0;
 
-// Konwertuje plik obrazu na base64
+function pobierzURL() {
+  const klucz = KLUCZE_API[aktualnyKluczIdx % KLUCZE_API.length];
+  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${klucz}`;
+}
+
+function nastepnyKlucz() {
+  aktualnyKluczIdx = (aktualnyKluczIdx + 1) % Math.max(1, KLUCZE_API.length);
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      const base64 = result.split(",")[1];
-      resolve({ base64, mimeType: file.type });
-    };
+    reader.onload = () => resolve({ base64: reader.result.split(",")[1], mimeType: file.type });
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }
 
-// Generuje prompt dla Gemini z listą oczekiwanych kart
-function buildPrompt(wszystkieTalie) {
-  const taliaInfo = wszystkieTalie.map(t => {
-    const karty = t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",");
-    return `${t.nazwa}: ${karty}`;
-  }).join("\n");
+// Skleja wiele screenów w jeden kolaż (siatka 2 kolumny)
+export async function scaleObrazki(files) {
+  const W = 390, H = 700, COLS = 2;
+  const rows = Math.ceil(files.length / COLS);
+  const canvas = document.createElement("canvas");
+  canvas.width = W * COLS;
+  canvas.height = H * rows;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#1a1a2e";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  return `Rozpoznaj karty z gry The Gang na screenie talii.
+  await Promise.all(files.map((file, i) => new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const col = i % COLS, row = Math.floor(i / COLS);
+      const x = col * W, y = row * H;
+      const scale = Math.min(W / img.width, H / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, x + (W - w) / 2, y + (H - h) / 2, w, h);
+      ctx.strokeStyle = "#444"; ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, W, H);
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(x + 4, y + 4, 24, 18);
+      ctx.fillStyle = "#ffd700"; ctx.font = "bold 12px sans-serif";
+      ctx.fillText(`${i + 1}`, x + 8, y + 17);
+      URL.revokeObjectURL(url);
+      resolve();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+    img.src = url;
+  })));
 
-Stan karty:
-- POSIADANA: kolorowa z grafiką i nazwą
-- DUPLIKAT: posiadana + cyfra "+1/+2/+3" w prawym dolnym rogu
-- BRAK: szara z napisem GANG
-
-Typy: złota = żółta ramka, diamentowa = niebiesko-biała holograficzna ramka.
-
-Znane talie (format: nazwa: "karta"(z=złota/d=diamentowa)):
-${taliaInfo}
-
-Zidentyfikuj nazwę talii z górnego paska (po "TALIA WYDARZENIA:"). Dla każdej z 9 kart określ stan.
-
-Zwróć WYŁĄCZNIE JSON (bez markdown, bez tekstu poza JSON):
-{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}
-
-Dopasuj nazwy do znanych. Zwróć wszystkie 9 kart talii. Pewność "niska" gdy tekst nieczytelny.`;
+  return canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
 }
 
-// Analizuje jeden screen
-export async function analyzeImage(file, wszystkieTalie) {
-  try {
-    if (!GEMINI_API_KEY) {
-      return { sukces: false, blad: "🔑 Brak klucza API — admin musi ustawić REACT_APP_GEMINI_API_KEY w Vercel", fileName: file.name };
-    }
-    const { base64, mimeType } = await fileToBase64(file);
-    const prompt = buildPrompt(wszystkieTalie);
+function buildPromptKolaz(wszystkieTalie, n) {
+  const info = wszystkieTalie.map(t =>
+    `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
+  ).join("\n");
+  return `Analizujesz kolaż ${n} screenów z gry The Gang. Każdy screen = jedna talia (nr 1-${n} w lewym górnym rogu).
 
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64 } }
-          ]
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 4096,
-        }
-      })
-    });
+Stan karty: POSIADANA=kolorowa z grafiką, DUPLIKAT=posiadana+cyfra+1/+2 w rogu, BRAK=szara "GANG".
+Typy: złota=żółta/złota ramka, diamentowa=niebiesko-biała holograficzna.
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Pełny błąd Gemini API:", errText);
-      // Parsuj błąd dla lepszego komunikatu
-      let userMessage = `Gemini API error ${response.status}`;
-      try {
-        const errJson = JSON.parse(errText);
-        const code = errJson.error?.code;
-        const msg = errJson.error?.message || "";
-        if (code === 429) {
-          if (msg.includes("free_tier") && msg.includes("limit: 0")) {
-            userMessage = "❌ Ten model nie jest dostępny w darmowym planie.";
-          } else if (msg.includes("per day") || msg.includes("RPD")) {
-            userMessage = "⏰ Wyczerpany dzienny limit zapytań. Spróbuj jutro.";
-          } else {
-            userMessage = "⏳ Za szybkie zapytania (limit ~15/min). Poczekaj minutę.";
-          }
-        } else if (code === 400) {
-          userMessage = `❌ Błąd: ${msg.substring(0, 100)}`;
-        } else if (code === 403) {
-          userMessage = `🔑 ${msg.substring(0, 150)}`;
-        } else {
-          userMessage = `Błąd ${code}: ${msg.substring(0, 150)}`;
-        }
-      } catch {}
-      throw new Error(userMessage);
-    }
+Talie i karty:
+${info}
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+Dla KAŻDEGO z ${n} screenów rozpoznaj talię i stan 9 kart.
+Zwróć WYŁĄCZNIE tablicę JSON (bez markdown, ${n} obiektów po kolei):
+[{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]},...]`;
+}
 
-    // Wyciągnij JSON z odpowiedzi (czasem Gemini dodaje markdown)
-    let jsonText = text.trim();
-    if (jsonText.startsWith("```json")) jsonText = jsonText.slice(7);
-    else if (jsonText.startsWith("```")) jsonText = jsonText.slice(3);
-    if (jsonText.endsWith("```")) jsonText = jsonText.slice(0, -3);
-    jsonText = jsonText.trim();
+function buildPromptJeden(wszystkieTalie) {
+  const info = wszystkieTalie.map(t =>
+    `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
+  ).join("\n");
+  return `Rozpoznaj karty z gry The Gang. Stan: POSIADANA=kolorowa, DUPLIKAT=posiadana+cyfra+1/+2, BRAK=szara GANG. Typy: złota=żółta ramka, diamentowa=niebiesko-biała.
+Talie: ${info}
+Zidentyfikuj talię z górnego paska. Zwróć WYŁĄCZNIE JSON: {"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
+}
 
-    const parsed = JSON.parse(jsonText);
-    return { sukces: true, dane: parsed, fileName: file.name };
-  } catch (e) {
-    console.error("Błąd analizy obrazu:", e);
-    return { sukces: false, blad: e.message, fileName: file.name };
+async function geminiRequest(prompt, base64, mimeType) {
+  if (KLUCZE_API.length === 0) throw new Error("🔑 Brak klucza API — ustaw REACT_APP_GEMINI_API_KEY w Vercel");
+  const url = pobierzURL();
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+    })
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("Gemini błąd:", errText);
+    let msg = `Błąd ${response.status}`;
+    try {
+      const j = JSON.parse(errText);
+      const code = j.error?.code, m = j.error?.message || "";
+      if (code === 429) {
+        if (m.includes("limit: 0")) msg = "❌ Model niedostępny w darmowym planie";
+        else if (m.includes("per day")) msg = "⏰ Dzienny limit wyczerpany — spróbuj jutro";
+        else msg = "⏳ Limit tokenów/min — czekaj";
+      } else if (code === 403) msg = `🔑 ${m.substring(0, 100)}`;
+      else msg = `Błąd ${code}: ${m.substring(0, 100)}`;
+    } catch {}
+    throw new Error(msg);
   }
+  const data = await response.json();
+  let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+  if (text.startsWith("```json")) text = text.slice(7);
+  else if (text.startsWith("```")) text = text.slice(3);
+  if (text.endsWith("```")) text = text.slice(0, -3);
+  return text.trim();
 }
 
-// Analizuje wiele obrazów po kolei z adaptacyjnym opóźnieniem
-// Limit Flash-Lite: 15 RPM, ale przy obrazach głównie problemem jest 250K TPM (tokenów/min)
-// Jeden screen ~15-20K tokenów, więc bezpieczna pauza to ~6 sek
+// GŁÓWNA FUNKCJA: wiele screenów → kolaże → min zapytań
 export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
+  if (files.length === 0) return [];
+  const GRUPA = 6;
+  const grupy = [];
+  for (let i = 0; i < files.length; i += GRUPA) grupy.push(files.slice(i, i + GRUPA));
+
   const wyniki = [];
-  let pauzaSekund = 6; // domyślna pauza
-  let kolejneBledy429 = 0;
+  let bledy = 0;
 
-  for (let i = 0; i < files.length; i++) {
-    onProgress?.(i, files.length, files[i].name);
-    const wynik = await analyzeImage(files[i], wszystkieTalie);
+  for (let g = 0; g < grupy.length; g++) {
+    const gr = grupy[g];
+    const start = g * GRUPA;
+    onProgress?.(start, files.length, `📸 Sklejam kolaż ${g + 1}/${grupy.length} (${gr.length} talii)...`);
 
-    // Jeśli błąd rate limit — backoff adaptacyjny
-    if (!wynik.sukces && (wynik.blad?.includes("limit") || wynik.blad?.includes("⏳") || wynik.blad?.includes("⏰"))) {
-      kolejneBledy429++;
-      const pauzaPoBledzie = Math.min(60, 15 * kolejneBledy429); // 15, 30, 45, max 60 sek
-      onProgress?.(i, files.length, `⏳ Limit Google — czekam ${pauzaPoBledzie}s i próbuję ponownie...`);
-      await new Promise(r => setTimeout(r, pauzaPoBledzie * 1000));
-
-      // Spróbuj jeszcze raz
-      const ponownie = await analyzeImage(files[i], wszystkieTalie);
-      if (ponownie.sukces) {
-        wyniki.push(ponownie);
-        kolejneBledy429 = 0;
-        pauzaSekund = Math.min(15, pauzaSekund + 2); // zwiększ stałą pauzę
-      } else {
-        // Drugi błąd z rzędu — zatrzymaj
-        wyniki.push(ponownie);
-        if (kolejneBledy429 >= 2) {
-          onProgress?.(files.length, files.length, "❌ Wyczerpany limit — przerywam");
+    let proba = 0;
+    while (proba < 3) {
+      try {
+        const base64 = await scaleObrazki(gr);
+        onProgress?.(start, files.length, `🤖 Analizuję grupę ${g + 1}/${grupy.length} (${gr.length} talii naraz)...`);
+        const prompt = gr.length === 1 ? buildPromptJeden(wszystkieTalie) : buildPromptKolaz(wszystkieTalie, gr.length);
+        const json = await geminiRequest(prompt, base64, "image/jpeg");
+        let parsed;
+        try { parsed = JSON.parse(json); }
+        catch { throw new Error("Niepoprawny JSON od AI"); }
+        const arr = Array.isArray(parsed) ? parsed : [parsed];
+        gr.forEach((f, i) => {
+          wyniki.push(arr[i]
+            ? { sukces: true, dane: arr[i], fileName: f.name }
+            : { sukces: false, blad: "Brak wyniku dla tego screena", fileName: f.name }
+          );
+        });
+        nastepnyKlucz();
+        bledy = 0;
+        break;
+      } catch (e) {
+        proba++;
+        bledy++;
+        if (e.message.includes("⏳") || e.message.includes("limit")) {
+          const czekaj = Math.min(60, 15 * proba);
+          onProgress?.(start, files.length, `⏳ Limit — czekam ${czekaj}s (próba ${proba}/3)...`);
+          await new Promise(r => setTimeout(r, czekaj * 1000));
+          nastepnyKlucz(); // Spróbuj drugim kluczem
+        } else {
+          gr.forEach(f => wyniki.push({ sukces: false, blad: e.message, fileName: f.name }));
           break;
         }
+        if (proba >= 3) {
+          gr.forEach(f => wyniki.push({ sukces: false, blad: e.message, fileName: f.name }));
+        }
       }
-    } else {
-      wyniki.push(wynik);
-      if (wynik.sukces) kolejneBledy429 = 0;
     }
-
-    if (i < files.length - 1) {
-      const aktualnaPauza = pauzaSekund; // stała w obrębie iteracji - bezpieczna dla closure
-      onProgress?.(i + 1, files.length, `⏱️ Pauza ${aktualnaPauza}s...`);
-      await new Promise(r => setTimeout(r, aktualnaPauza * 1000));
+    if (bledy >= 3) { onProgress?.(files.length, files.length, "❌ Zbyt wiele błędów — przerywam"); break; }
+    if (g < grupy.length - 1) {
+      onProgress?.(start + gr.length, files.length, `⏱️ Pauza 8s...`);
+      await new Promise(r => setTimeout(r, 8000));
     }
   }
   onProgress?.(files.length, files.length, "✓ Zakończono");
   return wyniki;
 }
 
-// Dopasowuje wynik OCR do struktury talii (znajduje talię po nazwie)
-export function matchTalia(ocrWynik, wszystkieTalie) {
-  if (!ocrWynik.sukces) return null;
-  const nazwaOCR = (ocrWynik.dane.talia || "").toLowerCase().trim();
-  // Próbuj dokładnego dopasowania
-  let talia = wszystkieTalie.find(t => t.nazwa.toLowerCase() === nazwaOCR);
-  if (talia) return talia;
-  // Próbuj częściowego
-  talia = wszystkieTalie.find(t =>
-    t.nazwa.toLowerCase().includes(nazwaOCR) || nazwaOCR.includes(t.nazwa.toLowerCase())
-  );
-  return talia || null;
+export async function analyzeImage(file, wszystkieTalie) {
+  try {
+    if (KLUCZE_API.length === 0) return { sukces: false, blad: "🔑 Brak klucza API", fileName: file.name };
+    const { base64, mimeType } = await fileToBase64(file);
+    const json = await geminiRequest(buildPromptJeden(wszystkieTalie), base64, mimeType);
+    return { sukces: true, dane: JSON.parse(json), fileName: file.name };
+  } catch (e) {
+    return { sukces: false, blad: e.message, fileName: file.name };
+  }
 }
 
-// Dopasowuje nazwę karty do listy kart z talii
+export function matchTalia(ocrWynik, wszystkieTalie) {
+  if (!ocrWynik.sukces) return null;
+  const n = (ocrWynik.dane.talia || "").toLowerCase().trim();
+  return wszystkieTalie.find(t => t.nazwa.toLowerCase() === n)
+    || wszystkieTalie.find(t => t.nazwa.toLowerCase().includes(n) || n.includes(t.nazwa.toLowerCase()))
+    || null;
+}
+
 export function matchKarta(nazwaOCR, talia) {
   if (!talia) return null;
   const norm = (nazwaOCR || "").toLowerCase().trim();
   if (!norm) return null;
-  // Dokładne
-  let karta = talia.karty.find(k => k.nazwa.toLowerCase() === norm);
-  if (karta) return karta;
-  // Częściowe — szukaj największego pokrycia
-  let najlepsza = null, najlepszyScore = 0;
-  talia.karty.forEach(k => {
-    const kn = k.nazwa.toLowerCase();
+  let k = talia.karty.find(k => k.nazwa.toLowerCase() === norm);
+  if (k) return k;
+  let best = null, bestScore = 0;
+  talia.karty.forEach(kk => {
+    const kn = kk.nazwa.toLowerCase();
     let score = 0;
     if (kn.includes(norm) || norm.includes(kn)) score = Math.min(kn.length, norm.length);
-    // Liczenie wspólnych słów
-    const slowaA = kn.split(/\s+/), slowaB = norm.split(/\s+/);
-    const wspolne = slowaA.filter(s => slowaB.includes(s) && s.length > 2).length;
-    score += wspolne * 10;
-    if (score > najlepszyScore) { najlepszyScore = score; najlepsza = k; }
+    norm.split(" ").forEach(w => { if (w.length > 3 && kn.includes(w)) score += w.length; });
+    if (score > bestScore) { bestScore = score; best = kk; }
   });
-  return najlepszyScore > 5 ? najlepsza : null;
+  return bestScore > 2 ? best : null;
 }
