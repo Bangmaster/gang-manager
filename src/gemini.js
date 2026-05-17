@@ -1,7 +1,7 @@
 // Logika rozpoznawania kart z screenów przez Google Gemini Vision API
 
 const GEMINI_API_KEY = "AIzaSyC796B2nyvnUzTy2ehZ9DQx1KaBqzmWDyw";
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // Konwertuje plik obrazu na base64
@@ -88,6 +88,7 @@ export async function analyzeImage(file, wszystkieTalie) {
 
     if (!response.ok) {
       const errText = await response.text();
+      console.error("Pełny błąd Gemini API:", errText);
       // Parsuj błąd dla lepszego komunikatu
       let userMessage = `Gemini API error ${response.status}`;
       try {
@@ -96,16 +97,18 @@ export async function analyzeImage(file, wszystkieTalie) {
         const msg = errJson.error?.message || "";
         if (code === 429) {
           if (msg.includes("free_tier") && msg.includes("limit: 0")) {
-            userMessage = "❌ Ten model nie jest dostępny w darmowym planie. Skontaktuj się z administratorem.";
+            userMessage = "❌ Ten model nie jest dostępny w darmowym planie.";
           } else if (msg.includes("per day") || msg.includes("RPD")) {
-            userMessage = "⏰ Wyczerpany dzienny limit (1000 obrazów/dzień). Spróbuj jutro.";
+            userMessage = "⏰ Wyczerpany dzienny limit zapytań. Spróbuj jutro.";
           } else {
             userMessage = "⏳ Za szybkie zapytania (limit ~15/min). Poczekaj minutę.";
           }
         } else if (code === 400) {
-          userMessage = "❌ Błędne dane wejściowe — sprawdź czy plik to obraz.";
+          userMessage = `❌ Błąd: ${msg.substring(0, 100)}`;
         } else if (code === 403) {
-          userMessage = "🔑 Błąd klucza API — może być nieważny lub ograniczony.";
+          userMessage = `🔑 ${msg.substring(0, 150)}`;
+        } else {
+          userMessage = `Błąd ${code}: ${msg.substring(0, 150)}`;
         }
       } catch {}
       throw new Error(userMessage);
