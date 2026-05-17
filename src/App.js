@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure } from "./firebase";
 import OcrView from "./OcrView";
+import WalkiView from "./WalkiView";
 
 const ADMIN_CREDENTIALS = [
   { login: "admin", haslo: "Twojastara00", rola: "admin" },
@@ -98,6 +99,7 @@ const DOMYSLNE_DANE = {
   czlonkowie: DOMYSLNI_CZLONKOWIE,
   posiadane: {},
   duplikaty: {},
+  walki: [],
 };
 
 export default function App() {
@@ -126,6 +128,7 @@ export default function App() {
           czlonkowie: start.czlonkowie || DOMYSLNE_DANE.czlonkowie,
           posiadane: start.posiadane || {},
           duplikaty: start.duplikaty || {},
+          walki: start.walki || [],
         });
       }
       unsub = subscribeGangData((d) => {
@@ -135,6 +138,7 @@ export default function App() {
           czlonkowie: d.czlonkowie || DOMYSLNE_DANE.czlonkowie,
           posiadane: d.posiadane || {},
           duplikaty: d.duplikaty || {},
+          walki: d.walki || [],
         });
       });
     })();
@@ -174,7 +178,7 @@ export default function App() {
   const tabs = [
     {id:"dane",label:"📋 Dane gangu"},
     {id:"wynik",label:"⚡ Wymiana"},
-    ...(isAdmin?[{id:"ocr",label:"📸 OCR screeny"},{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
+    ...(isAdmin?[{id:"ocr",label:"📸 OCR talii"},{id:"walki",label:"🎯 Walki"},{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
   ];
 
   return (
@@ -230,6 +234,11 @@ export default function App() {
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           zapiszKarte={zapiszKarte}
+        />}
+        {zakładka==="walki"&&isAdmin&&<WalkiView
+          czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
+          zapiszWalki={(now)=>zapiszStrukture("walki",now)}
+          isAdmin={isAdmin}
         />}
         {zakładka==="czlonkowie"&&isAdmin&&<EdycjaCzlonkow
           czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszStrukture("czlonkowie",now)}
@@ -401,56 +410,156 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb})
   const typ=typWymiany==="złote"?"złota":"diamentowa";
   const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
 
-  const kandidaci=[];
-  czlonkowie.forEach(osoba=>{
-    talie.forEach(talia=>{
-      const kartyT=talia.karty.filter(k=>k.typ===typ);
-      const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
-      if(!kartyT.length) return;
-      const brakT=kartyT.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-      const brakO=kartyO.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-      if(!brakT.length) return;
-      const faza=tryb==="zamknij"?10:obliczFaze(brakT.length,brakO.length);
-      const nagroda=talia.nagroda_amunicja||0;
-      const trudna=TRUDNE_NUMERY.includes(talia.numer);
-      brakT.forEach(karta=>{
-        kandidaci.push({osoba,talia,karta,faza,brakTCount:brakT.length,brakOCount:brakO.length,nagroda,trudna});
+  // Zbierz stan każdej talii dla każdej osoby
+  const staneTalii = []; // {osoba, talia, brakT, brakO, nagroda, trudna, kompletOpp}
+  czlonkowie.forEach(osoba => {
+    talie.forEach(talia => {
+      const kartyT = talia.karty.filter(k => k.typ === typ);
+      const kartyO = talia.karty.filter(k => k.typ === oppTyp);
+      if (!kartyT.length) return;
+      const brakT = kartyT.filter(k => !posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+      const brakO = kartyO.filter(k => !posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+      if (!brakT.length) return;
+      staneTalii.push({
+        osoba, talia,
+        brakT, brakO,
+        nagroda: talia.nagroda_amunicja || 0,
+        trudna: TRUDNE_NUMERY.includes(talia.numer),
+        kompletOpp: kartyO.length === 0 || brakO.length === 0,
       });
     });
   });
 
-  if(tryb==="zamknij") {
-    kandidaci.sort((a,b)=>{
-      if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
-      return a.brakTCount-b.brakTCount;
-    });
-  } else {
-    kandidaci.sort((a,b)=>{
-      if(a.faza!==b.faza) return a.faza-b.faza;
-      const aT=a.trudna?1:0,bT=b.trudna?1:0;
-      if(aT!==bT) return aT-bT;
-      if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
-      return a.brakTCount-b.brakTCount;
-    });
-  }
+  const wysylajacy = new Set();
+  const planoweWymiany = [];
+  const nieobsluzone = [];
 
-  const wysylajacy=new Set();
-  const planoweWymiany=[];
-  const nieobsluzone=[];
+  if (tryb === "zamknij") {
+    // TRYB "ZAMKNIJ COKOLWIEK"
+    // Priorytetyzuj talie które MOŻNA zamknąć w tej wymianie (komplet opp już zebrany)
+    // Wśród nich — największa nagroda, potem najmniej brakuje
+    // Dla każdej talii pakuj WIELE kart (od różnych dawców) żeby ją domknąć
 
-  for(const k of kandidaci){
-    const key=`${k.osoba.id}_${k.talia.id}_${k.karta.nazwa}`;
-    if(posiadane[key]) continue;
-    let dawca=null;
-    for(const o2 of czlonkowie){
-      if(o2.id===k.osoba.id||wysylajacy.has(o2.id)) continue;
-      if(duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]){dawca=o2;break;}
+    const dozamkniecia = staneTalii
+      .filter(s => s.kompletOpp) // tylko talie z kompletem drugiego typu — można je realnie zamknąć
+      .sort((a, b) => {
+        // Najpierw największa nagroda
+        if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
+        // Potem najmniej brakuje
+        if (a.brakT.length !== b.brakT.length) return a.brakT.length - b.brakT.length;
+        // Talie trudne na końcu
+        const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
+        return aT - bT;
+      });
+
+    // Próbuj zamknąć talie po kolei
+    for (const s of dozamkniecia) {
+      const potrzebne = [...s.brakT]; // kopia
+      const wymianyDlaTejTalii = [];
+      for (const karta of potrzebne) {
+        // Znajdź dawcę dla tej karty
+        let dawca = null;
+        for (const o2 of czlonkowie) {
+          if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
+          if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) {
+            dawca = o2; break;
+          }
+        }
+        if (dawca) {
+          wymianyDlaTejTalii.push({ dawca, karta });
+        } else {
+          // Brak dawcy dla tej karty — talia nie zostanie zamknięta tą wymianą
+          // (i tak dodaj resztę kart które mają dawców)
+        }
+      }
+      // Zatwierdź wszystkie znalezione wymiany dla tej talii
+      // (nawet jeśli nie zamkniemy 100%, dajemy ile się da)
+      wymianyDlaTejTalii.forEach(({ dawca, karta }) => {
+        wysylajacy.add(dawca.id);
+        planoweWymiany.push({
+          od: dawca.nazwa, do: s.osoba.nazwa,
+          karta: karta.nazwa, talia: s.talia.nazwa,
+          nagroda: s.nagroda, faza: 10,
+          brakTCount: s.brakT.length, brakOCount: s.brakO.length,
+          trudna: s.trudna,
+        });
+      });
+      // Brakujące potrzeby (kart bez dawcy)
+      s.brakT.forEach(karta => {
+        if (!wymianyDlaTejTalii.find(w => w.karta.nazwa === karta.nazwa)) {
+          nieobsluzone.push({ osoba: s.osoba, talia: s.talia, karta, brakTCount: s.brakT.length });
+        }
+      });
     }
-    if(dawca){
-      wysylajacy.add(dawca.id);
-      planoweWymiany.push({od:dawca.nazwa,do:k.osoba.nazwa,karta:k.karta.nazwa,talia:k.talia.nazwa,nagroda:k.nagroda,faza:k.faza,brakTCount:k.brakTCount,brakOCount:k.brakOCount,trudna:k.trudna});
-    } else if(k.brakTCount<=2){
-      nieobsluzone.push(k);
+
+    // POTEM też talie z brakiem opp (nie da się domknąć, ale gracz może być blisko)
+    const reszta = staneTalii.filter(s => !s.kompletOpp).sort((a, b) => {
+      if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
+      return a.brakT.length - b.brakT.length;
+    });
+    for (const s of reszta) {
+      for (const karta of s.brakT) {
+        let dawca = null;
+        for (const o2 of czlonkowie) {
+          if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
+          if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) {
+            dawca = o2; break;
+          }
+        }
+        if (dawca) {
+          wysylajacy.add(dawca.id);
+          planoweWymiany.push({
+            od: dawca.nazwa, do: s.osoba.nazwa,
+            karta: karta.nazwa, talia: s.talia.nazwa,
+            nagroda: s.nagroda, faza: 11,
+            brakTCount: s.brakT.length, brakOCount: s.brakO.length,
+            trudna: s.trudna,
+          });
+        }
+      }
+    }
+  } else {
+    // TRYB "PRIORYTET" (1-2 brakujące) — bez zmian
+    const kandidaci = [];
+    staneTalii.forEach(s => {
+      const faza = obliczFaze(s.brakT.length, s.brakO.length);
+      s.brakT.forEach(karta => {
+        kandidaci.push({
+          osoba: s.osoba, talia: s.talia, karta, faza,
+          brakTCount: s.brakT.length, brakOCount: s.brakO.length,
+          nagroda: s.nagroda, trudna: s.trudna,
+        });
+      });
+    });
+
+    kandidaci.sort((a, b) => {
+      if (a.faza !== b.faza) return a.faza - b.faza;
+      const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
+      if (aT !== bT) return aT - bT;
+      if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
+      return a.brakTCount - b.brakTCount;
+    });
+
+    for (const k of kandidaci) {
+      const key = `${k.osoba.id}_${k.talia.id}_${k.karta.nazwa}`;
+      if (posiadane[key]) continue;
+      let dawca = null;
+      for (const o2 of czlonkowie) {
+        if (o2.id === k.osoba.id || wysylajacy.has(o2.id)) continue;
+        if (duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) { dawca = o2; break; }
+      }
+      if (dawca) {
+        wysylajacy.add(dawca.id);
+        planoweWymiany.push({
+          od: dawca.nazwa, do: k.osoba.nazwa,
+          karta: k.karta.nazwa, talia: k.talia.nazwa,
+          nagroda: k.nagroda, faza: k.faza,
+          brakTCount: k.brakTCount, brakOCount: k.brakOCount,
+          trudna: k.trudna,
+        });
+      } else if (k.brakTCount <= 2) {
+        nieobsluzone.push(k);
+      }
     }
   }
 
@@ -505,7 +614,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     3:{t:"🟡 FAZA 3 — Brakuje 1 karty + 1-2 innych typów do uzupełnienia",k:"#fa0"},
     4:{t:"🟡 FAZA 4 — Brakuje 2 kart + 1-2 innych typów do uzupełnienia",k:"#d4b800"},
     5:{t:"🔵 FAZA 5 — Talia daleka od zamknięcia (3+ braków)",k:"#6af"},
-    10:{t:"🔓 Tryb: zamknij cokolwiek (koniec sezonu)",k:"#bb88ff"},
+    10:{t:"🔓 ZAMKNIE TALIĘ — pakiet kart na zamknięcie talii (komplet innych typów już ma)",k:"#bb88ff"},
+    11:{t:"🔓 Dodatkowo — brakuje też kart innego typu, ale wysyłamy bo nie ma lepszych",k:"#888bff"},
   };
 
   return (
@@ -565,7 +675,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           {wynik.nieobsluzone.length>0&&<span style={{color:"#fa0",marginLeft:12}}>⚠️ {wynik.nieobsluzone.length} bez dawcy</span>}
         </div>
 
-        {[1,2,3,4,5,10].map(faza=>{
+        {[1,2,3,4,5,10,11].map(faza=>{
           const w=wynik.planoweWymiany.filter(x=>x.faza===faza);
           if(!w.length) return null;
           const e=etykietyFaz[faza]||{t:`Faza ${faza}`,k:"#aaa"};
