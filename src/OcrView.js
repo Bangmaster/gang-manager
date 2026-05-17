@@ -110,8 +110,9 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
   return (
     <div>
       <div style={{ background: "rgba(255,215,0,0.06)", border: "1px solid #b8860b33", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#ffd700" }}>
-        📸 <strong>Tryb OCR (Gemini Vision)</strong> — wgraj screeny talii osoby, AI rozpozna karty automatycznie
+        📸 <strong>Tryb OCR (Gemini 2.5 Flash-Lite)</strong> — wgraj screeny talii osoby, AI rozpozna karty automatycznie
         <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>Każdy screen = jedna talia. Możesz wgrać od 1 do 14 screenów naraz dla wybranej osoby.</div>
+        <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>Limity darmowe: 15 zapytań/min, 1000/dzień. Apka czeka ~4.5 sek między obrazami żeby zmieścić się w limicie.</div>
       </div>
 
       {/* Wybór osoby */}
