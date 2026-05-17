@@ -177,6 +177,7 @@ export default function App() {
 
   const tabs = [
     {id:"dane",label:"📋 Dane gangu"},
+    {id:"duplikaty",label:"🔄 Duplikaty"},
     {id:"wynik",label:"⚡ Wymiana"},
     ...(isAdmin?[{id:"ocr",label:"📸 OCR talii"},{id:"walki",label:"🎯 Walki"},{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
   ];
@@ -219,6 +220,10 @@ export default function App() {
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           typWymiany={typWymiany} zalogowany={zalogowany}
           zapiszKarte={zapiszKarte}
+        />}
+        {zakładka==="duplikaty"&&<DuplikatyView
+          talie={talieSorted} czlonkowie={dane.czlonkowie}
+          duplikaty={dane.duplikaty||{}}
         />}
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
         {zakładka==="wynik"&&isAdmin&&<WynikView
@@ -597,9 +602,19 @@ function obliczFaze(brakT,brakO){
 
 function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany}) {
   const [skopiowano,setSkopiowano]=useState(false);
+  const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
+
+  const toggleTalia=(id)=>{
+    setWylaczoneTalie(prev=>{
+      const n=new Set(prev);
+      n.has(id)?n.delete(id):n.add(id);
+      return n;
+    });
+  };
 
   const generuj=()=>{
-    setWynik(generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany}));
+    const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -632,6 +647,42 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
             color:trybWymiany===t.id?"#ffd700":"#666",
           }}>{t.label}</button>
         ))}
+      </div>
+
+      {/* Panel wyłączania talii */}
+      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700"}}>
+            🚫 Wyłącz talie z generowania
+            {wylaczoneTalie.size>0&&<span style={{marginLeft:8,fontSize:11,color:"#fa0"}}>({wylaczoneTalie.size} wyłączone)</span>}
+          </div>
+          {wylaczoneTalie.size>0&&(
+            <button onClick={()=>setWylaczoneTalie(new Set())} style={{fontSize:10,padding:"2px 8px",background:"rgba(255,165,0,0.1)",border:"1px solid #fa055",borderRadius:4,color:"#fa0",cursor:"pointer"}}>
+              Włącz wszystkie
+            </button>
+          )}
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {talie.map(t=>{
+            const wylaczona=wylaczoneTalie.has(t.id);
+            return (
+              <button key={t.id} onClick={()=>toggleTalia(t.id)} style={{
+                padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+                background:wylaczona?"rgba(255,50,50,0.15)":"rgba(255,255,255,0.05)",
+                border:wylaczona?"1px solid #f5544488":"1px solid #2a2a3a",
+                color:wylaczona?"#f55":"#888",
+                textDecoration:wylaczona?"line-through":"none",
+              }}>
+                {wylaczona?"🚫 ":""}{t.nazwa}
+              </button>
+            );
+          })}
+        </div>
+        {wylaczoneTalie.size>0&&(
+          <div style={{fontSize:10,color:"#666",marginTop:6}}>
+            Wyłączone talie są ignorowane przy generowaniu wymian.
+          </div>
+        )}
       </div>
 
       <button onClick={generuj} style={{
@@ -858,6 +909,142 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
           style={{flex:1,padding:"8px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
         <button onClick={dodaj} style={{padding:"8px 16px",background:"rgba(0,200,100,0.12)",border:"1px solid #0c655",borderRadius:6,color:"#0c6",cursor:"pointer",fontWeight:"bold",fontSize:13}}>+ Dodaj</button>
       </div>
+    </div>
+  );
+}
+
+function DuplikatyView({talie,czlonkowie,duplikaty}) {
+  const [szukaj,setSzukaj]=useState("");
+  const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie | złota | diamentowa
+  const [filtrTalia,setFiltrTalia]=useState("wszystkie");
+
+  // Zbierz wszystkie duplikaty w jeden flat list
+  const wszystkieDup=[];
+  talie.forEach(talia=>{
+    talia.karty.forEach(karta=>{
+      const posiadacze=[];
+      czlonkowie.forEach(czl=>{
+        const ile=parseInt(duplikaty[`${czl.id}_${talia.id}_${karta.nazwa}`])||0;
+        if(ile>0) posiadacze.push({nick:czl.nazwa,ile});
+      });
+      if(posiadacze.length>0){
+        wszystkieDup.push({
+          taliaNazwa:talia.nazwa,taliaId:talia.id,taliaNum:talia.numer,
+          kartaNazwa:karta.nazwa,kartaTyp:karta.typ,
+          posiadacze,
+          lacznie:posiadacze.reduce((s,p)=>s+p.ile,0),
+        });
+      }
+    });
+  });
+
+  // Filtruj
+  const frazy=szukaj.split("\n").map(l=>l.trim().toLowerCase()).filter(l=>l.length>0);
+  const filtered=wszystkieDup.filter(d=>{
+    if(filtrTyp!=="wszystkie"&&d.kartaTyp!==filtrTyp) return false;
+    if(filtrTalia!=="wszystkie"&&d.taliaId!==filtrTalia) return false;
+    if(frazy.length>0){
+      // Pasuje jeśli którakolwiek fraza trafia w kartę, talię lub gracza
+      const pasuje=frazy.some(f=>
+        d.kartaNazwa.toLowerCase().includes(f)||
+        d.taliaNazwa.toLowerCase().includes(f)||
+        d.posiadacze.some(p=>p.nick.toLowerCase().includes(f))
+      );
+      if(!pasuje) return false;
+    }
+    return true;
+  }).sort((a,b)=>b.lacznie-a.lacznie);
+
+  const lacznie=filtered.reduce((s,d)=>s+d.lacznie,0);
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:8,padding:"10px 14px",marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:2}}>🔄 Wszystkie duplikaty w gangu</div>
+        <div style={{fontSize:11,color:"#aaa"}}>Karty które ktoś posiada w nadmiarze i może wysłać innym</div>
+      </div>
+
+      {/* Filtry */}
+      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+        <textarea
+          value={szukaj} onChange={e=>setSzukaj(e.target.value)}
+          placeholder={"🔍 Wpisz nazwy kart — każda w osobnej linii:\n\nWystępy mimów\nAkrobatyczne popisy\nSztuka kredowa"}
+          rows={4}
+          style={{width:"100%",padding:"8px 12px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,marginBottom:10,boxSizing:"border-box",resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}
+        />
+        <div style={{fontSize:10,color:"#555",marginBottom:10}}>
+          💡 Jedna nazwa per linijka — znajdzie karty pasujące do którejkolwiek z wpisanych fraz
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[
+            {id:"wszystkie",label:"Wszystkie"},
+            {id:"złota",label:"⭐ Złote"},
+            {id:"diamentowa",label:"💎 Diamentowe"},
+          ].map(f=>(
+            <button key={f.id} onClick={()=>setFiltrTyp(f.id)} style={{
+              padding:"4px 12px",borderRadius:20,fontSize:11,cursor:"pointer",
+              background:filtrTyp===f.id?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
+              border:filtrTyp===f.id?"1px solid #ffd700":"1px solid #2a2a3a",
+              color:filtrTyp===f.id?"#ffd700":"#888",
+            }}>{f.label}</button>
+          ))}
+          <select value={filtrTalia} onChange={e=>setFiltrTalia(e.target.value)} style={{
+            padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+            background:"rgba(255,255,255,0.05)",border:"1px solid #2a2a3a",color:"#888",
+            outline:"none",
+          }}>
+            <option value="wszystkie">Wszystkie talie</option>
+            {talie.map(t=><option key={t.id} value={t.id}>#{t.numer} {t.nazwa}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Statystyki */}
+      <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+        <div style={{background:"rgba(255,215,0,0.08)",border:"1px solid #b8860b44",borderRadius:8,padding:"8px 14px",flex:1,minWidth:100}}>
+          <div style={{fontSize:18,fontWeight:"bold",color:"#ffd700"}}>{filtered.length}</div>
+          <div style={{fontSize:10,color:"#888"}}>różnych kart</div>
+        </div>
+        <div style={{background:"rgba(0,200,100,0.08)",border:"1px solid #0c644",borderRadius:8,padding:"8px 14px",flex:1,minWidth:100}}>
+          <div style={{fontSize:18,fontWeight:"bold",color:"#0c6"}}>{lacznie}</div>
+          <div style={{fontSize:10,color:"#888"}}>duplikatów łącznie</div>
+        </div>
+      </div>
+
+      {/* Lista duplikatów */}
+      {filtered.length===0?(
+        <div style={{textAlign:"center",padding:40,color:"#555"}}>
+          <div style={{fontSize:32,marginBottom:8}}>🔍</div>
+          <div style={{fontSize:13}}>Brak duplikatów{frazy.length>0?` dla ${frazy.length} ${frazy.length===1?"frazy":"fraz"}`:""}</div>
+        </div>
+      ):(
+        filtered.map((d,i)=>(
+          <div key={i} style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:8,padding:"10px 12px",marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+              <span style={{fontSize:10,color:d.kartaTyp==="złota"?"#ffd700":"#87CEEB"}}>
+                {d.kartaTyp==="złota"?"⭐":"💎"}
+              </span>
+              <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"#ddd"}}>{d.kartaNazwa}</span>
+              <span style={{fontSize:11,color:"#888"}}>#{d.taliaNum} {d.taliaNazwa}</span>
+              <span style={{
+                fontSize:12,fontWeight:"bold",padding:"2px 10px",borderRadius:12,
+                background:"rgba(0,200,100,0.15)",border:"1px solid #0c644",color:"#0c6",
+              }}>×{d.lacznie}</span>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {d.posiadacze.map((p,j)=>(
+                <span key={j} style={{
+                  fontSize:11,padding:"3px 10px",borderRadius:14,
+                  background:"rgba(255,255,255,0.05)",border:"1px solid #2a2a3a",color:"#bbb",
+                }}>
+                  {p.nick}
+                  {p.ile>1&&<span style={{marginLeft:4,color:"#ffd700",fontWeight:"bold"}}>×{p.ile}</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
