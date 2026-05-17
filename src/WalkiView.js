@@ -4,6 +4,7 @@ import { useState } from "react";
 const KLUCZE = [
   process.env.REACT_APP_GEMINI_API_KEY || "",
   process.env.REACT_APP_GEMINI_API_KEY_2 || "",
+  process.env.REACT_APP_GEMINI_API_KEY_3 || "",
 ].filter(k => k.length > 0);
 let kluczIdx = 0;
 function pobierzURL() {
@@ -348,7 +349,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin }) {
       )}
 
       {podglad === "sezon" && (
-        <PodsumowanieSezonu podsumowanie={podsumowanieSezonu} />
+        <PodsumowanieSezonu podsumowanie={podsumowanieSezonu} zapiszWalki={zapiszWalki} walki={walki || []} />
       )}
     </div>
   );
@@ -421,7 +422,7 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
                         style={{ width: "100%", padding: "5px 8px", background: "#12122a", border: "1px solid #444", borderRadius: 4, color: "#ffd700", fontSize: 12, boxSizing: "border-box" }} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 10, color: "#888", marginBottom: 2 }}>⚡ Tarcze</div>
+                      <div style={{ fontSize: 10, color: "#888", marginBottom: 2 }}>🛡️ Tarcze</div>
                       <input value={tempVal.tarcze} onChange={e => setTempVal(v => ({ ...v, tarcze: e.target.value }))}
                         style={{ width: "100%", padding: "5px 8px", background: "#12122a", border: "1px solid #444", borderRadius: 4, color: "#87CEEB", fontSize: 12, boxSizing: "border-box" }} />
                     </div>
@@ -441,7 +442,7 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
                   {g.nazwa} <span style={{ fontSize: 10, color: "#555" }}>L{g.poziom}</span>
                 </span>
                 <span style={{ fontSize: 12, color: "#ffd700", zIndex: 1 }}>🔫 {fmt(g.obrazenia)}</span>
-                <span style={{ fontSize: 12, color: "#87CEEB", minWidth: 40, textAlign: "right", zIndex: 1 }}>⚡ {g.tarcze}</span>
+                <span style={{ fontSize: 12, color: "#87CEEB", minWidth: 40, textAlign: "right", zIndex: 1 }}>🛡️ {g.tarcze}</span>
                 <button onClick={() => startEdycji(i)} style={{ padding: "2px 7px", background: "rgba(255,215,0,0.1)", border: "none", borderRadius: 3, color: "#b8860b", cursor: "pointer", fontSize: 10, zIndex: 1 }}>✏️</button>
                 <button onClick={() => usun(i)} style={{ padding: "2px 6px", background: "rgba(255,50,50,0.1)", border: "none", borderRadius: 3, color: "#f5544488", cursor: "pointer", fontSize: 10, zIndex: 1 }}>✕</button>
               </div>
@@ -479,7 +480,7 @@ function RankingTabela({ gracze, edytowalne, onChange }) {
               {g.nazwa} <span style={{ fontSize: 10, color: "#666" }}>L{g.poziom}</span>
             </span>
             <span style={{ fontSize: 12, color: "#ffd700", minWidth: 70, textAlign: "right", zIndex: 1 }}>🔫 {fmt(g.obrazenia)}</span>
-            <span style={{ fontSize: 12, color: "#87CEEB", minWidth: 40, textAlign: "right", zIndex: 1 }}>⚡ {g.tarcze}</span>
+            <span style={{ fontSize: 12, color: "#87CEEB", minWidth: 40, textAlign: "right", zIndex: 1 }}>🛡️ {g.tarcze}</span>
           </div>
         );
       })}
@@ -639,7 +640,11 @@ function formatLiczby(n) {
   return n.toString();
 }
 
-function PodsumowanieSezonu({ podsumowanie }) {
+function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki }) {
+  const [scalanie, setScalanie] = useState(null); // { zrodlo, cel } — scalanie nicków
+  const [edycjaGracza, setEdycjaGracza] = useState(null); // nazwa gracza do edycji
+  const [nowyNick, setNowyNick] = useState("");
+
   if (!podsumowanie) {
     return (
       <div style={{ textAlign: "center", padding: 40, color: "#666" }}>
@@ -651,11 +656,33 @@ function PodsumowanieSezonu({ podsumowanie }) {
 
   const { wszyscy, ciekawostki, lacznaWalka } = podsumowanie;
 
+  // Scal wszystkie wystąpienia starego nicku na nowy we wszystkich walkach
+  const scalajNick = async (staryNick, nowyNickVal) => {
+    if (!nowyNickVal.trim() || staryNick === nowyNickVal.trim()) {
+      setEdycjaGracza(null);
+      return;
+    }
+    const zaktualizowane = walki.map(w => ({
+      ...w,
+      gracze: w.gracze.map(g =>
+        g.nazwa === staryNick ? { ...g, nazwa: nowyNickVal.trim() } : g
+      )
+    }));
+    await zapiszWalki(zaktualizowane);
+    setEdycjaGracza(null);
+    alert(`✓ Zmieniono "${staryNick}" → "${nowyNickVal.trim()}" we wszystkich walkach`);
+  };
+
   return (
     <div>
       <div style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.1), rgba(184,134,11,0.1))", border: "1px solid #b8860b", borderRadius: 10, padding: 14, marginBottom: 14, textAlign: "center" }}>
         <div style={{ fontSize: 18, fontWeight: "bold", color: "#ffd700", marginBottom: 4 }}>🏆 Podsumowanie sezonu</div>
         <div style={{ fontSize: 12, color: "#aaa" }}>Analiza z {lacznaWalka} walk gangu</div>
+      </div>
+
+      {/* Info o edycji nicków */}
+      <div style={{ background: "rgba(255,165,0,0.06)", border: "1px solid #fa055", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 11, color: "#fa0" }}>
+        ✏️ <strong>Kliknij gracza</strong> żeby zmienić nick — jeśli AI zapisała kogoś pod różnymi nazwami, zmień na jedną i statystyki się scalą automatycznie.
       </div>
 
       {/* Ciekawostki */}
@@ -672,30 +699,61 @@ function PodsumowanieSezonu({ podsumowanie }) {
         ))}
       </div>
 
-      {/* Pełny ranking */}
+      {/* Pełny ranking z edycją */}
       <div>
         <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 8 }}>📊 Łączny ranking sezonu</div>
         {wszyscy.map((g, i) => {
           const kolor = i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#888";
           const sredniaObr = Math.round(g.obrazeniaLacznie / g.uczestnictwa);
           const sredniaTarcz = (g.tarczeLacznie / g.uczestnictwa).toFixed(1);
+          const edytuje = edycjaGracza === g.nazwa;
+
           return (
             <div key={i} style={{
-              background: i < 3 ? `linear-gradient(90deg, ${kolor}15, transparent)` : "rgba(255,255,255,0.02)",
-              border: "1px solid #2a2a3a", borderLeft: `3px solid ${kolor}`,
+              background: edytuje ? "rgba(255,215,0,0.08)" : i < 3 ? `linear-gradient(90deg, ${kolor}15, transparent)` : "rgba(255,255,255,0.02)",
+              border: edytuje ? `1px solid ${kolor}88` : "1px solid #2a2a3a",
+              borderLeft: `3px solid ${kolor}`,
               borderRadius: 6, padding: 10, marginBottom: 4,
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, color: kolor, fontWeight: "bold", width: 26 }}>{i + 1}.</span>
-                <span style={{ flex: 1, fontSize: 12, color: "#ddd", fontWeight: i < 3 ? "bold" : "normal" }}>{g.nazwa}</span>
-                <span style={{ fontSize: 11, color: "#666" }}>{g.uczestnictwa}/{lacznaWalka} walk</span>
-              </div>
-              <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#aaa", flexWrap: "wrap", paddingLeft: 34 }}>
-                <span>🔫 łącznie: <strong style={{ color: "#ffd700" }}>{formatLiczby(g.obrazeniaLacznie)}</strong></span>
-                <span>średnio: {formatLiczby(sredniaObr)}</span>
-                <span>⚡ tarcz: <strong style={{ color: "#87CEEB" }}>{g.tarczeLacznie}</strong></span>
-                <span>śr. {sredniaTarcz}</span>
-              </div>
+              {edytuje ? (
+                // Tryb edycji nicku
+                <div>
+                  <div style={{ fontSize: 11, color: "#ffd700", marginBottom: 6 }}>
+                    ✏️ Zmień nick gracza #{i + 1} (zmiana dotyczy WSZYSTKICH walk w historii)
+                  </div>
+                  <input
+                    value={nowyNick}
+                    onChange={e => setNowyNick(e.target.value)}
+                    placeholder={g.nazwa}
+                    autoFocus
+                    style={{ width: "100%", padding: "6px 8px", background: "#12122a", border: "1px solid #444", borderRadius: 4, color: "#fff", fontSize: 12, marginBottom: 8, boxSizing: "border-box" }}
+                  />
+                  <div style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>
+                    💡 Jeśli AI zapisała tę samą osobę jako dwa różne nicki, wpisz poprawny nick — statystyki się scalą.
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => scalajNick(g.nazwa, nowyNick)} style={{ flex: 1, padding: "6px", background: "rgba(0,200,100,0.15)", border: "1px solid #0c6", borderRadius: 5, color: "#0c6", cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✓ Zapisz</button>
+                    <button onClick={() => setEdycjaGracza(null)} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid #444", borderRadius: 5, color: "#888", cursor: "pointer", fontSize: 12 }}>Anuluj</button>
+                  </div>
+                </div>
+              ) : (
+                // Tryb widoku
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 13, color: kolor, fontWeight: "bold", width: 26 }}>{i + 1}.</span>
+                    <span style={{ flex: 1, fontSize: 12, color: "#ddd", fontWeight: i < 3 ? "bold" : "normal" }}>{g.nazwa}</span>
+                    <span style={{ fontSize: 11, color: "#666" }}>{g.uczestnictwa}/{lacznaWalka} walk</span>
+                    <button onClick={() => { setEdycjaGracza(g.nazwa); setNowyNick(g.nazwa); }}
+                      style={{ padding: "2px 7px", background: "rgba(255,215,0,0.1)", border: "none", borderRadius: 3, color: "#b8860b", cursor: "pointer", fontSize: 10 }}>✏️</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#aaa", flexWrap: "wrap", paddingLeft: 34 }}>
+                    <span>🔫 łącznie: <strong style={{ color: "#ffd700" }}>{formatLiczby(g.obrazeniaLacznie)}</strong></span>
+                    <span>średnio: {formatLiczby(sredniaObr)}</span>
+                    <span>🛡️ tarcz: <strong style={{ color: "#87CEEB" }}>{g.tarczeLacznie}</strong></span>
+                    <span>śr. {sredniaTarcz}</span>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
@@ -726,7 +784,7 @@ function generujTekstPodsumowania(p) {
   t += "\n📊 RANKING SEZONU (TOP 10):\n";
   p.wszyscy.slice(0, 10).forEach((g, i) => {
     const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
-    t += `${medal} ${g.nazwa} — 🔫 ${formatLiczby(g.obrazeniaLacznie)} | ⚡ ${g.tarczeLacznie} | ${g.uczestnictwa} walk\n`;
+    t += `${medal} ${g.nazwa} — 🔫 ${formatLiczby(g.obrazeniaLacznie)} | 🛡️ ${g.tarczeLacznie} | ${g.uczestnictwa} walk\n`;
   });
   return t;
 }
