@@ -1,7 +1,7 @@
 // Logika rozpoznawania kart z screenów przez Google Gemini Vision API
 
 const GEMINI_API_KEY = "AIzaSyC796B2nyvnUzTy2ehZ9DQx1KaBqzmWDyw";
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // Konwertuje plik obrazu na base64
@@ -88,7 +88,27 @@ export async function analyzeImage(file, wszystkieTalie) {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Gemini API error ${response.status}: ${errText}`);
+      // Parsuj błąd dla lepszego komunikatu
+      let userMessage = `Gemini API error ${response.status}`;
+      try {
+        const errJson = JSON.parse(errText);
+        const code = errJson.error?.code;
+        const msg = errJson.error?.message || "";
+        if (code === 429) {
+          if (msg.includes("free_tier") && msg.includes("limit: 0")) {
+            userMessage = "❌ Ten model nie jest dostępny w darmowym planie. Skontaktuj się z administratorem.";
+          } else if (msg.includes("per day") || msg.includes("RPD")) {
+            userMessage = "⏰ Wyczerpany dzienny limit (1000 obrazów/dzień). Spróbuj jutro.";
+          } else {
+            userMessage = "⏳ Za szybkie zapytania (limit ~15/min). Poczekaj minutę.";
+          }
+        } else if (code === 400) {
+          userMessage = "❌ Błędne dane wejściowe — sprawdź czy plik to obraz.";
+        } else if (code === 403) {
+          userMessage = "🔑 Błąd klucza API — może być nieważny lub ograniczony.";
+        }
+      } catch {}
+      throw new Error(userMessage);
     }
 
     const data = await response.json();
@@ -109,15 +129,20 @@ export async function analyzeImage(file, wszystkieTalie) {
   }
 }
 
-// Analizuje wiele obrazów równolegle (z opóźnieniem żeby nie przekroczyć limitów)
+// Analizuje wiele obrazów po kolei z opóźnieniem dla limitu 15/min (~4 sek odstęp)
 export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
   const wyniki = [];
   for (let i = 0; i < files.length; i++) {
     onProgress?.(i, files.length, files[i].name);
     const wynik = await analyzeImage(files[i], wszystkieTalie);
     wyniki.push(wynik);
-    // Pauza 200ms między requestami żeby nie przekroczyć 15/min
-    if (i < files.length - 1) await new Promise(r => setTimeout(r, 200));
+    // Jeśli błąd 429 (rate limit) — zatrzymaj i zwróć co już mamy
+    if (!wynik.sukces && wynik.blad?.includes("limit")) {
+      onProgress?.(files.length, files.length, "Przerwano przez limit");
+      break;
+    }
+    // Pauza ~4.5 sek między requestami (limit 15/min = max 1 co 4 sek)
+    if (i < files.length - 1) await new Promise(r => setTimeout(r, 4500));
   }
   onProgress?.(files.length, files.length, "Zakończono");
   return wyniki;
