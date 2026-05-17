@@ -641,8 +641,7 @@ function formatLiczby(n) {
 }
 
 function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki }) {
-  const [scalanie, setScalanie] = useState(null); // { zrodlo, cel } — scalanie nicków
-  const [edycjaGracza, setEdycjaGracza] = useState(null); // nazwa gracza do edycji
+  const [edycjaGracza, setEdycjaGracza] = useState(null);
   const [nowyNick, setNowyNick] = useState("");
 
   if (!podsumowanie) {
