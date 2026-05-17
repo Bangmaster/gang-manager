@@ -129,6 +129,7 @@ export default function App() {
           posiadane: start.posiadane || {},
           duplikaty: start.duplikaty || {},
           walki: start.walki || [],
+          aktywnaWymiana: start.aktywnaWymiana || null,
         });
       }
       unsub = subscribeGangData((d) => {
@@ -139,6 +140,7 @@ export default function App() {
           posiadane: d.posiadane || {},
           duplikaty: d.duplikaty || {},
           walki: d.walki || [],
+          aktywnaWymiana: d.aktywnaWymiana || null,
         });
       });
     })();
@@ -178,7 +180,8 @@ export default function App() {
   const tabs = [
     {id:"dane",label:"📋 Dane gangu"},
     {id:"duplikaty",label:"🔄 Duplikaty"},
-    {id:"wynik",label:"⚡ Wymiana"},
+    {id:"aktywna",label:dane?.aktywnaWymiana?"📤 Wymiana ●":"📤 Wymiana"},
+    {id:"wynik",label:"⚡ Generuj"},
     ...(isAdmin?[{id:"ocr",label:"📸 OCR talii"},{id:"walki",label:"🎯 Walki"},{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
   ];
 
@@ -225,12 +228,21 @@ export default function App() {
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           duplikaty={dane.duplikaty||{}}
         />}
+        {zakładka==="aktywna"&&<AktywnaWymiana
+          aktywnaWymiana={dane.aktywnaWymiana}
+          zalogowany={zalogowany}
+          czlonkowie={dane.czlonkowie}
+          isAdmin={isAdmin}
+          zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
+        />}
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
         {zakładka==="wynik"&&isAdmin&&<WynikView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           typWymiany={typWymiany} wynik={wynik} setWynik={setWynik}
           trybWymiany={trybWymiany} setTrybWymiany={setTrybWymiany}
+          zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
+          przejdzDoAktywnej={()=>setZakładka("aktywna")}
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
@@ -689,8 +701,9 @@ function obliczFaze(brakT,brakO){
   return 5;
 }
 
-function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany}) {
+function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej}) {
   const [skopiowano,setSkopiowano]=useState(false);
+  const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
   const [vipKolejka,setVipKolejka]=useState([]); // lista id osób w kolejności priorytetu
 
@@ -898,6 +911,23 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         <div style={{fontSize:12,color:"#888",marginBottom:10}}>
           Zaplanowane wymiany: <strong style={{color:"#ffd700"}}>{wynik.planoweWymiany.length}</strong>
           {wynik.nieobsluzone.length>0&&<span style={{color:"#fa0",marginLeft:12}}>⚠️ {wynik.nieobsluzone.length} bez dawcy</span>}
+          <button onClick={async()=>{
+            setPublikowanie(true);
+            const aktywna={
+              wymiany: wynik.planoweWymiany,
+              typWymiany,
+              data: new Date().toISOString(),
+              potwierdzone: {},
+            };
+            await zapiszAktywna(aktywna);
+            setPublikowanie(false);
+            przejdzDoAktywnej();
+          }} style={{
+            marginLeft:"auto",padding:"5px 14px",
+            background:"linear-gradient(135deg,#0c6,#0fa)",
+            border:"none",borderRadius:6,color:"#000",
+            cursor:"pointer",fontSize:12,fontWeight:"bold",
+          }}>{publikowanie?"⏳ Zapisuję...":"📤 Opublikuj dla gangu"}</button>
         </div>
 
         {[1,2,3,4,5,10,11,20,21].map(faza=>{
@@ -1221,6 +1251,126 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAktywna}) {
+  const [zamykanie,setZamykanie]=useState(false);
+
+  if(!aktywnaWymiana) return (
+    <div style={{textAlign:"center",padding:50,color:"#555"}}>
+      <div style={{fontSize:40,marginBottom:10}}>📭</div>
+      <div style={{fontSize:14,color:"#666"}}>Brak aktywnej wymiany</div>
+      <div style={{fontSize:11,color:"#555",marginTop:6}}>Admin generuje wymianę w zakładce ⚡ Generuj i publikuje ją tutaj</div>
+    </div>
+  );
+
+  const {wymiany,typWymiany,data,potwierdzone={}} = aktywnaWymiana;
+  const czyPotwierdzilem=potwierdzone[zalogowany.login];
+  const poNadawcach={};
+  wymiany.forEach(w=>{
+    if(!poNadawcach[w.od]) poNadawcach[w.od]=[];
+    poNadawcach[w.od].push(w);
+  });
+  const potwierdzonychCount=Object.keys(potwierdzone).filter(k=>potwierdzone[k]).length;
+  const wszystkichNadawcow=Object.keys(poNadawcach).length;
+
+  const potwierdz=async()=>{
+    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[zalogowany.login]:true}});
+  };
+  const cofnijPotwierdzenie=async()=>{
+    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[zalogowany.login]:false}});
+  };
+  const zamknijWymiane=async()=>{
+    if(!window.confirm("Zamknąć aktywną wymianę? Zniknie dla wszystkich.")) return;
+    setZamykanie(true);
+    await zapiszAktywna(null);
+    setZamykanie(false);
+  };
+
+  return (
+    <div>
+      <div style={{background:"linear-gradient(135deg,rgba(0,200,100,0.1),rgba(0,100,50,0.1))",border:"1px solid #0c6",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:"bold",color:"#0c6"}}>📤 Aktywna wymiana</div>
+            <div style={{fontSize:11,color:"#888",marginTop:2}}>
+              {typWymiany==="złote"?"⭐ Złote":"💎 Diamentowe"} • {new Date(data).toLocaleString("pl-PL")} • {wymiany.length} wymian
+            </div>
+          </div>
+          {isAdmin&&(
+            <button onClick={zamknijWymiane} disabled={zamykanie} style={{
+              padding:"5px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544488",
+              borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11,
+            }}>{zamykanie?"⏳":"🗑"} Zamknij wymianę</button>
+          )}
+        </div>
+        <div style={{marginTop:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#aaa",marginBottom:4}}>
+            <span>Potwierdzenia: <strong style={{color:"#0c6"}}>{potwierdzonychCount}</strong>/{wszystkichNadawcow}</span>
+            <span>{Math.round((potwierdzonychCount/Math.max(1,wszystkichNadawcow))*100)}%</span>
+          </div>
+          <div style={{height:8,background:"rgba(0,0,0,0.3)",borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${(potwierdzonychCount/Math.max(1,wszystkichNadawcow))*100}%`,background:"linear-gradient(90deg,#0c6,#0fa)",transition:"width 0.5s",borderRadius:4}}/>
+          </div>
+        </div>
+      </div>
+
+      {poNadawcach[zalogowany.login]?(
+        <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"#ffd700"}`,borderRadius:10,padding:14,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:czyPotwierdzilem?"#0c6":"#ffd700",marginBottom:8}}>
+            {czyPotwierdzilem?"✅ Twoja wymiana — POTWIERDZONA":"👋 Twoja wymiana — wyślij kartę!"}
+          </div>
+          {poNadawcach[zalogowany.login].map((w,i)=>(
+            <div key={i} style={{fontSize:13,color:"#ddd",padding:"5px 0",borderBottom:"1px solid #12122a"}}>
+              Wyślij <strong style={{color:"#ffd700"}}>{w.karta}</strong> do <strong style={{color:"#0c6"}}>{w.do}</strong>
+              <span style={{fontSize:11,color:"#666",marginLeft:6}}>[{w.talia}]</span>
+            </div>
+          ))}
+          <div style={{marginTop:12}}>
+            {!czyPotwierdzilem?(
+              <button onClick={potwierdz} style={{
+                width:"100%",padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",
+                border:"none",borderRadius:8,color:"#000",fontSize:14,fontWeight:"bold",cursor:"pointer",
+              }}>✅ Potwierdzam — wysłałem kartę!</button>
+            ):(
+              <button onClick={cofnijPotwierdzenie} style={{
+                width:"100%",padding:8,background:"rgba(255,255,255,0.05)",
+                border:"1px solid #333",borderRadius:8,color:"#666",fontSize:12,cursor:"pointer",
+              }}>↩️ Cofnij potwierdzenie</button>
+            )}
+          </div>
+        </div>
+      ):(
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#666",textAlign:"center"}}>
+          Nie masz żadnej wymiany do wykonania w tej rundzie
+        </div>
+      )}
+
+      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📋 Status wszystkich wysyłek</div>
+        {Object.entries(poNadawcach).sort(([a],[b])=>(potwierdzone[b]?1:0)-(potwierdzone[a]?1:0)).map(([nadawca,ws])=>{
+          const potw=potwierdzone[nadawca];
+          return (
+            <div key={nadawca} style={{
+              display:"flex",alignItems:"flex-start",gap:10,padding:"8px 10px",
+              background:potw?"rgba(0,200,100,0.06)":"rgba(255,255,255,0.02)",
+              borderLeft:`3px solid ${potw?"#0c6":"#333"}`,borderRadius:6,marginBottom:4,
+            }}>
+              <span style={{fontSize:16,marginTop:1}}>{potw?"✅":"⏳"}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:potw?"#0c6":"#aaa"}}>{nadawca}</div>
+                {ws.map((w,i)=>(
+                  <div key={i} style={{fontSize:11,color:"#666",marginTop:2}}>
+                    → <span style={{color:"#888"}}>{w.do}</span>: {w.karta}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
