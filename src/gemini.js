@@ -1,7 +1,8 @@
 // Logika rozpoznawania kart z screenów przez Google Gemini Vision API
 
-const GEMINI_API_KEY = "AIzaSyC796B2nyvnUzTy2ehZ9DQx1KaBqzmWDyw";
-const GEMINI_MODEL = "gemini-2.5-flash";
+// Klucz API z zmiennej środowiskowej Vercel (bezpieczne!)
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "";
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 // Konwertuje plik obrazu na base64
@@ -66,6 +67,9 @@ Dopasuj nazwy kart do listy z talii (jeśli rozpoznasz część nazwy, znajdź n
 // Analizuje jeden screen
 export async function analyzeImage(file, wszystkieTalie) {
   try {
+    if (!GEMINI_API_KEY) {
+      return { sukces: false, blad: "🔑 Brak klucza API — admin musi ustawić REACT_APP_GEMINI_API_KEY w Vercel", fileName: file.name };
+    }
     const { base64, mimeType } = await fileToBase64(file);
     const prompt = buildPrompt(wszystkieTalie);
 
@@ -144,8 +148,8 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
       onProgress?.(files.length, files.length, "Przerwano przez limit");
       break;
     }
-    // Pauza ~4.5 sek między requestami (limit 15/min = max 1 co 4 sek)
-    if (i < files.length - 1) await new Promise(r => setTimeout(r, 4500));
+    // Pauza ~4 sek między requestami (limit 15/min Flash-Lite)
+    if (i < files.length - 1) await new Promise(r => setTimeout(r, 4000));
   }
   onProgress?.(files.length, files.length, "Zakończono");
   return wyniki;
