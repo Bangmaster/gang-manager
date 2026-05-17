@@ -29,58 +29,6 @@ function fileToBase64(file) {
 }
 
 // Skleja wiele screenów w jeden kolaż (siatka 2 kolumny)
-export async function scaleObrazki(files) {
-  const W = 390, H = 700, COLS = 2;
-  const rows = Math.ceil(files.length / COLS);
-  const canvas = document.createElement("canvas");
-  canvas.width = W * COLS;
-  canvas.height = H * rows;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#1a1a2e";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  await Promise.all(files.map((file, i) => new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const col = i % COLS, row = Math.floor(i / COLS);
-      const x = col * W, y = row * H;
-      const scale = Math.min(W / img.width, H / img.height);
-      const w = img.width * scale, h = img.height * scale;
-      ctx.drawImage(img, x + (W - w) / 2, y + (H - h) / 2, w, h);
-      ctx.strokeStyle = "#444"; ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, W, H);
-      ctx.fillStyle = "rgba(0,0,0,0.7)";
-      ctx.fillRect(x + 4, y + 4, 24, 18);
-      ctx.fillStyle = "#ffd700"; ctx.font = "bold 12px sans-serif";
-      ctx.fillText(`${i + 1}`, x + 8, y + 17);
-      URL.revokeObjectURL(url);
-      resolve();
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
-    img.src = url;
-  })));
-
-  return canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
-}
-
-function buildPromptKolaz(wszystkieTalie, n) {
-  const info = wszystkieTalie.map(t =>
-    `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
-  ).join("\n");
-  return `Analizujesz kolaż ${n} screenów z gry The Gang. Każdy screen = jedna talia (nr 1-${n} w lewym górnym rogu).
-
-Stan karty: POSIADANA=kolorowa z grafiką, DUPLIKAT=posiadana+cyfra+1/+2 w rogu, BRAK=szara "GANG".
-Typy: złota=żółta/złota ramka, diamentowa=niebiesko-biała holograficzna.
-
-Talie i karty:
-${info}
-
-Dla KAŻDEGO z ${n} screenów rozpoznaj talię i stan 9 kart.
-Zwróć WYŁĄCZNIE tablicę JSON (bez markdown, ${n} obiektów po kolei):
-[{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]},...]`;
-}
-
 function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
     `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
