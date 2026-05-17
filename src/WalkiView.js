@@ -1,6 +1,4 @@
-import { useState, useEffect } from "react";
-import { analyzeMultiple } from "./gemini";
-import { setStructure } from "./firebase";
+import { useState } from "react";
 
 // Prompt do rozpoznawania rankingu walki
 function buildBattlePrompt() {
@@ -263,7 +261,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin }) {
       )}
 
       {podglad === "sezon" && (
-        <PodsumowanieSezonu podsumowanie={podsumowanieSezonu} czlonkowie={czlonkowie} walki={walki || []} />
+        <PodsumowanieSezonu podsumowanie={podsumowanieSezonu} />
       )}
     </div>
   );
@@ -460,7 +458,7 @@ function formatLiczby(n) {
   return n.toString();
 }
 
-function PodsumowanieSezonu({ podsumowanie, czlonkowie, walki }) {
+function PodsumowanieSezonu({ podsumowanie }) {
   if (!podsumowanie) {
     return (
       <div style={{ textAlign: "center", padding: 40, color: "#666" }}>
