@@ -188,9 +188,6 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
   onProgress?.(files.length, files.length, "✓ Zakończono");
   return wyniki;
 }
-  onProgress?.(files.length, files.length, "✓ Zakończono");
-  return wyniki;
-}
 
 export async function analyzeImage(file, wszystkieTalie) {
   try {
