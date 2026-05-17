@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { analyzeMultiple, matchTalia, matchKarta } from "./gemini";
 
 // Komponent zakładki OCR (dla admina/zastępcy)
@@ -7,8 +7,32 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
   const [pliki, setPliki] = useState([]);
   const [analizujac, setAnalizujac] = useState(false);
   const [progress, setProgress] = useState({ aktualny: 0, total: 0, plik: "" });
-  const [wyniki, setWyniki] = useState(null); // { wymianyDoZatwierdzenia, surowe }
+  const [wyniki, setWyniki] = useState(null);
   const [zapisywanie, setZapisywanie] = useState(false);
+  // Cooldown timer — pozwala wgrać kolejną partię dopiero po X sekundach
+  const [cooldownDo, setCooldownDo] = useState(null); // timestamp
+  const [pozostalo, setPozostalo] = useState(0);
+  const [cooldownAktywowanyZBleduLimitu, setCooldownAktywowanyZBleduLimitu] = useState(false);
+
+  // Aktualizuj licznik co sekundę
+  useEffect(() => {
+    if (!cooldownDo) return;
+    const interval = setInterval(() => {
+      const sek = Math.max(0, Math.ceil((cooldownDo - Date.now()) / 1000));
+      setPozostalo(sek);
+      if (sek === 0) {
+        setCooldownDo(null);
+        setCooldownAktywowanyZBleduLimitu(false);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [cooldownDo]);
+
+  const formatCzas = (sek) => {
+    const m = Math.floor(sek / 60);
+    const s = sek % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   const osoba = czlonkowie.find(c => c.id === wybranaOsoba);
 
@@ -48,29 +72,64 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
           // dodaj jako nieznaną, ale nie zatrzymuj
           return;
         }
+        const key = `${wybranaOsoba}_${talia.id}_${karta.nazwa}`;
+        const poprzednioMial = !!posiadane[key];
+        const poprzednioDup = !!duplikaty[key];
+        const ma = !!k.posiadana;
+        const dup = Math.max(0, parseInt(k.duplikaty) || 0);
         propozycje.push({
           taliaId: talia.id,
           taliaNazwa: talia.nazwa,
           kartaNazwa: karta.nazwa,
           typ: karta.typ,
-          ma: !!k.posiadana,
-          dup: Math.max(0, parseInt(k.duplikaty) || 0),
+          ma,
+          dup,
           pewnosc: k.pewnosc || "srednia",
           fileName: w.fileName,
+          // Status zmiany:
+          zmiana: !poprzednioMial && ma ? "nowa"
+                : poprzednioMial && !ma ? "usunieta"
+                : poprzednioMial && ma && !poprzednioDup && dup > 0 ? "nowy_duplikat"
+                : poprzednioMial && ma && poprzednioDup && dup === 0 ? "usuniety_duplikat"
+                : "bez_zmian",
         });
       });
     });
 
     setWyniki({ propozycje, bledy });
     setAnalizujac(false);
+
+    // Ustaw cooldown — krótszy po sukcesie, dłuższy po błędach limitu
+    const wystapilBladLimitu = bledy.some(b => b.blad?.includes("limit") || b.blad?.includes("⏳") || b.blad?.includes("⏰"));
+    if (wystapilBladLimitu) {
+      setCooldownAktywowanyZBleduLimitu(true);
+      setCooldownDo(Date.now() + 10 * 60 * 1000); // 10 min po błędzie
+    } else if (pliki.length >= 5) {
+      // Krótszy cooldown przy większych partiach
+      setCooldownDo(Date.now() + 5 * 60 * 1000); // 5 min
+    } else if (pliki.length >= 2) {
+      setCooldownDo(Date.now() + 60 * 1000); // 1 min przy małych partiach
+    }
+    // Po 1 screenie bez cooldownu
   };
 
   const togglePropozycja = (idx, pole) => {
     setWyniki(w => {
       const p = [...w.propozycje];
-      if (pole === "ma") p[idx] = { ...p[idx], ma: !p[idx].ma };
-      else if (pole === "dup") p[idx] = { ...p[idx], dup: p[idx].dup > 0 ? 0 : 1 };
-      else if (pole === "odrzuc") p[idx] = { ...p[idx], odrzucona: !p[idx].odrzucona };
+      let item = { ...p[idx] };
+      if (pole === "ma") item.ma = !item.ma;
+      else if (pole === "dup") item.dup = item.dup > 0 ? 0 : 1;
+      else if (pole === "odrzuc") item.odrzucona = !item.odrzucona;
+      // Przelicz status zmiany na podstawie aktualnych wartości i poprzedniego stanu w bazie
+      const key = `${wybranaOsoba}_${item.taliaId}_${item.kartaNazwa}`;
+      const poprzednioMial = !!posiadane[key];
+      const poprzednioDup = !!duplikaty[key];
+      item.zmiana = !poprzednioMial && item.ma ? "nowa"
+                  : poprzednioMial && !item.ma ? "usunieta"
+                  : poprzednioMial && item.ma && !poprzednioDup && item.dup > 0 ? "nowy_duplikat"
+                  : poprzednioMial && item.ma && poprzednioDup && item.dup === 0 ? "usuniety_duplikat"
+                  : "bez_zmian";
+      p[idx] = item;
       return { ...w, propozycje: p };
     });
   };
@@ -111,8 +170,12 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
     <div>
       <div style={{ background: "rgba(255,215,0,0.06)", border: "1px solid #b8860b33", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#ffd700" }}>
         📸 <strong>Tryb OCR (Gemini 2.5 Flash-Lite)</strong> — wgraj screeny talii osoby, AI rozpozna karty automatycznie
-        <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>Każdy screen = jedna talia. Możesz wgrać od 1 do 14 screenów naraz dla wybranej osoby.</div>
-        <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>Limity darmowe: 15 zapytań/min, 1000/dzień. Apka czeka ~4.5 sek między obrazami żeby zmieścić się w limicie.</div>
+        <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>Każdy screen = jedna talia. Możesz wgrać 1-14 screenów dla osoby.</div>
+        <div style={{ fontSize: 10, color: "#888", marginTop: 4, lineHeight: 1.5 }}>
+          ⚙️ Limity Google (darmowe): 15 zapytań/min, 250k tokenów/min, 1000/dzień.<br/>
+          ⏱️ Pauza 6 sek między obrazami. Po błędzie limitu apka czeka i ponawia automatycznie.<br/>
+          💡 <strong>Jeśli wciąż dostajesz limit:</strong> Google nakłada cool-down ~15-30 min. Odczekaj i wróć później.
+        </div>
       </div>
 
       {/* Wybór osoby */}
@@ -141,22 +204,65 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
             Wybrano {pliki.length} {pliki.length === 1 ? "plik" : "plików"}: {pliki.map(p => p.name).join(", ")}
           </div>
         )}
-        <button onClick={analizuj} disabled={!osoba || pliki.length === 0 || analizujac}
+        <button onClick={analizuj} disabled={!osoba || pliki.length === 0 || analizujac || pozostalo > 0}
           style={{
             width: "100%", padding: 12,
-            background: !osoba || pliki.length === 0 || analizujac ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,#b8860b,#ffd700)",
-            border: "none", borderRadius: 8, color: !osoba || pliki.length === 0 || analizujac ? "#666" : "#000",
-            fontSize: 14, fontWeight: "bold", cursor: !osoba || pliki.length === 0 || analizujac ? "not-allowed" : "pointer",
+            background: !osoba || pliki.length === 0 || analizujac || pozostalo > 0 ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,#b8860b,#ffd700)",
+            border: "none", borderRadius: 8, color: !osoba || pliki.length === 0 || analizujac || pozostalo > 0 ? "#666" : "#000",
+            fontSize: 14, fontWeight: "bold", cursor: !osoba || pliki.length === 0 || analizujac || pozostalo > 0 ? "not-allowed" : "pointer",
             letterSpacing: 1,
           }}>
-          {analizujac ? `⏳ Analizuję ${progress.aktualny}/${progress.total}...` : `🤖 Analizuj ${pliki.length} screen${pliki.length === 1 ? "" : "ów"} dla ${osoba?.nazwa || "?"}`}
+          {analizujac ? `⏳ Analizuję ${progress.aktualny}/${progress.total}...`
+            : pozostalo > 0 ? `⏱️ Cooldown ${formatCzas(pozostalo)} — czekaj`
+            : `🤖 Analizuj ${pliki.length} screen${pliki.length === 1 ? "" : "ów"} dla ${osoba?.nazwa || "?"}`}
         </button>
+
+        {/* Cooldown timer panel */}
+        {pozostalo > 0 && !analizujac && (
+          <div style={{
+            marginTop: 10,
+            background: cooldownAktywowanyZBleduLimitu ? "rgba(255,50,50,0.08)" : "rgba(255,165,0,0.08)",
+            border: cooldownAktywowanyZBleduLimitu ? "1px solid #f5544455" : "1px solid #fa050",
+            borderRadius: 8, padding: 12,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: "bold", color: cooldownAktywowanyZBleduLimitu ? "#f55" : "#fa0" }}>
+                {cooldownAktywowanyZBleduLimitu ? "🚫 Limit Google przekroczony" : "⏱️ Cooldown między partiami"}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: "bold", color: cooldownAktywowanyZBleduLimitu ? "#f55" : "#ffd700", fontFamily: "monospace" }}>
+                {formatCzas(pozostalo)}
+              </div>
+            </div>
+            <div style={{ height: 6, background: "#12122a", borderRadius: 3, overflow: "hidden", marginBottom: 6 }}>
+              <div style={{
+                height: "100%",
+                width: `${(pozostalo / ((cooldownAktywowanyZBleduLimitu ? 600 : 300))) * 100}%`,
+                background: cooldownAktywowanyZBleduLimitu ? "linear-gradient(90deg,#f55,#fa0)" : "linear-gradient(90deg,#fa0,#ffd700)",
+                transition: "width 1s linear",
+              }} />
+            </div>
+            <div style={{ fontSize: 10, color: "#888" }}>
+              {cooldownAktywowanyZBleduLimitu
+                ? "Google nałożył dłuższy cool-down. Po czasie spróbuj wgrać kolejną partię."
+                : "Po czasie możesz wgrywać kolejnych graczy. Możesz też pominąć cooldown przyciskiem poniżej (na własne ryzyko)."}
+            </div>
+            {!cooldownAktywowanyZBleduLimitu && (
+              <button onClick={() => { setCooldownDo(null); setPozostalo(0); }}
+                style={{ marginTop: 8, padding: "4px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid #444", borderRadius: 5, color: "#888", cursor: "pointer", fontSize: 10 }}>
+                ⚠️ Pomiń cooldown
+              </button>
+            )}
+          </div>
+        )}
+
         {analizujac && (
           <div style={{ marginTop: 10 }}>
-            <div style={{ height: 6, background: "#12122a", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ height: 8, background: "#12122a", borderRadius: 4, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${(progress.aktualny / Math.max(1, progress.total)) * 100}%`, background: "linear-gradient(90deg,#b8860b,#ffd700)", transition: "width 0.3s" }} />
             </div>
-            <div style={{ fontSize: 11, color: "#aaa", marginTop: 4, textAlign: "center" }}>{progress.plik}</div>
+            <div style={{ fontSize: 11, color: "#aaa", marginTop: 6, textAlign: "center" }}>
+              📸 Screen {progress.aktualny + 1}/{progress.total}: <strong style={{ color: "#ffd700" }}>{progress.plik}</strong>
+            </div>
           </div>
         )}
       </div>
@@ -182,6 +288,102 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
             </button>
           </div>
 
+          {/* Podsumowanie zmian */}
+          {(() => {
+            const aktywne = wyniki.propozycje.filter(p => !p.odrzucona);
+            const nowe = aktywne.filter(p => p.zmiana === "nowa");
+            const noweDup = aktywne.filter(p => p.zmiana === "nowy_duplikat");
+            const usuniete = aktywne.filter(p => p.zmiana === "usunieta");
+            const usunieteDup = aktywne.filter(p => p.zmiana === "usuniety_duplikat");
+            const bezZmian = aktywne.filter(p => p.zmiana === "bez_zmian").length;
+            const lacznieZmian = nowe.length + noweDup.length + usuniete.length + usunieteDup.length;
+
+            if (lacznieZmian === 0) {
+              return (
+                <div style={{ background: "rgba(100,180,255,0.06)", border: "1px solid #6af55", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 12, color: "#6af" }}>
+                  ℹ️ Brak nowych zmian — {bezZmian} kart bez zmian względem aktualnego stanu w bazie
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ background: "rgba(0,200,100,0.06)", border: "1px solid #0c655", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: "bold", color: "#0c6", marginBottom: 8 }}>
+                  📊 Wykryto {lacznieZmian} {lacznieZmian === 1 ? "zmianę" : "zmian"} względem bazy:
+                </div>
+
+                {nowe.length > 0 && (
+                  <details style={{ marginBottom: 6 }}>
+                    <summary style={{ fontSize: 12, color: "#0c6", cursor: "pointer", padding: "2px 0" }}>
+                      🆕 <strong>{nowe.length}</strong> {nowe.length === 1 ? "nowa karta" : nowe.length < 5 ? "nowe karty" : "nowych kart"}
+                    </summary>
+                    <div style={{ paddingLeft: 16, marginTop: 4 }}>
+                      {Object.entries(nowe.reduce((acc, p) => {
+                        if (!acc[p.taliaNazwa]) acc[p.taliaNazwa] = [];
+                        acc[p.taliaNazwa].push(p);
+                        return acc;
+                      }, {})).map(([talia, karty]) => (
+                        <div key={talia} style={{ fontSize: 11, color: "#bbb", marginBottom: 2 }}>
+                          <span style={{ color: "#888" }}>{talia}:</span>{" "}
+                          {karty.map((p, i) => (
+                            <span key={i}>
+                              {i > 0 && ", "}
+                              <span style={{ color: p.typ === "złota" ? "#ffd700" : "#87CEEB" }}>
+                                {p.typ === "złota" ? "⭐" : "💎"} {p.kartaNazwa}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
+                {noweDup.length > 0 && (
+                  <details style={{ marginBottom: 6 }}>
+                    <summary style={{ fontSize: 12, color: "#4169E1", cursor: "pointer", padding: "2px 0" }}>
+                      💎 <strong>{noweDup.length}</strong> {noweDup.length === 1 ? "nowy duplikat" : "nowych duplikatów"}
+                    </summary>
+                    <div style={{ paddingLeft: 16, marginTop: 4 }}>
+                      {Object.entries(noweDup.reduce((acc, p) => {
+                        if (!acc[p.taliaNazwa]) acc[p.taliaNazwa] = [];
+                        acc[p.taliaNazwa].push(p);
+                        return acc;
+                      }, {})).map(([talia, karty]) => (
+                        <div key={talia} style={{ fontSize: 11, color: "#bbb", marginBottom: 2 }}>
+                          <span style={{ color: "#888" }}>{talia}:</span>{" "}
+                          {karty.map((p, i) => (
+                            <span key={i}>
+                              {i > 0 && ", "}
+                              <span style={{ color: "#87CEEB" }}>{p.kartaNazwa}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
+                {(usuniete.length > 0 || usunieteDup.length > 0) && (
+                  <details style={{ marginBottom: 6 }}>
+                    <summary style={{ fontSize: 12, color: "#fa0", cursor: "pointer", padding: "2px 0" }}>
+                      ⚠️ <strong>{usuniete.length + usunieteDup.length}</strong> kart oznaczonych jako utracone
+                    </summary>
+                    <div style={{ paddingLeft: 16, marginTop: 4, fontSize: 11, color: "#aaa" }}>
+                      {usuniete.length > 0 && <div>Karty: {usuniete.map(p => `${p.kartaNazwa} [${p.taliaNazwa}]`).join(", ")}</div>}
+                      {usunieteDup.length > 0 && <div>Duplikaty: {usunieteDup.map(p => `${p.kartaNazwa} [${p.taliaNazwa}]`).join(", ")}</div>}
+                      <div style={{ marginTop: 4, color: "#888", fontStyle: "italic" }}>(Sprawdź — może AI źle rozpoznała, a karta jednak jest)</div>
+                    </div>
+                  </details>
+                )}
+
+                <div style={{ fontSize: 11, color: "#666", marginTop: 4, paddingTop: 6, borderTop: "1px solid #0c633" }}>
+                  Bez zmian: {bezZmian} kart
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Błędy */}
           {wyniki.bledy.length > 0 && (
             <div style={{ background: "rgba(255,50,50,0.08)", border: "1px solid #f5544455", borderRadius: 8, padding: 10, marginBottom: 10 }}>
@@ -196,19 +398,31 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
           {Array.from(new Set(wyniki.propozycje.map(p => p.taliaId))).map(taliaId => {
             const talia = talie.find(t => t.id === taliaId);
             const kartyTalii = wyniki.propozycje.map((p, i) => ({ ...p, idx: i })).filter(p => p.taliaId === taliaId);
+            const zmianWTalii = kartyTalii.filter(p => !p.odrzucona && p.zmiana !== "bez_zmian").length;
             return (
               <div key={taliaId} style={{ marginBottom: 12, background: "rgba(255,255,255,0.02)", borderRadius: 8, padding: 10 }}>
-                <div style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13, marginBottom: 8 }}>
-                  #{talia?.numer} {talia?.nazwa || taliaId}
+                <div style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13, marginBottom: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>#{talia?.numer} {talia?.nazwa || taliaId}</span>
+                  {zmianWTalii > 0 && (
+                    <span style={{ fontSize: 10, padding: "2px 7px", background: "rgba(0,200,100,0.15)", border: "1px solid #0c655", borderRadius: 10, color: "#0c6", fontWeight: "bold" }}>
+                      {zmianWTalii} {zmianWTalii === 1 ? "zmiana" : "zmian"}
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {kartyTalii.map(p => {
                     const kolorPewnosc = p.pewnosc === "wysoka" ? "#0c6" : p.pewnosc === "srednia" ? "#fa0" : "#f55";
                     const ikonaPewnosc = p.pewnosc === "wysoka" ? "✓" : p.pewnosc === "srednia" ? "⚠️" : "❓";
+                    const badgeZmiany = p.odrzucona ? null
+                      : p.zmiana === "nowa" ? { tekst: "🆕 NOWA", kolor: "#0c6", bg: "rgba(0,200,100,0.15)" }
+                      : p.zmiana === "usunieta" ? { tekst: "⚠️ utracona", kolor: "#fa0", bg: "rgba(255,165,0,0.12)" }
+                      : p.zmiana === "nowy_duplikat" ? { tekst: "💎 nowy dup", kolor: "#4169E1", bg: "rgba(65,105,225,0.15)" }
+                      : p.zmiana === "usuniety_duplikat" ? { tekst: "dup utracony", kolor: "#aaa", bg: "rgba(255,255,255,0.05)" }
+                      : null;
                     return (
                       <div key={p.idx} style={{
                         display: "flex", alignItems: "center", gap: 8, padding: "5px 8px",
-                        background: p.odrzucona ? "rgba(255,50,50,0.05)" : "rgba(0,0,0,0.2)",
+                        background: p.odrzucona ? "rgba(255,50,50,0.05)" : p.zmiana === "nowa" ? "rgba(0,200,100,0.06)" : "rgba(0,0,0,0.2)",
                         borderRadius: 6,
                         opacity: p.odrzucona ? 0.5 : 1,
                         borderLeft: `3px solid ${kolorPewnosc}`,
@@ -219,6 +433,11 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
                           <span style={{ fontSize: 10, color: p.typ === "złota" ? "#ffd700" : "#87CEEB", marginLeft: 6 }}>
                             {p.typ === "złota" ? "⭐" : "💎"}
                           </span>
+                          {badgeZmiany && (
+                            <span style={{ fontSize: 9, padding: "1px 6px", background: badgeZmiany.bg, border: `1px solid ${badgeZmiany.kolor}55`, borderRadius: 8, color: badgeZmiany.kolor, marginLeft: 6, fontWeight: "bold" }}>
+                              {badgeZmiany.tekst}
+                            </span>
+                          )}
                         </span>
                         <button onClick={() => togglePropozycja(p.idx, "ma")} style={{
                           padding: "3px 8px", fontSize: 11, borderRadius: 4, cursor: "pointer",
