@@ -335,7 +335,8 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapiszKarte,z
 
   const osoba=czlonkowie[wybranaOsoba];
   const typ=typWymiany==="złote"?"złota":"diamentowa";
-  const mozeEdytowac = isAdmin || (swojaOsoba && osoba && osoba.id===swojaOsoba.id);
+  // Tylko admin i zastępca mogą edytować karty
+  const mozeEdytowac = isAdmin;
 
   return (
     <div>
@@ -1349,7 +1350,9 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAkty
       )}
 
       <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📋 Status wszystkich wysyłek</div>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📋 Status wszystkich wysyłek
+          {isAdmin&&<span style={{fontSize:10,color:"#888",fontWeight:"normal",marginLeft:8}}>— kliknij ✅/⏳ żeby zaznaczyć za kogoś</span>}
+        </div>
         {Object.entries(poNadawcach).sort(([a],[b])=>(potwierdzone[b]?1:0)-(potwierdzone[a]?1:0)).map(([nadawca,ws])=>{
           const potw=potwierdzone[nadawca];
           return (
@@ -1358,7 +1361,15 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAkty
               background:potw?"rgba(0,200,100,0.06)":"rgba(255,255,255,0.02)",
               borderLeft:`3px solid ${potw?"#0c6":"#333"}`,borderRadius:6,marginBottom:4,
             }}>
-              <span style={{fontSize:16,marginTop:1}}>{potw?"✅":"⏳"}</span>
+              {isAdmin?(
+                <button onClick={()=>zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[nadawca]:!potw}})}
+                  style={{fontSize:16,background:"none",border:"none",cursor:"pointer",padding:0,marginTop:1}}
+                  title={potw?"Kliknij żeby cofnąć potwierdzenie":"Kliknij żeby potwierdzić za tę osobę"}>
+                  {potw?"✅":"⏳"}
+                </button>
+              ):(
+                <span style={{fontSize:16,marginTop:1}}>{potw?"✅":"⏳"}</span>
+              )}
               <div style={{flex:1}}>
                 <div style={{fontSize:12,fontWeight:"bold",color:potw?"#0c6":"#aaa"}}>{nadawca}</div>
                 {ws.map((w,i)=>(
