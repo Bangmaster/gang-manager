@@ -99,18 +99,13 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
     setWyniki({ propozycje, bledy });
     setAnalizujac(false);
 
-    // Ustaw cooldown — krótszy po sukcesie, dłuższy po błędach limitu
+    // Cooldown tylko po błędzie limitu
     const wystapilBladLimitu = bledy.some(b => b.blad?.includes("limit") || b.blad?.includes("⏳") || b.blad?.includes("⏰"));
     if (wystapilBladLimitu) {
       setCooldownAktywowanyZBleduLimitu(true);
-      setCooldownDo(Date.now() + 10 * 60 * 1000); // 10 min po błędzie
-    } else if (pliki.length >= 5) {
-      // Krótszy cooldown przy większych partiach
-      setCooldownDo(Date.now() + 5 * 60 * 1000); // 5 min
-    } else if (pliki.length >= 2) {
-      setCooldownDo(Date.now() + 60 * 1000); // 1 min przy małych partiach
+      setCooldownDo(Date.now() + 10 * 60 * 1000);
     }
-    // Po 1 screenie bez cooldownu
+    // Bez cooldownu przy normalnym zakończeniu — 3 klucze rotacyjne wystarczają
   };
 
   const togglePropozycja = (idx, pole) => {
