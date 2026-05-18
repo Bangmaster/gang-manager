@@ -232,6 +232,10 @@ export default function App() {
           aktywnaWymiana={dane.aktywnaWymiana}
           zalogowany={zalogowany}
           czlonkowie={dane.czlonkowie}
+          talie={talieSorted}
+          posiadane={dane.posiadane||{}}
+          duplikaty={dane.duplikaty||{}}
+          typWymiany={typWymiany}
           isAdmin={isAdmin}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
         />}
@@ -735,6 +739,74 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     });
   };
 
+  const [podmienDawce,setPodmienDawce]=useState(null); // {dawcaNazwa, idx}
+
+  // Znajdź alternatywną wymianę dla dawcy
+  const znajdzAlternatywe=(dawcaNazwa)=>{
+    // Znajdź dawcę w liście członków
+    const dawca=czlonkowie.find(c=>c.nazwa===dawcaNazwa);
+    if(!dawca) return null;
+
+    // Kto już wysyła (wszyscy dawcy z planu)
+    const juzWysylajacy=new Set(wynik.planoweWymiany.map(w=>w.od));
+    // Kto już odbiera
+    const juzOdbierajacy=new Set(wynik.planoweWymiany.map(w=>w.do));
+
+    // Szukaj kogokolwiek kto POTRZEBUJE karty którą dawca ma jako duplikat
+    // Priorytet: fazy 1-2, największa nagroda
+    const kandydaci=[];
+    const typ=typWymiany==="złote"?"złota":"diamentowa";
+    const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
+
+    czlonkowie.forEach(odbiorca=>{
+      if(odbiorca.id===dawca.id) return; // nie sam do siebie
+      talie.forEach(talia=>{
+        const kartyT=talia.karty.filter(k=>k.typ===typ);
+        const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
+        const brakT=kartyT.filter(k=>!posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]);
+        const brakO=kartyO.filter(k=>!posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]);
+        brakT.forEach(karta=>{
+          // Dawca musi mieć duplikat tej karty
+          if(!duplikaty[`${dawca.id}_${talia.id}_${karta.nazwa}`]) return;
+          const faza=obliczFaze(brakT.length,brakO.length);
+          kandydaci.push({
+            od:dawcaNazwa, do:odbiorca.nazwa,
+            karta:karta.nazwa, talia:talia.nazwa,
+            nagroda:talia.nagroda_amunicja||0, faza,
+            brakTCount:brakT.length, brakOCount:brakO.length,
+            trudna:TRUDNE_NUMERY.includes(talia.numer),
+          });
+        });
+      });
+    });
+
+    // Sortuj po fazie i nagrodzie
+    kandydaci.sort((a,b)=>{
+      if(a.faza!==b.faza) return a.faza-b.faza;
+      if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
+      return a.brakTCount-b.brakTCount;
+    });
+
+    // Wyklucz wymiany które już są w planie (ten dawca już wysyła tę kartę)
+    const juzWysylane=new Set(wynik.planoweWymiany.filter(w=>w.od===dawcaNazwa).map(w=>`${w.do}_${w.karta}`));
+    return kandydaci.filter(k=>`${k.do}_${k.karta}`!==juzWysylane.values().next().value).slice(0,5);
+  };
+
+  const podmienWymiane=(idx,nowaWymiana)=>{
+    setWynik(prev=>({
+      ...prev,
+      planoweWymiany: prev.planoweWymiany.map((w,i)=>i===idx?nowaWymiana:w)
+    }));
+    setPodmienDawce(null);
+  };
+
+  const usunWymiane=(idx)=>{
+    setWynik(prev=>({
+      ...prev,
+      planoweWymiany: prev.planoweWymiany.filter((_,i)=>i!==idx)
+    }));
+  };
+
   const generuj=()=>{
     const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
     setWynik(generujAlgorytm({talie:aktywne,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[]}));
@@ -938,18 +1010,57 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           return (
             <div key={faza} style={{marginBottom:12,background:"rgba(0,0,0,0.15)",border:`1px solid ${e.k}33`,borderRadius:10,overflow:"hidden"}}>
               <div style={{padding:"8px 14px",background:`${e.k}15`,color:e.k,fontWeight:"bold",fontSize:12,borderBottom:`1px solid ${e.k}25`}}>{e.t}</div>
-              {w.map((x,i)=>(
-                <div key={i} style={{padding:"8px 14px",borderBottom:i<w.length-1?"1px solid #12122a":"none",display:"flex",flexWrap:"wrap",alignItems:"center",gap:8}}>
-                  <span style={{background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b",padding:"2px 8px",borderRadius:20,fontSize:12,color:"#ffd700",fontWeight:"bold"}}>{x.od}</span>
-                  <span style={{color:"#444"}}>→</span>
-                  <span style={{background:`${e.k}18`,border:`1px solid ${e.k}`,padding:"2px 8px",borderRadius:20,fontSize:12,color:e.k,fontWeight:"bold"}}>{x.do}</span>
-                  <span style={{fontSize:12,color:"#ddd"}}><strong>{x.karta}</strong></span>
-                  <span style={{fontSize:11,color:"#555"}}>[{x.talia}]</span>
-                  {x.brakOCount>0&&<span style={{fontSize:10,color:"#87CEEB",background:"rgba(65,105,225,0.12)",padding:"1px 6px",borderRadius:10}}>jeszcze brak {x.brakOCount} {typWymiany==="złote"?"💎":"⭐"}</span>}
-                  {x.trudna&&<span style={{fontSize:10,color:"#f55"}}>⚠️trudna</span>}
-                  <span style={{marginLeft:"auto",fontSize:11,color:"#fa0"}}>🎯{x.nagroda?.toLocaleString()}</span>
-                </div>
-              ))}
+              {w.map((x,i)=>{
+                  const globalIdx=wynik.planoweWymiany.indexOf(x);
+                  const pokazujPodmien=podmienDawce?.globalIdx===globalIdx;
+                  const alternatywy=pokazujPodmien?znajdzAlternatywe(x.od):[];
+                  return (
+                    <div key={i}>
+                      <div style={{padding:"8px 14px",borderBottom:(!pokazujPodmien&&i<w.length-1)?"1px solid #12122a":"none",display:"flex",flexWrap:"wrap",alignItems:"center",gap:8}}>
+                        <span style={{background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b",padding:"2px 8px",borderRadius:20,fontSize:12,color:"#ffd700",fontWeight:"bold"}}>{x.od}</span>
+                        <span style={{color:"#444"}}>→</span>
+                        <span style={{background:`${e.k}18`,border:`1px solid ${e.k}`,padding:"2px 8px",borderRadius:20,fontSize:12,color:e.k,fontWeight:"bold"}}>{x.do}</span>
+                        <span style={{fontSize:12,color:"#ddd"}}><strong>{x.karta}</strong></span>
+                        <span style={{fontSize:11,color:"#555"}}>[{x.talia}]</span>
+                        {x.brakOCount>0&&<span style={{fontSize:10,color:"#87CEEB",background:"rgba(65,105,225,0.12)",padding:"1px 6px",borderRadius:10}}>jeszcze brak {x.brakOCount} {typWymiany==="złote"?"💎":"⭐"}</span>}
+                        {x.trudna&&<span style={{fontSize:10,color:"#f55"}}>⚠️trudna</span>}
+                        <span style={{fontSize:11,color:"#fa0"}}>🎯{x.nagroda?.toLocaleString()}</span>
+                        <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+                          <button onClick={()=>setPodmienDawce(pokazujPodmien?null:{globalIdx,dawca:x.od})} style={{
+                            padding:"2px 8px",background:pokazujPodmien?"rgba(255,215,0,0.2)":"rgba(255,165,0,0.1)",
+                            border:`1px solid ${pokazujPodmien?"#ffd700":"#fa055"}`,borderRadius:4,
+                            color:pokazujPodmien?"#ffd700":"#fa0",cursor:"pointer",fontSize:10,
+                          }}>🔄 Podmień</button>
+                          <button onClick={()=>usunWymiane(globalIdx)} style={{
+                            padding:"2px 6px",background:"rgba(255,50,50,0.1)",border:"none",
+                            borderRadius:4,color:"#f5544488",cursor:"pointer",fontSize:10,
+                          }}>✕</button>
+                        </div>
+                      </div>
+                      {pokazujPodmien&&(
+                        <div style={{padding:"8px 14px",background:"rgba(255,165,0,0.05)",borderBottom:i<w.length-1?"1px solid #12122a":"none"}}>
+                          <div style={{fontSize:11,color:"#fa0",marginBottom:6}}>
+                            🔄 Alternatywne wymiany dla <strong>{x.od}</strong> — karta wpadła odbiorcy z paczki?
+                          </div>
+                          {alternatywy.length===0?(
+                            <div style={{fontSize:11,color:"#666"}}>Brak alternatyw — {x.od} nie ma innych duplikatów które ktoś potrzebuje</div>
+                          ):alternatywy.map((alt,ai)=>(
+                            <div key={ai} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",flexWrap:"wrap"}}>
+                              <span style={{fontSize:11,color:["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>F{alt.faza}</span>
+                              <span style={{fontSize:11,color:"#888"}}>→ <strong style={{color:"#ddd"}}>{alt.do}</strong>: {alt.karta}</span>
+                              <span style={{fontSize:10,color:"#666"}}>[{alt.talia}]</span>
+                              <span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>
+                              <button onClick={()=>podmienWymiane(globalIdx,alt)} style={{
+                                marginLeft:"auto",padding:"2px 10px",background:"rgba(0,200,100,0.15)",
+                                border:"1px solid #0c644",borderRadius:4,color:"#0c6",cursor:"pointer",fontSize:10,fontWeight:"bold",
+                              }}>Wybierz</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           );
         })}
@@ -1256,8 +1367,9 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
   );
 }
 
-function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAktywna}) {
+function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna}) {
   const [zamykanie,setZamykanie]=useState(false);
+  const [podmienIdx,setPodmienIdx]=useState(null); // indeks wymiany do podmiany
 
   if(!aktywnaWymiana) return (
     <div style={{textAlign:"center",padding:50,color:"#555"}}>
@@ -1267,12 +1379,13 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAkty
     </div>
   );
 
-  const {wymiany,typWymiany,data,potwierdzone={}} = aktywnaWymiana;
+  const {wymiany,data,potwierdzone={}} = aktywnaWymiana;
+  const typAkt=aktywnaWymiana.typWymiany||typWymiany;
   const czyPotwierdzilem=potwierdzone[zalogowany.login];
   const poNadawcach={};
-  wymiany.forEach(w=>{
+  wymiany.forEach((w,i)=>{
     if(!poNadawcach[w.od]) poNadawcach[w.od]=[];
-    poNadawcach[w.od].push(w);
+    poNadawcach[w.od].push({...w,_idx:i});
   });
   const potwierdzonychCount=Object.keys(potwierdzone).filter(k=>potwierdzone[k]).length;
   const wszystkichNadawcow=Object.keys(poNadawcach).length;
@@ -1290,21 +1403,69 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAkty
     setZamykanie(false);
   };
 
+  // Znajdź alternatywy dla dawcy (karta wpadła z paczki)
+  const znajdzAlternatywy=(dawcaNazwa,wykluczonaWymiana)=>{
+    const dawca=czlonkowie.find(c=>c.nazwa===dawcaNazwa);
+    if(!dawca||!talie) return [];
+    const typ=typAkt==="złote"?"złota":"diamentowa";
+    const oppTyp=typAkt==="złote"?"diamentowa":"złota";
+    // Kto już wysyła (nie licząc podmieniany wymiany)
+    const juzWysylajacy=new Set(wymiany.filter((_,i)=>i!==wykluczonaWymiana._idx).map(w=>w.od));
+    const kandydaci=[];
+    czlonkowie.forEach(odbiorca=>{
+      if(odbiorca.id===dawca.id) return;
+      talie.forEach(talia=>{
+        const kartyT=talia.karty.filter(k=>k.typ===typ);
+        const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
+        const brakT=kartyT.filter(k=>!posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]);
+        const brakO=kartyO.filter(k=>!posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]);
+        brakT.forEach(karta=>{
+          if(!duplikaty[`${dawca.id}_${talia.id}_${karta.nazwa}`]) return;
+          // Nie proponuj tej samej wymiany co jest już w planie
+          const juzJest=wymiany.some((w,i)=>i!==wykluczonaWymiana._idx&&w.od===dawcaNazwa&&w.do===odbiorca.nazwa&&w.karta===karta.nazwa);
+          if(juzJest) return;
+          const faza=obliczFaze(brakT.length,brakO.length);
+          kandydaci.push({od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja||0,faza,brakTCount:brakT.length,brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer)});
+        });
+      });
+    });
+    return kandydaci.sort((a,b)=>{
+      if(a.faza!==b.faza) return a.faza-b.faza;
+      if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
+      return a.brakTCount-b.brakTCount;
+    }).slice(0,6);
+  };
+
+  const podmienWymiane=async(staryIdx,nowaWymiana)=>{
+    const noweWymiany=[...wymiany];
+    noweWymiany[staryIdx]={...nowaWymiana};
+    // Resetuj potwierdzenie dawcy bo musi wysłać inną kartę
+    const nowePotwierdzone={...potwierdzone,[nowaWymiana.od]:false};
+    await zapiszAktywna({...aktywnaWymiana,wymiany:noweWymiany,potwierdzone:nowePotwierdzone});
+    setPodmienIdx(null);
+  };
+
+  const usunWymiane=async(idx)=>{
+    const noweWymiany=wymiany.filter((_,i)=>i!==idx);
+    await zapiszAktywna({...aktywnaWymiana,wymiany:noweWymiany});
+    if(podmienIdx===idx) setPodmienIdx(null);
+  };
+
   return (
     <div>
+      {/* Nagłówek */}
       <div style={{background:"linear-gradient(135deg,rgba(0,200,100,0.1),rgba(0,100,50,0.1))",border:"1px solid #0c6",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
           <div>
             <div style={{fontSize:15,fontWeight:"bold",color:"#0c6"}}>📤 Aktywna wymiana</div>
             <div style={{fontSize:11,color:"#888",marginTop:2}}>
-              {typWymiany==="złote"?"⭐ Złote":"💎 Diamentowe"} • {new Date(data).toLocaleString("pl-PL")} • {wymiany.length} wymian
+              {typAkt==="złote"?"⭐ Złote":"💎 Diamentowe"} • {new Date(data).toLocaleString("pl-PL")} • {wymiany.length} wymian
             </div>
           </div>
           {isAdmin&&(
-            <button onClick={zamknijWymiane} disabled={zamykanie} style={{
-              padding:"5px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544488",
-              borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11,
-            }}>{zamykanie?"⏳":"🗑"} Zamknij wymianę</button>
+            <button onClick={zamknijWymiane} disabled={zamykanie} style={{padding:"5px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544488",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>
+              {zamykanie?"⏳":"🗑"} Zamknij wymianę
+            </button>
           )}
         </div>
         <div style={{marginTop:12}}>
@@ -1318,6 +1479,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAkty
         </div>
       </div>
 
+      {/* Moja wymiana */}
       {poNadawcach[zalogowany.login]?(
         <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"#ffd700"}`,borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:"bold",color:czyPotwierdzilem?"#0c6":"#ffd700",marginBottom:8}}>
@@ -1331,15 +1493,13 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAkty
           ))}
           <div style={{marginTop:12}}>
             {!czyPotwierdzilem?(
-              <button onClick={potwierdz} style={{
-                width:"100%",padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",
-                border:"none",borderRadius:8,color:"#000",fontSize:14,fontWeight:"bold",cursor:"pointer",
-              }}>✅ Potwierdzam — wysłałem kartę!</button>
+              <button onClick={potwierdz} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontSize:14,fontWeight:"bold",cursor:"pointer"}}>
+                ✅ Potwierdzam — wysłałem kartę!
+              </button>
             ):(
-              <button onClick={cofnijPotwierdzenie} style={{
-                width:"100%",padding:8,background:"rgba(255,255,255,0.05)",
-                border:"1px solid #333",borderRadius:8,color:"#666",fontSize:12,cursor:"pointer",
-              }}>↩️ Cofnij potwierdzenie</button>
+              <button onClick={cofnijPotwierdzenie} style={{width:"100%",padding:8,background:"rgba(255,255,255,0.05)",border:"1px solid #333",borderRadius:8,color:"#666",fontSize:12,cursor:"pointer"}}>
+                ↩️ Cofnij potwierdzenie
+              </button>
             )}
           </div>
         </div>
@@ -1349,35 +1509,88 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,isAdmin,zapiszAkty
         </div>
       )}
 
+      {/* Status wszystkich — z podmianą dla admina */}
       <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📋 Status wszystkich wysyłek
-          {isAdmin&&<span style={{fontSize:10,color:"#888",fontWeight:"normal",marginLeft:8}}>— kliknij ✅/⏳ żeby zaznaczyć za kogoś</span>}
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+          📋 Status wszystkich wysyłek
+          {isAdmin&&<span style={{fontSize:10,color:"#888",fontWeight:"normal",marginLeft:8}}>— ✅/⏳ kliknij żeby zaznaczyć • 🔄 podmień jeśli karta wpadła z paczki</span>}
         </div>
+
         {Object.entries(poNadawcach).sort(([a],[b])=>(potwierdzone[b]?1:0)-(potwierdzone[a]?1:0)).map(([nadawca,ws])=>{
           const potw=potwierdzone[nadawca];
           return (
-            <div key={nadawca} style={{
-              display:"flex",alignItems:"flex-start",gap:10,padding:"8px 10px",
-              background:potw?"rgba(0,200,100,0.06)":"rgba(255,255,255,0.02)",
-              borderLeft:`3px solid ${potw?"#0c6":"#333"}`,borderRadius:6,marginBottom:4,
-            }}>
-              {isAdmin?(
-                <button onClick={()=>zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[nadawca]:!potw}})}
-                  style={{fontSize:16,background:"none",border:"none",cursor:"pointer",padding:0,marginTop:1}}
-                  title={potw?"Kliknij żeby cofnąć potwierdzenie":"Kliknij żeby potwierdzić za tę osobę"}>
-                  {potw?"✅":"⏳"}
-                </button>
-              ):(
-                <span style={{fontSize:16,marginTop:1}}>{potw?"✅":"⏳"}</span>
-              )}
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:"bold",color:potw?"#0c6":"#aaa"}}>{nadawca}</div>
-                {ws.map((w,i)=>(
-                  <div key={i} style={{fontSize:11,color:"#666",marginTop:2}}>
-                    → <span style={{color:"#888"}}>{w.do}</span>: {w.karta}
-                  </div>
-                ))}
+            <div key={nadawca} style={{background:potw?"rgba(0,200,100,0.06)":"rgba(255,255,255,0.02)",borderLeft:`3px solid ${potw?"#0c6":"#333"}`,borderRadius:6,marginBottom:6,overflow:"hidden"}}>
+              {/* Nagłówek nadawcy */}
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px"}}>
+                {isAdmin?(
+                  <button onClick={()=>zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[nadawca]:!potw}})}
+                    style={{fontSize:16,background:"none",border:"none",cursor:"pointer",padding:0}}
+                    title={potw?"Cofnij potwierdzenie":"Potwierdź za tę osobę"}>
+                    {potw?"✅":"⏳"}
+                  </button>
+                ):(
+                  <span style={{fontSize:16}}>{potw?"✅":"⏳"}</span>
+                )}
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:"bold",color:potw?"#0c6":"#aaa"}}>{nadawca}</div>
+                </div>
               </div>
+
+              {/* Wymiany tego nadawcy */}
+              {ws.map((w)=>{
+                const pokazPodmien=podmienIdx===w._idx;
+                const alternatywy=isAdmin&&pokazPodmien?znajdzAlternatywy(nadawca,w):[];
+                return (
+                  <div key={w._idx}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px 5px 38px",borderTop:"1px solid #12122a",flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,color:"#888"}}>→</span>
+                      <span style={{fontSize:12,color:"#ddd",flex:1}}>
+                        <strong style={{color:"#ffd700"}}>{w.karta}</strong>
+                        <span style={{color:"#888",fontSize:11}}> do </span>
+                        <strong>{w.do}</strong>
+                        <span style={{fontSize:10,color:"#555",marginLeft:6}}>[{w.talia}]</span>
+                      </span>
+                      {isAdmin&&(
+                        <div style={{display:"flex",gap:4}}>
+                          <button onClick={()=>setPodmienIdx(pokazPodmien?null:w._idx)} style={{
+                            padding:"2px 8px",fontSize:10,borderRadius:4,cursor:"pointer",
+                            background:pokazPodmien?"rgba(255,215,0,0.2)":"rgba(255,165,0,0.08)",
+                            border:`1px solid ${pokazPodmien?"#ffd700":"#fa055"}`,
+                            color:pokazPodmien?"#ffd700":"#fa0",
+                          }}>🔄 Podmień</button>
+                          <button onClick={()=>usunWymiane(w._idx)} style={{padding:"2px 6px",fontSize:10,borderRadius:4,cursor:"pointer",background:"rgba(255,50,50,0.08)",border:"none",color:"#f5544488"}}>✕</button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Panel alternatyw */}
+                    {isAdmin&&pokazPodmien&&(
+                      <div style={{padding:"8px 10px 10px 38px",background:"rgba(255,165,0,0.05)",borderTop:"1px solid #fa022"}}>
+                        <div style={{fontSize:11,color:"#fa0",marginBottom:6}}>
+                          🔄 Karta <strong>{w.karta}</strong> wpadła {w.do} z paczki? Wybierz alternatywę dla <strong>{nadawca}</strong>:
+                        </div>
+                        {alternatywy.length===0?(
+                          <div style={{fontSize:11,color:"#555"}}>Brak alternatyw — {nadawca} nie ma innych duplikatów których ktoś potrzebuje</div>
+                        ):alternatywy.map((alt,ai)=>(
+                          <div key={ai} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid #12122a22",flexWrap:"wrap"}}>
+                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>F{alt.faza}</span>
+                            <span style={{fontSize:11,flex:1,color:"#ddd"}}>
+                              <strong style={{color:"#ffd700"}}>{alt.karta}</strong>
+                              <span style={{color:"#888"}}> → {alt.do}</span>
+                              <span style={{fontSize:10,color:"#555",marginLeft:4}}>[{alt.talia}]</span>
+                            </span>
+                            <span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>
+                            <button onClick={()=>podmienWymiane(w._idx,alt)} style={{
+                              padding:"3px 10px",fontSize:11,fontWeight:"bold",borderRadius:4,cursor:"pointer",
+                              background:"rgba(0,200,100,0.15)",border:"1px solid #0c644",color:"#0c6",
+                            }}>✓ Wybierz</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
