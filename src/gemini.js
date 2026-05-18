@@ -5,6 +5,8 @@ const KLUCZE_API = [
   process.env.REACT_APP_GEMINI_API_KEY || "",
   process.env.REACT_APP_GEMINI_API_KEY_2 || "",
   process.env.REACT_APP_GEMINI_API_KEY_3 || "",
+  process.env.REACT_APP_GEMINI_API_KEY_4 || "",
+  process.env.REACT_APP_GEMINI_API_KEY_5 || "",
 ].filter(k => k.length > 0);
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -33,9 +35,34 @@ function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
     `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
   ).join("\n");
-  return `Rozpoznaj karty z gry The Gang. Stan: POSIADANA=kolorowa, DUPLIKAT=posiadana+cyfra+1/+2, BRAK=szara GANG. Typy: złota=żółta ramka, diamentowa=niebiesko-biała.
-Talie: ${info}
-Zidentyfikuj talię z górnego paska. Zwróć WYŁĄCZNIE JSON: {"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
+  return `Rozpoznaj karty z gry The Gang. Jesteś ekspertem od tej gry.
+
+JAK ROZRÓŻNIĆ POSIADANĄ OD BRAK — to najważniejsze:
+
+POSIADANA karta:
+- Widać KOLOROWĄ ILUSTRACJĘ/GRAFIKĘ — postacie, sceny, kolory, szczegóły
+- Pasek nazwy na dole ma żywe kolory (pomarańczowy/złoty)
+- Karta wygląda "wypełniona"
+
+BRAK karty (nie posiada):
+- Środek karty jest SZARY z napisem "GANG" lub "THE GANG" — brak ilustracji
+- Może mieć efekt błyszczący/holograficzny NA TLE ale sam środek jest szary i pusty
+- To NIE jest posiadana — szary środek = false zawsze
+
+TYPY (tylko dla posiadanych):
+- ZŁOTA: żółto-pomarańczowa ramka i gwiazdki
+- DIAMENTOWA: biało-niebieska holograficzna ramka, fioletowe gwiazdki
+
+DUPLIKAT: żółta cyfra "+1"/"+2"/"+3" w prawym dolnym rogu posiadanej karty.
+
+UWAGA: Diamentowe karty BRAK też mogą mieć błyszczące tło — to nie znaczy że są posiadane! Zawsze sprawdź czy widać ILUSTRACJĘ w środku karty. Brak ilustracji = false.
+
+Talie (z=złota, d=diamentowa):
+${info}
+
+Zidentyfikuj talię z napisu "TALIA WYDARZEŃ:" na górze screena.
+Zwróć WYŁĄCZNIE JSON (bez markdown, bez tekstu):
+{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
 }
 
 async function geminiRequest(prompt, base64, mimeType) {
