@@ -8,6 +8,14 @@ const ADMIN_CREDENTIALS = [
   { login: "zastepca", haslo: "Twojastara00", rola: "zastepca" },
 ];
 
+// Normalizuje tekst do porównania — usuwa polskie znaki i zamienia na małe litery
+function normalizuj(s) {
+  return (s||"").toLowerCase()
+    .replace(/ą/g,"a").replace(/ć/g,"c").replace(/ę/g,"e")
+    .replace(/ł/g,"l").replace(/ń/g,"n").replace(/ó/g,"o")
+    .replace(/ś/g,"s").replace(/ź/g,"z").replace(/ż/g,"z");
+}
+
 const TRUDNE_NUMERY = [10, 11, 12, 14, 15];
 
 const DOMYSLNE_TALIE = [
@@ -192,7 +200,7 @@ export default function App() {
     } catch {}
   }, [zalogowany]);
 
-  if (!zalogowany) return <LoginScreen onLogin={setZalogowany}/>;
+  if (!zalogowany) return <LoginScreen onLogin={setZalogowany} czlonkowie={dane?.czlonkowie||[]}/>;  
   if (!dane) return <LoadingScreen/>;
 
   const isAdmin = zalogowany.rola === "admin" || zalogowany.rola === "zastepca";
@@ -329,7 +337,7 @@ function LoadingScreen() {
   );
 }
 
-function LoginScreen({onLogin}) {
+function LoginScreen({onLogin, czlonkowie}) {
   const [login,setLogin]=useState("");
   const [haslo,setHaslo]=useState("");
   const [blad,setBlad]=useState("");
@@ -337,7 +345,12 @@ function LoginScreen({onLogin}) {
   const zaloguj=()=>{
     const u=ADMIN_CREDENTIALS.find(c=>c.login===login&&c.haslo===haslo);
     if(u){onLogin(u);return;}
-    if(login.trim().length>=2&&haslo===""){onLogin({login:login.trim(),rola:"czlonek"});return;}
+    if(login.trim().length>=2&&haslo===""){
+      // Znajdź oryginalny nick w bazie (case-insensitive)
+      const oryginalny=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(login.trim()));
+      onLogin({login: oryginalny ? oryginalny.nazwa : login.trim(), rola:"czlonek"});
+      return;
+    }
     setBlad("Błędne dane. Członek: tylko nick (bez hasła). Admin: login + hasło.");
   };
 
@@ -364,7 +377,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapiszKarte,z
   const isAdmin = zalogowany.rola==="admin"||zalogowany.rola==="zastepca";
 
   // Członek może edytować tylko swoje (po nazwie)
-  const swojaOsoba = czlonkowie.find(c=>c.nazwa.toLowerCase()===zalogowany.login.toLowerCase());
+  const swojaOsoba = czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(zalogowany.login));
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
   const [wybranaOsoba,setWybranaOsoba]=useState(startIdx);
 
@@ -1300,16 +1313,15 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
   });
 
   // Filtruj
-  const frazy=szukaj.split("\n").map(l=>l.trim().toLowerCase()).filter(l=>l.length>0);
+  const frazy=szukaj.split("\n").map(l=>normalizuj(l.trim())).filter(l=>l.length>0);
   const filtered=wszystkieDup.filter(d=>{
     if(filtrTyp!=="wszystkie"&&d.kartaTyp!==filtrTyp) return false;
     if(filtrTalia!=="wszystkie"&&d.taliaId!==filtrTalia) return false;
     if(frazy.length>0){
-      // Pasuje jeśli którakolwiek fraza trafia w kartę, talię lub gracza
       const pasuje=frazy.some(f=>
-        d.kartaNazwa.toLowerCase().includes(f)||
-        d.taliaNazwa.toLowerCase().includes(f)||
-        d.posiadacze.some(p=>p.nick.toLowerCase().includes(f))
+        normalizuj(d.kartaNazwa).includes(f)||
+        normalizuj(d.taliaNazwa).includes(f)||
+        d.posiadacze.some(p=>normalizuj(p.nick).includes(f))
       );
       if(!pasuje) return false;
     }
@@ -1424,20 +1436,31 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 
   const {wymiany,data,potwierdzone={}} = aktywnaWymiana;
   const typAkt=aktywnaWymiana.typWymiany||typWymiany;
-  const czyPotwierdzilem=potwierdzone[zalogowany.login];
+
+  // Dopasowanie nicku bez uwzględnienia wielkości liter
+  const loginLower = normalizuj(zalogowany.login);
+  const mojNick = Object.keys(
+    wymiany.reduce((acc,w)=>{acc[w.od]=1;return acc;},{})
+  ).find(nick => normalizuj(nick) === loginLower) || zalogowany.login;
+  // Klucz potwierdzenia też szukamy case-insensitive + bez polskich znaków
+  const mojKluczPotw = Object.keys(potwierdzone)
+    .find(k => normalizuj(k) === loginLower) || zalogowany.login;
+
+  const czyPotwierdzilem=potwierdzone[mojKluczPotw];
   const poNadawcach={};
   wymiany.forEach((w,i)=>{
     if(!poNadawcach[w.od]) poNadawcach[w.od]=[];
     poNadawcach[w.od].push({...w,_idx:i});
   });
+  const mojePozycje = poNadawcach[mojNick];
   const potwierdzonychCount=Object.keys(potwierdzone).filter(k=>potwierdzone[k]).length;
   const wszystkichNadawcow=Object.keys(poNadawcach).length;
 
   const potwierdz=async()=>{
-    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[zalogowany.login]:true}});
+    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[mojNick]:true}});
   };
   const cofnijPotwierdzenie=async()=>{
-    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[zalogowany.login]:false}});
+    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[mojNick]:false}});
   };
   const zamknijWymiane=async()=>{
     if(!window.confirm("Zamknąć aktywną wymianę? Zniknie dla wszystkich.")) return;
@@ -1525,12 +1548,12 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
       </div>
 
       {/* Moja wymiana */}
-      {poNadawcach[zalogowany.login]?(
+      {mojePozycje?(
         <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"#ffd700"}`,borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:"bold",color:czyPotwierdzilem?"#0c6":"#ffd700",marginBottom:8}}>
             {czyPotwierdzilem?"✅ Twoja wymiana — POTWIERDZONA":"👋 Twoja wymiana — wyślij kartę!"}
           </div>
-          {poNadawcach[zalogowany.login].map((w,i)=>(
+          {mojePozycje.map((w,i)=>(
             <div key={i} style={{fontSize:13,color:"#ddd",padding:"5px 0",borderBottom:"1px solid #12122a"}}>
               Wyślij <strong style={{color:"#ffd700"}}>{w.karta}</strong> do <strong style={{color:"#0c6"}}>{w.do}</strong>
               <span style={{fontSize:11,color:"#666",marginLeft:6}}>[{w.talia}]</span>
@@ -1549,8 +1572,9 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           </div>
         </div>
       ):(
-        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#666",textAlign:"center"}}>
-          Nie masz żadnej wymiany do wykonania w tej rundzie
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8,padding:12,marginBottom:14,textAlign:"center"}}>
+          <div style={{fontSize:12,color:"#666"}}>Nie masz żadnej wymiany do wykonania w tej rundzie</div>
+          <div style={{fontSize:10,color:"#444",marginTop:4}}>Szukam po nicku: <span style={{color:"#666"}}>{mojNick}</span></div>
         </div>
       )}
 
