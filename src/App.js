@@ -180,7 +180,7 @@ export default function App() {
   const tabs = [
     {id:"dane",label:"📋 Dane gangu"},
     {id:"duplikaty",label:"🔄 Duplikaty"},
-    {id:"aktywna",label:dane?.aktywnaWymiana?"📤 Wymiana ●":"📤 Wymiana"},
+    {id:"aktywna",label:dane?.aktywnaWymiana?"📋 ROZPISKA ●":"📋 ROZPISKA"},
     {id:"wynik",label:"⚡ Generuj"},
     ...(isAdmin?[{id:"ocr",label:"📸 OCR talii"},{id:"walki",label:"🎯 Walki"},{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
   ];
@@ -1419,11 +1419,14 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           const juzJest=wymiany.some((w,i)=>i!==wykluczonaWymiana._idx&&w.od===dawcaNazwa&&w.do===odbiorca.nazwa&&w.karta===karta.nazwa);
           if(juzJest) return;
           const faza=obliczFaze(brakT.length,brakO.length);
-          kandydaci.push({od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja||0,faza,brakTCount:brakT.length,brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer)});
+          const zamknieTalie=brakT.length===1&&brakO.length===0;
+          kandydaci.push({od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja||0,faza,brakTCount:brakT.length,brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer),zamknieTalie});
         });
       });
     });
     return kandydaci.sort((a,b)=>{
+      // Najpierw te które zamkną talię
+      if(b.zamknieTalie!==a.zamknieTalie) return (b.zamknieTalie?1:0)-(a.zamknieTalie?1:0);
       if(a.faza!==b.faza) return a.faza-b.faza;
       if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
       return a.brakTCount-b.brakTCount;
@@ -1566,17 +1569,27 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                         {alternatywy.length===0?(
                           <div style={{fontSize:11,color:"#555"}}>Brak alternatyw — {nadawca} nie ma innych duplikatów których ktoś potrzebuje</div>
                         ):alternatywy.map((alt,ai)=>(
-                          <div key={ai} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid #12122a22",flexWrap:"wrap"}}>
+                          <div key={ai} style={{
+                            display:"flex",alignItems:"center",gap:6,padding:"6px 0",
+                            borderBottom:"1px solid #12122a22",flexWrap:"wrap",
+                            background:alt.zamknieTalie?"rgba(0,200,100,0.05)":"transparent",
+                          }}>
+                            {alt.zamknieTalie&&(
+                              <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"rgba(0,200,100,0.2)",border:"1px solid #0c6",color:"#0c6",fontWeight:"bold",width:"100%",marginBottom:2}}>
+                                🏆 ZAMKNIE TALIĘ — +{alt.nagroda?.toLocaleString()} amunicji dla gangu!
+                              </span>
+                            )}
                             <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>F{alt.faza}</span>
                             <span style={{fontSize:11,flex:1,color:"#ddd"}}>
                               <strong style={{color:"#ffd700"}}>{alt.karta}</strong>
                               <span style={{color:"#888"}}> → {alt.do}</span>
                               <span style={{fontSize:10,color:"#555",marginLeft:4}}>[{alt.talia}]</span>
                             </span>
-                            <span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>
+                            {!alt.zamknieTalie&&<span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>}
                             <button onClick={()=>podmienWymiane(w._idx,alt)} style={{
                               padding:"3px 10px",fontSize:11,fontWeight:"bold",borderRadius:4,cursor:"pointer",
-                              background:"rgba(0,200,100,0.15)",border:"1px solid #0c644",color:"#0c6",
+                              background:alt.zamknieTalie?"rgba(0,200,100,0.25)":"rgba(0,200,100,0.15)",
+                              border:`1px solid ${alt.zamknieTalie?"#0c6":"#0c644"}`,color:"#0c6",
                             }}>✓ Wybierz</button>
                           </div>
                         ))}
