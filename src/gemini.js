@@ -201,6 +201,8 @@ Zwróć dokładnie 9 kart.`;
     return { sukces: false, blad: e.message };
   }
 }
+
+export async function analyzeImage(file, wszystkieTalie) {
   try {
     if (KLUCZE_API.length === 0) return { sukces: false, blad: "🔑 Brak klucza API", fileName: file.name };
     const { base64, mimeType } = await fileToBase64(file);
