@@ -41,28 +41,34 @@ JAK ROZRÓŻNIĆ POSIADANĄ OD BRAK — to najważniejsze:
 
 POSIADANA karta:
 - Widać KOLOROWĄ ILUSTRACJĘ/GRAFIKĘ — postacie, sceny, kolory, szczegóły
-- Pasek nazwy na dole ma żywe kolory (pomarańczowy/złoty)
+- Pasek nazwy na dole ma żywe kolory (pomarańczowy/złoty/zielony)
 - Karta wygląda "wypełniona"
 
 BRAK karty (nie posiada):
 - Środek karty jest SZARY z napisem "GANG" lub "THE GANG" — brak ilustracji
-- Może mieć efekt błyszczący/holograficzny NA TLE ale sam środek jest szary i pusty
-- To NIE jest posiadana — szary środek = false zawsze
+- Może mieć efekt błyszczący NA TLE ale sam środek jest szary i pusty
+- Szary środek = false ZAWSZE
 
 TYPY (tylko dla posiadanych):
 - ZŁOTA: żółto-pomarańczowa ramka i gwiazdki
 - DIAMENTOWA: biało-niebieska holograficzna ramka, fioletowe gwiazdki
 
-DUPLIKAT: żółta cyfra "+1"/"+2"/"+3" w prawym dolnym rogu posiadanej karty.
+DUPLIKAT — WAŻNE, czytaj uważnie:
+- To jest posiadana karta która ma ŻÓŁTĄ CYFRĘ w prawym dolnym rogu (+1, +2, +3, +4, +5, +6, +7 itp.)
+- NIE WAŻNE jaka to cyfra — wystarczy że widzisz JAKĄKOLWIEK cyfrę = duplikat: true
+- Cyfra może być mała i trudna do odczytania — jeśli widzisz jakikolwiek żółty znacznik w rogu = duplikat: true
+- Brak cyfry = duplikat: false
 
-UWAGA: Diamentowe karty BRAK też mogą mieć błyszczące tło — to nie znaczy że są posiadane! Zawsze sprawdź czy widać ILUSTRACJĘ w środku karty. Brak ilustracji = false.
+UWAGA: Diamentowe karty BRAK też mają błyszczące tło — to nie znaczy że są posiadane!
 
 Talie (z=złota, d=diamentowa):
 ${info}
 
 Zidentyfikuj talię z napisu "TALIA WYDARZEŃ:" na górze screena.
 Zwróć WYŁĄCZNIE JSON (bez markdown, bez tekstu):
-{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
+{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":1,"pewnosc":"wysoka|srednia|niska"}]}
+
+WAŻNE: pole "duplikaty" to zawsze 0 lub 1 — nie podawaj innych liczb. 1 = ma duplikat, 0 = nie ma.`;
 }
 
 async function geminiRequest(prompt, base64, mimeType) {
