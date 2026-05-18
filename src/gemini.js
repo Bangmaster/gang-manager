@@ -35,40 +35,25 @@ function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
     `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
   ).join("\n");
-  return `Rozpoznaj karty z gry The Gang. Jesteś ekspertem od tej gry.
+  return `Rozpoznaj karty z gry The Gang. Użyj GWIAZDEK jako głównego sygnału.
 
-JAK ROZRÓŻNIĆ POSIADANĄ OD BRAK — to najważniejsze:
+GWIAZDKI NA GÓRZE KAŻDEJ KARTY — to główny wyróżnik:
+⭐ ŻÓŁTE/ZŁOTE gwiazdki = karta ZŁOTA i POSIADANA → typ: złota, posiadana: true
+💜 FIOLETOWE/RÓŻOWE gwiazdki = karta DIAMENTOWA i POSIADANA → typ: diamentowa, posiadana: true  
+☆ SZARE gwiazdki (wypełnione lub puste) = karta NIEPOSIADANA → posiadana: false (niezależnie od koloru ilustracji!)
 
-POSIADANA karta:
-- Widać KOLOROWĄ ILUSTRACJĘ/GRAFIKĘ — postacie, sceny, kolory, szczegóły
-- Pasek nazwy na dole ma żywe kolory (pomarańczowy/złoty/zielony)
-- Karta wygląda "wypełniona"
-
-BRAK karty (nie posiada):
-- Środek karty jest SZARY z napisem "GANG" lub "THE GANG" — brak ilustracji
-- Może mieć efekt błyszczący NA TLE ale sam środek jest szary i pusty
-- Szary środek = false ZAWSZE
-
-TYPY (tylko dla posiadanych):
-- ZŁOTA: żółto-pomarańczowa ramka i gwiazdki
-- DIAMENTOWA: biało-niebieska holograficzna ramka, fioletowe gwiazdki
-
-DUPLIKAT — WAŻNE, czytaj uważnie:
-- To jest posiadana karta która ma ŻÓŁTĄ CYFRĘ w prawym dolnym rogu (+1, +2, +3, +4, +5, +6, +7 itp.)
-- NIE WAŻNE jaka to cyfra — wystarczy że widzisz JAKĄKOLWIEK cyfrę = duplikat: true
-- Cyfra może być mała i trudna do odczytania — jeśli widzisz jakikolwiek żółty znacznik w rogu = duplikat: true
-- Brak cyfry = duplikat: false
-
-UWAGA: Diamentowe karty BRAK też mają błyszczące tło — to nie znaczy że są posiadane!
+DUPLIKAT:
+Żółta cyfra (+1, +2, +3...) która przecina prawą ramkę karty, trochę poniżej środka = duplikaty: 1
+Brak cyfry = duplikaty: 0
 
 Talie (z=złota, d=diamentowa):
 ${info}
 
-Zidentyfikuj talię z napisu "TALIA WYDARZEŃ:" na górze screena.
-Zwróć WYŁĄCZNIE JSON (bez markdown, bez tekstu):
-{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":1,"pewnosc":"wysoka|srednia|niska"}]}
+Zidentyfikuj talię z napisu "TALIA WYDARZEŃ:" na górze.
+Zwróć WYŁĄCZNIE JSON (bez markdown):
+{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}
 
-WAŻNE: pole "duplikaty" to zawsze 0 lub 1 — nie podawaj innych liczb. 1 = ma duplikat, 0 = nie ma.`;
+Dla każdej karty: najpierw sprawdź kolor gwiazdek → żółte=złota posiadana, fioletowe=diamentowa posiadana, szare=nieposiadana.`;
 }
 
 async function geminiRequest(prompt, base64, mimeType) {
