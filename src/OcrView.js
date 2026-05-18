@@ -76,7 +76,8 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
         const poprzednioMial = !!posiadane[key];
         const poprzednioDup = !!duplikaty[key];
         const ma = !!k.posiadana;
-        const dup = Math.max(0, parseInt(k.duplikaty) || 0);
+        // Duplikaty: tylko 0 lub 1 — wystarczy wiedzieć czy ma duplikat
+        const dup = (parseInt(k.duplikaty) || 0) >= 1 ? 1 : 0;
         propozycje.push({
           taliaId: talia.id,
           taliaNazwa: talia.nazwa,
