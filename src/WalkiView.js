@@ -5,6 +5,8 @@ const KLUCZE = [
   process.env.REACT_APP_GEMINI_API_KEY || "",
   process.env.REACT_APP_GEMINI_API_KEY_2 || "",
   process.env.REACT_APP_GEMINI_API_KEY_3 || "",
+  process.env.REACT_APP_GEMINI_API_KEY_4 || "",
+  process.env.REACT_APP_GEMINI_API_KEY_5 || "",
 ].filter(k => k.length > 0);
 let kluczIdx = 0;
 function pobierzURL() {
@@ -537,101 +539,155 @@ function HistoriaWalk({ walki, usunWalke, isAdmin }) {
 function obliczPodsumowanieSezonu(walki, czlonkowie) {
   if (walki.length === 0) return null;
 
-  // Zbierz wszystkich graczy z różnych walk
   const statystyki = {};
   walki.forEach(w => {
+    // Deduplikuj graczy w ramach jednej walki (mogą być na 2 screenach)
+    const graczeWWalce = {};
     w.gracze.forEach(g => {
+      if (!graczeWWalce[g.nazwa] || g.obrazenia > graczeWWalce[g.nazwa].obrazenia) {
+        graczeWWalce[g.nazwa] = g;
+      }
+    });
+
+    Object.values(graczeWWalce).forEach(g => {
       if (!statystyki[g.nazwa]) {
         statystyki[g.nazwa] = {
           nazwa: g.nazwa,
-          poziomy: [],
           obrazeniaLacznie: 0,
           tarczeLacznie: 0,
           uczestnictwa: 0,
           miejsca: [],
           historiaObr: [],
+          historiaPozyc: [], // pozycja w rankingu per walka
         };
       }
       const s = statystyki[g.nazwa];
-      s.poziomy.push(g.poziom);
       s.obrazeniaLacznie += g.obrazenia;
       s.tarczeLacznie += g.tarcze;
       s.uczestnictwa++;
-      s.miejsca.push(g.miejsce);
-      s.historiaObr.push({ data: w.data, obr: g.obrazenia });
+      s.miejsca.push(g.miejsce || 99);
+      s.historiaObr.push({ data: w.data, obr: g.obrazenia, walkaId: w.id });
     });
   });
 
   const wszyscy = Object.values(statystyki);
-
-  // Sortuj wg łącznych obrażeń
   wszyscy.sort((a, b) => b.obrazeniaLacznie - a.obrazeniaLacznie);
 
-  // Oblicz ciekawostki
+  // Pozycja w łącznym rankingu sezonu (indeks w posortowanej liście)
+  wszyscy.forEach((g, i) => { g.pozycjaSezonu = i + 1; });
+
+  const lacznaWalka = walki.length;
   const ciekawostki = [];
 
   // 1. Król obrażeń
   if (wszyscy[0]) {
-    ciekawostki.push({ ikona: "👑", tytul: "Król obrażeń", opis: `${wszyscy[0].nazwa} — ${formatLiczby(wszyscy[0].obrazeniaLacznie)} łącznych obrażeń w ${wszyscy[0].uczestnictwa} walkach` });
+    ciekawostki.push({ ikona: "👑", tytul: "Król obrażeń", opis: `${wszyscy[0].nazwa} — ${formatLiczby(wszyscy[0].obrazeniaLacznie)} łącznych obrażeń (śr. ${formatLiczby(Math.round(wszyscy[0].obrazeniaLacznie / wszyscy[0].uczestnictwa))} na walkę)` });
   }
 
   // 2. Mistrz tarcz
   const mistrzTarcz = [...wszyscy].sort((a, b) => b.tarczeLacznie - a.tarczeLacznie)[0];
   if (mistrzTarcz && mistrzTarcz.tarczeLacznie > 0) {
-    ciekawostki.push({ ikona: "🛡️", tytul: "Mistrz tarcz", opis: `${mistrzTarcz.nazwa} — zdjął ${mistrzTarcz.tarczeLacznie} tarcz przeciwnikom` });
+    ciekawostki.push({ ikona: "🛡️", tytul: "Mistrz tarcz", opis: `${mistrzTarcz.nazwa} — zdjął ${mistrzTarcz.tarczeLacznie} tarcz (śr. ${(mistrzTarcz.tarczeLacznie / mistrzTarcz.uczestnictwa).toFixed(1)} na walkę)` });
   }
 
-  // 3. Największy awans (różnica między najwyższym a najniższym poziomem)
-  const awanse = wszyscy.map(g => ({
-    nazwa: g.nazwa,
-    awans: g.poziomy.length > 1 ? Math.max(...g.poziomy) - Math.min(...g.poziomy) : 0,
-  })).filter(a => a.awans > 0).sort((a, b) => b.awans - a.awans);
-  if (awanse[0]) {
-    ciekawostki.push({ ikona: "📈", tytul: "Największy awans", opis: `${awanse[0].nazwa} — awansował o ${awanse[0].awans} poziomów w tym sezonie` });
+  // 3. Największy awans w RANKINGU (porównanie pozycji w 1. połowie vs 2. połowie sezonu)
+  if (lacznaWalka >= 4) {
+    const polowa = Math.floor(lacznaWalka / 2);
+    const walkiSortowane = [...walki].sort((a, b) => new Date(a.data) - new Date(b.data));
+    const walkiPierwsze = walkiSortowane.slice(0, polowa);
+    const walkiDrugie = walkiSortowane.slice(polowa);
+
+    const awanseRankingowe = wszyscy.map(g => {
+      const obrPierwsze = walkiPierwsze
+        .map(w => w.gracze.find(gr => gr.nazwa === g.nazwa)?.obrazenia || 0)
+        .filter(x => x > 0);
+      const obrDrugie = walkiDrugie
+        .map(w => w.gracze.find(gr => gr.nazwa === g.nazwa)?.obrazenia || 0)
+        .filter(x => x > 0);
+      if (obrPierwsze.length === 0 || obrDrugie.length === 0) return null;
+      const srPierwsze = obrPierwsze.reduce((s, x) => s + x, 0) / obrPierwsze.length;
+      const srDrugie = obrDrugie.reduce((s, x) => s + x, 0) / obrDrugie.length;
+      const zmiana = srPierwsze > 0 ? ((srDrugie - srPierwsze) / srPierwsze) * 100 : 0;
+      return { nazwa: g.nazwa, zmiana, srPierwsze, srDrugie };
+    }).filter(Boolean);
+
+    const najlepszaForma = [...awanseRankingowe].sort((a, b) => b.zmiana - a.zmiana)[0];
+    const najgorszaForma = [...awanseRankingowe].sort((a, b) => a.zmiana - b.zmiana)[0];
+
+    if (najlepszaForma && najlepszaForma.zmiana > 15) {
+      ciekawostki.push({ ikona: "📈", tytul: "Największy awans formy", opis: `${najlepszaForma.nazwa} — wzrost o ${najlepszaForma.zmiana.toFixed(0)}% (śr. ${formatLiczby(Math.round(najlepszaForma.srPierwsze))} → ${formatLiczby(Math.round(najlepszaForma.srDrugie))} na walkę)` });
+    }
+    if (najgorszaForma && najgorszaForma.zmiana < -15) {
+      ciekawostki.push({ ikona: "📉", tytul: "Największy spadek formy", opis: `${najgorszaForma.nazwa} — spadek o ${Math.abs(najgorszaForma.zmiana).toFixed(0)}% (śr. ${formatLiczby(Math.round(najgorszaForma.srPierwsze))} → ${formatLiczby(Math.round(najgorszaForma.srDrugie))} na walkę)` });
+    }
   }
 
-  // 4. Najczęstszy uczestnik
+  // 4. Najaktywniejszy — max uczestnictwa (cap do liczby walk)
   const najwiecejWalk = [...wszyscy].sort((a, b) => b.uczestnictwa - a.uczestnictwa)[0];
   if (najwiecejWalk) {
-    ciekawostki.push({ ikona: "🎮", tytul: "Najaktywniejszy", opis: `${najwiecejWalk.nazwa} — uczestniczył w ${najwiecejWalk.uczestnictwa} z ${walki.length} walk` });
+    const procent = Math.round((najwiecejWalk.uczestnictwa / lacznaWalka) * 100);
+    ciekawostki.push({ ikona: "🎮", tytul: "Najaktywniejszy", opis: `${najwiecejWalk.nazwa} — był w ${najwiecejWalk.uczestnictwa} z ${lacznaWalka} walk (${procent}%)` });
   }
 
-  // 5. Wzrastająca forma (porównanie ostatnich 3 walk vs poprzednich)
-  if (walki.length >= 4) {
-    const polowa = Math.floor(walki.length / 2);
-    const formaWynik = wszyscy.map(g => {
-      const sorted = [...g.historiaObr].sort((a, b) => new Date(a.data) - new Date(b.data));
-      const starsze = sorted.slice(0, polowa);
-      const nowsze = sorted.slice(polowa);
-      if (starsze.length === 0 || nowsze.length === 0) return null;
-      const srStarsze = starsze.reduce((s, x) => s + x.obr, 0) / starsze.length;
-      const srNowsze = nowsze.reduce((s, x) => s + x.obr, 0) / nowsze.length;
-      const zmiana = srStarsze > 0 ? ((srNowsze - srStarsze) / srStarsze) * 100 : 0;
-      return { nazwa: g.nazwa, zmiana };
-    }).filter(Boolean);
-    const najlepszaForma = [...formaWynik].sort((a, b) => b.zmiana - a.zmiana)[0];
-    const najgorszaForma = [...formaWynik].sort((a, b) => a.zmiana - b.zmiana)[0];
-    if (najlepszaForma && najlepszaForma.zmiana > 10) {
-      ciekawostki.push({ ikona: "🔥", tytul: "Wzrastająca forma", opis: `${najlepszaForma.nazwa} — +${najlepszaForma.zmiana.toFixed(0)}% obrażeń w drugiej połowie sezonu` });
-    }
-    if (najgorszaForma && najgorszaForma.zmiana < -10) {
-      ciekawostki.push({ ikona: "📉", tytul: "Spadająca forma", opis: `${najgorszaForma.nazwa} — ${najgorszaForma.zmiana.toFixed(0)}% obrażeń w drugiej połowie sezonu` });
+  // 5. Konsekwentny gracz — najmniejsza wariancja wyników (stabilna forma)
+  if (lacznaWalka >= 3) {
+    const stabilni = wszyscy.filter(g => g.uczestnictwa >= Math.ceil(lacznaWalka * 0.6)).map(g => {
+      const sr = g.obrazeniaLacznie / g.uczestnictwa;
+      const wariancja = g.historiaObr.reduce((s, h) => s + Math.pow(h.obr - sr, 2), 0) / g.historiaObr.length;
+      const odchylenie = Math.sqrt(wariancja);
+      const wskaznik = sr > 0 ? (odchylenie / sr) * 100 : 999; // niższy = bardziej stabilny
+      return { nazwa: g.nazwa, wskaznik, sr };
+    }).sort((a, b) => a.wskaznik - b.wskaznik);
+    if (stabilni[0] && stabilni[0].wskaznik < 30) {
+      ciekawostki.push({ ikona: "🎯", tytul: "Żelazna konsekwencja", opis: `${stabilni[0].nazwa} — najbardziej stabilny gracz, odchylenie tylko ${stabilni[0].wskaznik.toFixed(0)}% od swojej średniej ${formatLiczby(Math.round(stabilni[0].sr))}` });
     }
   }
 
-  // 6. Brak aktywności — członkowie nieobecni w walkach
-  const nieobecni = czlonkowie.filter(c => !statystyki[c.nazwa]).map(c => c.nazwa);
-  if (nieobecni.length > 0) {
-    ciekawostki.push({ ikona: "👻", tytul: "Nieaktywni", opis: `${nieobecni.length} osób bez żadnej walki: ${nieobecni.slice(0, 5).join(", ")}${nieobecni.length > 5 ? "..." : ""}` });
+  // 6. Brak obrażeń — nieobecni lub z zerowymi obrażeniami
+  const bezObr = czlonkowie.filter(c => {
+    const s = statystyki[c.nazwa];
+    return !s || s.obrazeniaLacznie === 0;
+  }).map(c => c.nazwa);
+  if (bezObr.length > 0) {
+    ciekawostki.push({ ikona: "💀", tytul: "Brak obrażeń", opis: `${bezObr.length} osób bez ani jednego obrażenia w sezonie: ${bezObr.slice(0, 5).join(", ")}${bezObr.length > 5 ? "..." : ""}` });
   }
 
-  // 7. Najmniej zaangażowani (są w walce, ale mało obrażeń)
-  const malo = wszyscy.filter(g => g.obrazeniaLacznie < 100000 && g.uczestnictwa >= 2);
+  // 7. Mało zaangażowani
+  const malo = wszyscy.filter(g => g.obrazeniaLacznie < 500000 && g.uczestnictwa >= 2);
   if (malo.length > 0) {
-    ciekawostki.push({ ikona: "💤", tytul: "Mało zaangażowani", opis: `${malo.length} osób z bardzo niskimi obrażeniami (poniżej 100k): ${malo.slice(0, 3).map(g => g.nazwa).join(", ")}` });
+    ciekawostki.push({ ikona: "💤", tytul: "Mało zaangażowani", opis: `${malo.map(g => `${g.nazwa} (${formatLiczby(g.obrazeniaLacznie)})`).slice(0, 3).join(", ")}` });
   }
 
-  return { wszyscy, ciekawostki, lacznaWalka: walki.length };
+  // 8. Śmieszne ciekawostki
+  const ostatniaWalka = [...walki].sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+  if (ostatniaWalka) {
+    const ostatniRanking = [...ostatniaWalka.gracze].sort((a, b) => b.obrazenia - a.obrazenia);
+    const ostatniMiejsce = ostatniRanking[ostatniRanking.length - 1];
+    const pierwszeMiejsce = ostatniRanking[0];
+    if (ostatniMiejsce && pierwszeMiejsce && ostatniMiejsce.obrazenia < 10000) {
+      ciekawostki.push({ ikona: "🥄", tytul: "Złota łyżka", opis: `${ostatniMiejsce.nazwa} zdobył tylko ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeń w ostatniej walce — może zapomniał że jest walka? 😅` });
+    }
+  }
+
+  // Czy ktoś nigdy nie zdjął tarcze
+  const zerTarcz = wszyscy.filter(g => g.tarczeLacznie === 0 && g.uczestnictwa >= 3);
+  if (zerTarcz.length > 0) {
+    ciekawostki.push({ ikona: "🫧", tytul: "Tarcze? Co to jest?", opis: `${zerTarcz.map(g => g.nazwa).join(", ")} ${zerTarcz.length === 1 ? "nie zdjął" : "nie zdjęli"} ani jednej tarczy przez cały sezon 😂` });
+  }
+
+  // Kto jest na samym dole rankingu sezonu
+  if (wszyscy.length > 2) {
+    const ostatni = wszyscy[wszyscy.length - 1];
+    const najlepszy = wszyscy[0];
+    if (ostatni.obrazeniaLacznie > 0) {
+      const stosunek = Math.round(najlepszy.obrazeniaLacznie / Math.max(1, ostatni.obrazeniaLacznie));
+      if (stosunek >= 10) {
+        ciekawostki.push({ ikona: "🐢", tytul: "Żółwik sezonu", opis: `${ostatni.nazwa} robi ${stosunek}× mniej obrażeń niż lider ${najlepszy.nazwa}. Może następny sezon będzie lepszy? 😄` });
+      }
+    }
+  }
+
+  return { wszyscy, ciekawostki, lacznaWalka };
 }
 
 function formatLiczby(n) {
