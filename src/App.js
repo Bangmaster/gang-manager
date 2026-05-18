@@ -1574,7 +1574,8 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
       ):(
         <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8,padding:12,marginBottom:14,textAlign:"center"}}>
           <div style={{fontSize:12,color:"#666"}}>Nie masz żadnej wymiany do wykonania w tej rundzie</div>
-          <div style={{fontSize:10,color:"#444",marginTop:4}}>Szukam po nicku: <span style={{color:"#666"}}>{mojNick}</span></div>
+          <div style={{fontSize:10,color:"#444",marginTop:4}}>Szukam po nicku: <span style={{color:"#888"}}>{mojNick}</span></div>
+          <div style={{fontSize:9,color:"#333",marginTop:2}}>Nadawcy w planie: {Object.keys(poNadawcach).join(", ")}</div>
         </div>
       )}
 
