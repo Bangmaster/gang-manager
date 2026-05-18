@@ -35,25 +35,22 @@ function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
     `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
   ).join("\n");
-  return `Rozpoznaj karty z gry The Gang. Użyj GWIAZDEK jako głównego sygnału.
+  return `Analizuj karty w grze The Gang. Każda karta ma gwiazdki na górze.
 
-GWIAZDKI NA GÓRZE KAŻDEJ KARTY — to główny wyróżnik:
-⭐ ŻÓŁTE/ZŁOTE gwiazdki = karta ZŁOTA i POSIADANA → typ: złota, posiadana: true
-💜 FIOLETOWE/RÓŻOWE gwiazdki = karta DIAMENTOWA i POSIADANA → typ: diamentowa, posiadana: true  
-☆ SZARE gwiazdki (wypełnione lub puste) = karta NIEPOSIADANA → posiadana: false (niezależnie od koloru ilustracji!)
+ZASADA 1 — POSIADANIE (patrz TYLKO na kolor gwiazdek):
+- Gwiazdki ŻÓŁTE/ZŁOTE = karta złota, posiadana: true
+- Gwiazdki FIOLETOWE/RÓŻOWE = karta diamentowa, posiadana: true  
+- Gwiazdki SZARE = karta nieposiadana: false
 
-DUPLIKAT:
-Żółta cyfra (+1, +2, +3...) która przecina prawą ramkę karty, trochę poniżej środka = duplikaty: 1
-Brak cyfry = duplikaty: 0
+ZASADA 2 — DUPLIKAT:
+- Żółta cyfra (+1, +2 itd.) przecinająca prawą ramkę karty = duplikaty: 1
+- Brak cyfry = duplikaty: 0
 
-Talie (z=złota, d=diamentowa):
+Talie:
 ${info}
 
-Zidentyfikuj talię z napisu "TALIA WYDARZEŃ:" na górze.
-Zwróć WYŁĄCZNIE JSON (bez markdown):
-{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}
-
-Dla każdej karty: najpierw sprawdź kolor gwiazdek → żółte=złota posiadana, fioletowe=diamentowa posiadana, szare=nieposiadana.`;
+Zwróć WYŁĄCZNIE JSON:
+{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
 }
 
 async function geminiRequest(prompt, base64, mimeType) {
