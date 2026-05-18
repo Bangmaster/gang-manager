@@ -231,10 +231,10 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin }) {
 
   return (
     <div>
-      {/* Tabs */}
+      {/* Tabs — wgrywanie tylko dla admina */}
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {[
-          { id: "ranking", label: "📤 Wgraj walkę" },
+          ...(isAdmin ? [{ id: "ranking", label: "📤 Wgraj walkę" }] : []),
           { id: "historia", label: `📜 Historia (${(walki || []).length})` },
           { id: "sezon", label: "🏆 Podsumowanie sezonu" },
         ].map(t => (
@@ -247,7 +247,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin }) {
         ))}
       </div>
 
-      {podglad === "ranking" && (
+      {podglad === "ranking" && isAdmin && (
         <>
           <div style={{ background: "rgba(255,215,0,0.06)", border: "1px solid #b8860b33", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#ffd700" }}>
             🎯 <strong>Analiza walki gangu</strong> — wgraj 1-3 screeny rankingu po walce
@@ -658,34 +658,63 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     ciekawostki.push({ ikona: "💤", tytul: "Mało zaangażowani", opis: `${malo.map(g => `${g.nazwa} (${formatLiczby(g.obrazeniaLacznie)})`).slice(0, 3).join(", ")}` });
   }
 
-  // 8. Śmieszne ciekawostki
+  // 8. Śmieszne ciekawostki — więcej i bardziej czarne 😄
   const ostatniaWalka = [...walki].sort((a, b) => new Date(b.data) - new Date(a.data))[0];
   if (ostatniaWalka) {
     const ostatniRanking = [...ostatniaWalka.gracze].sort((a, b) => b.obrazenia - a.obrazenia);
     const ostatniMiejsce = ostatniRanking[ostatniRanking.length - 1];
     const pierwszeMiejsce = ostatniRanking[0];
+
     if (ostatniMiejsce && pierwszeMiejsce && ostatniMiejsce.obrazenia < 10000) {
-      ciekawostki.push({ ikona: "🥄", tytul: "Złota łyżka", opis: `${ostatniMiejsce.nazwa} zdobył tylko ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeń w ostatniej walce — może zapomniał że jest walka? 😅` });
+      ciekawostki.push({ ikona: "🥄", tytul: "Złota łyżka", opis: `${ostatniMiejsce.nazwa} zdobył tylko ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeń w ostatniej walce. Telefon się rozładował? Pies zjadł ładowarkę? 📱` });
+    }
+
+    // Ktoś zrobił 0 obrażeń
+    const zerObr = ostatniRanking.filter(g => g.obrazenia === 0);
+    if (zerObr.length > 0) {
+      ciekawostki.push({ ikona: "👁️", tytul: "Świadek walki", opis: `${zerObr.map(g=>g.nazwa).join(", ")} ${zerObr.length===1?"obserwował":"obserwowali"} walkę z boku z 0 obrażeniami. Może następnym razem weźcie udział? 😂` });
     }
   }
 
-  // Czy ktoś nigdy nie zdjął tarcze
+  // Ktoś nigdy nie zdjął tarcz
   const zerTarcz = wszyscy.filter(g => g.tarczeLacznie === 0 && g.uczestnictwa >= 3);
   if (zerTarcz.length > 0) {
-    ciekawostki.push({ ikona: "🫧", tytul: "Tarcze? Co to jest?", opis: `${zerTarcz.map(g => g.nazwa).join(", ")} ${zerTarcz.length === 1 ? "nie zdjął" : "nie zdjęli"} ani jednej tarczy przez cały sezon 😂` });
+    ciekawostki.push({ ikona: "🫧", tytul: "Tarcze? Co to jest?", opis: `${zerTarcz.map(g => g.nazwa).join(", ")} przez cały sezon nie zdjął ani jednej tarczy. Czy w ogóle walczysz, czy tylko pozujesz? 😂` });
   }
 
-  // Kto jest na samym dole rankingu sezonu
+  // Największa różnica między najlepszym a najgorszym
   if (wszyscy.length > 2) {
     const ostatni = wszyscy[wszyscy.length - 1];
     const najlepszy = wszyscy[0];
     if (ostatni.obrazeniaLacznie > 0) {
       const stosunek = Math.round(najlepszy.obrazeniaLacznie / Math.max(1, ostatni.obrazeniaLacznie));
       if (stosunek >= 10) {
-        ciekawostki.push({ ikona: "🐢", tytul: "Żółwik sezonu", opis: `${ostatni.nazwa} robi ${stosunek}× mniej obrażeń niż lider ${najlepszy.nazwa}. Może następny sezon będzie lepszy? 😄` });
+        ciekawostki.push({ ikona: "🐢", tytul: "Żółwik sezonu", opis: `${ostatni.nazwa} robi ${stosunek}× mniej obrażeń niż lider ${najlepszy.nazwa}. Może zamiast grać w The Gang, grasz w The Nap? 😴` });
       }
     }
   }
+
+  // Ktoś jest zawsze w top 3
+  if (lacznaWalka >= 3) {
+    const zawszeTop3 = wszyscy.filter(g =>
+      g.uczestnictwa >= Math.ceil(lacznaWalka * 0.7) &&
+      g.historiaObr.filter(h => {
+        const walka = walki.find(w => w.data === h.data || w.gracze.some(gr => gr.nazwa === g.nazwa && gr.obrazenia === h.obr));
+        if (!walka) return false;
+        const ranking = [...walka.gracze].sort((a,b) => b.obrazenia - a.obrazenia);
+        const pozycja = ranking.findIndex(gr => gr.nazwa === g.nazwa);
+        return pozycja <= 2;
+      }).length >= Math.ceil(g.uczestnictwa * 0.6)
+    );
+    if (zawszeTop3.length > 0) {
+      ciekawostki.push({ ikona: "🦁", tytul: "Niezniszczalny", opis: `${zawszeTop3[0].nazwa} regularnie kończy w TOP 3. Reszta gangu zastanawia się czy grasz fair czy po prostu masz lepszy telefon 📱` });
+    }
+  }
+
+  // Suchy żart o całym gangu
+  const lacznie = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0);
+  const srWalka = lacznaWalka > 0 ? Math.round(lacznie / lacznaWalka) : 0;
+  ciekawostki.push({ ikona: "📊", tytul: "Statystyka sezonu", opis: `Gang zadał łącznie ${formatLiczby(lacznie)} obrażeń w ${lacznaWalka} walkach (${formatLiczby(srWalka)}/walkę). To jak ${Math.round(lacznie/1000000)} razy uderzyć mokrą gazetą 🗞️` });
 
   return { wszyscy, ciekawostki, lacznaWalka };
 }
@@ -814,32 +843,36 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki }) {
         })}
       </div>
 
-      {/* Tekst do wklejenia */}
-      <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid #2a2a3a", borderRadius: 10, padding: 14, marginTop: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13 }}>📋 Tekst do wklejenia na grupę</div>
-          <button onClick={() => {
-            const tekst = generujTekstPodsumowania(podsumowanie);
-            navigator.clipboard?.writeText(tekst);
-          }} style={{ padding: "4px 10px", background: "rgba(255,215,0,0.1)", border: "1px solid #b8860b", borderRadius: 5, color: "#ffd700", cursor: "pointer", fontSize: 11 }}>📋 Kopiuj</button>
-        </div>
-        <pre style={{ fontSize: 11, color: "#bbb", whiteSpace: "pre-wrap", margin: 0, fontFamily: "monospace", maxHeight: 200, overflow: "auto", background: "rgba(0,0,0,0.3)", padding: 8, borderRadius: 4 }}>
-          {generujTekstPodsumowania(podsumowanie)}
-        </pre>
-      </div>
     </div>
   );
 }
 
 function generujTekstPodsumowania(p) {
   if (!p) return "";
-  let t = `🏆 PODSUMOWANIE SEZONU 🏆\nAnaliza z ${p.lacznaWalka} walk\n\n`;
-  t += "✨ NAJCIEKAWSZE:\n";
-  p.ciekawostki.forEach(c => { t += `${c.ikona} ${c.tytul}: ${c.opis}\n`; });
-  t += "\n📊 RANKING SEZONU (TOP 10):\n";
-  p.wszyscy.slice(0, 10).forEach((g, i) => {
-    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
-    t += `${medal} ${g.nazwa} — 🔫 ${formatLiczby(g.obrazeniaLacznie)} | 🛡️ ${g.tarczeLacznie} | ${g.uczestnictwa} walk\n`;
+  const linia = "─────────────────────";
+  let t = "";
+  t += `🏆 PODSUMOWANIE SEZONU 🏆\n`;
+  t += `${linia}\n`;
+  t += `📊 Analiza z ${p.lacznaWalka} walk gangu\n`;
+  t += `${linia}\n\n`;
+
+  t += `✨ CIEKAWOSTKI SEZONU:\n\n`;
+  p.ciekawostki.forEach(c => {
+    t += `${c.ikona} ${c.tytul.toUpperCase()}\n`;
+    t += `   ${c.opis}\n\n`;
   });
+
+  t += `${linia}\n`;
+  t += `📊 PEŁNY RANKING SEZONU:\n\n`;
+  p.wszyscy.forEach((g, i) => {
+    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+    const sr = formatLiczby(Math.round(g.obrazeniaLacznie / g.uczestnictwa));
+    t += `${medal} ${g.nazwa}\n`;
+    t += `   🔫 ${formatLiczby(g.obrazeniaLacznie)} łącznie  |  śr. ${sr}/walkę\n`;
+    t += `   🛡️ ${g.tarczeLacznie} tarcz  |  ${g.uczestnictwa}/${p.lacznaWalka} walk\n\n`;
+  });
+
+  t += `${linia}\n`;
+  t += `📱 Gang Manager — gang-manager-beta.vercel.app`;
   return t;
 }
