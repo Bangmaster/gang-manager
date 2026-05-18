@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
+import { analyzeDeckStructure } from "./gemini";
 
 const ADMIN_CREDENTIALS = [
   { login: "admin", haslo: "Twojastara00", rola: "admin" },
@@ -1145,6 +1146,48 @@ function EdycjaTalii({talie,zapisz}) {
   const [nowaKarta,setNowaKarta]=useState({nazwa:"",typ:"złota"});
   const [nowyModal,setNowyModal]=useState(false);
   const [nowaTalia,setNowaTalia]=useState({nazwa:"",numer:"",nagroda_amunicja:""});
+  const [ocrMode,setOcrMode]=useState(false);
+  const [ocrAnalizuje,setOcrAnalizuje]=useState(false);
+  const [ocrWynik,setOcrWynik]=useState(null); // {talia, karty}
+  const [ocrNumer,setOcrNumer]=useState("");
+  const [ocrNagroda,setOcrNagroda]=useState("");
+
+  const analizujScreenTalii=async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file) return;
+    setOcrAnalizuje(true);
+    setOcrWynik(null);
+    const wynik=await analyzeDeckStructure(file);
+    if(wynik.sukces){
+      setOcrWynik(wynik.dane);
+      setOcrNumer("");
+      setOcrNagroda("");
+    } else {
+      alert("Błąd OCR: "+wynik.blad);
+    }
+    setOcrAnalizuje(false);
+  };
+
+  const zatwierdzeOcrTalie=()=>{
+    if(!ocrWynik) return;
+    const id=ocrWynik.talia.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now();
+    const nowaTaliaOcr={
+      id, nazwa:ocrWynik.talia,
+      numer:parseInt(ocrNumer)||99,
+      nagroda_amunicja:parseInt(ocrNagroda)||0,
+      karty:ocrWynik.karty.map(k=>({nazwa:k.nazwa,typ:k.typ}))
+    };
+    // Sprawdź czy talia już istnieje
+    const istnieje=talie.find(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia));
+    if(istnieje){
+      if(!window.confirm(`Talia "${ocrWynik.talia}" już istnieje. Nadpisać karty?`)) return;
+      zapisz(talie.map(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia)?{...t,karty:nowaTaliaOcr.karty}:t));
+    } else {
+      zapisz([...talie,nowaTaliaOcr]);
+    }
+    setOcrWynik(null);
+    setOcrMode(false);
+  };
 
   const sorted=[...talie].sort((a,b)=>(a.numer||99)-(b.numer||99));
   const talia=sorted[wybranaIdx];
@@ -1174,8 +1217,58 @@ function EdycjaTalii({talie,zapisz}) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700"}}>⚙️ Talie ({talie.length})</div>
-        <button onClick={()=>setNowyModal(true)} style={{padding:"6px 14px",background:"rgba(0,200,100,0.12)",border:"1px solid #0c655",borderRadius:8,color:"#0c6",cursor:"pointer",fontSize:12}}>+ Nowa talia</button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{setOcrMode(!ocrMode);setOcrWynik(null);}} style={{padding:"6px 14px",background:ocrMode?"rgba(255,215,0,0.15)":"rgba(255,165,0,0.1)",border:`1px solid ${ocrMode?"#ffd700":"#fa055"}`,borderRadius:8,color:ocrMode?"#ffd700":"#fa0",cursor:"pointer",fontSize:12}}>📸 OCR nowej talii</button>
+          <button onClick={()=>setNowyModal(true)} style={{padding:"6px 14px",background:"rgba(0,200,100,0.12)",border:"1px solid #0c655",borderRadius:8,color:"#0c6",cursor:"pointer",fontSize:12}}>+ Ręcznie</button>
+        </div>
       </div>
+
+      {/* Panel OCR nowej talii */}
+      {ocrMode&&(
+        <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:10,padding:14,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#fa0",marginBottom:8}}>📸 OCR nowej talii — wgraj screen z ekranu talii</div>
+          <div style={{fontSize:11,color:"#888",marginBottom:10}}>AI rozpozna nazwę talii i wszystkie 9 kart automatycznie. Potem ustawisz numer i nagrodę.</div>
+
+          <input type="file" accept="image/*" onChange={analizujScreenTalii} disabled={ocrAnalizuje}
+            style={{width:"100%",padding:8,background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,marginBottom:8,boxSizing:"border-box"}}/>
+
+          {ocrAnalizuje&&<div style={{textAlign:"center",padding:12,color:"#fa0",fontSize:12}}>🤖 Analizuję screen...</div>}
+
+          {ocrWynik&&(
+            <div style={{marginTop:10}}>
+              <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
+                ✅ Rozpoznano: <span style={{color:"#0c6"}}>{ocrWynik.talia}</span>
+              </div>
+              <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <label style={{fontSize:11,color:"#aaa"}}>Numer talii:
+                  <input type="number" value={ocrNumer} onChange={e=>setOcrNumer(e.target.value)} placeholder="np. 8"
+                    style={{display:"block",marginTop:4,width:70,padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
+                </label>
+                <label style={{fontSize:11,color:"#aaa"}}>Nagroda (amunicja):
+                  <input type="number" value={ocrNagroda} onChange={e=>setOcrNagroda(e.target.value)} placeholder="np. 3500"
+                    style={{display:"block",marginTop:4,width:90,padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
+                </label>
+              </div>
+              <div style={{marginBottom:10}}>
+                {ocrWynik.karty.map((k,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid #12122a"}}>
+                    <span style={{fontSize:10,color:k.typ==="złota"?"#ffd700":"#87CEEB"}}>{k.typ==="złota"?"⭐":"💎"}</span>
+                    <span style={{flex:1,fontSize:12,color:"#ddd"}}>{k.nazwa}</span>
+                    <select value={k.typ} onChange={e=>{const n=[...ocrWynik.karty];n[i]={...n[i],typ:e.target.value};setOcrWynik({...ocrWynik,karty:n});}}
+                      style={{padding:"2px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:k.typ==="złota"?"#ffd700":"#87CEEB",fontSize:11}}>
+                      <option value="złota">⭐ Złota</option>
+                      <option value="diamentowa">💎 Diamentowa</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <button onClick={zatwierdzeOcrTalie} style={{width:"100%",padding:10,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+                ✓ Zatwierdź i dodaj talię
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {nowyModal&&(
         <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid #0c655",borderRadius:10,padding:16,marginBottom:14}}>
@@ -1207,8 +1300,8 @@ function EdycjaTalii({talie,zapisz}) {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:8}}>
             <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700"}}>{talia.nazwa} <span style={{fontSize:12,color:"#888"}}>({talia.karty.length} kart)</span></div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-              <label style={{fontSize:11,color:"#aaa"}}>Nr: <input type="number" defaultValue={talia.numer} onBlur={e=>zapiszPole("numer",e.target.value)} style={{width:45,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
-              <label style={{fontSize:11,color:"#aaa"}}>Nagroda: <input type="number" defaultValue={talia.nagroda_amunicja} onBlur={e=>zapiszPole("nagroda_amunicja",e.target.value)} style={{width:70,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
+              <label style={{fontSize:11,color:"#aaa"}}>Nr: <input key={`nr-${talia.id}`} type="number" defaultValue={talia.numer} onBlur={e=>zapiszPole("numer",e.target.value)} style={{width:45,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
+              <label style={{fontSize:11,color:"#aaa"}}>Nagroda: <input key={`nr-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja} onBlur={e=>zapiszPole("nagroda_amunicja",e.target.value)} style={{width:70,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
               <button onClick={()=>usunTalie(talia.id)} style={{padding:"4px 10px",background:"rgba(255,50,50,0.12)",border:"1px solid #f5544455",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>🗑 Usuń</button>
             </div>
           </div>
