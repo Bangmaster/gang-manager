@@ -35,16 +35,15 @@ function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
     `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
   ).join("\n");
-  return `Analizuj karty w grze The Gang. Każda karta ma gwiazdki na górze.
+  return `Rozpoznaj karty z gry The Gang. Każda karta ma pomarańczowy pasek z nazwą na dole.
 
-ZASADA 1 — POSIADANIE (patrz TYLKO na kolor gwiazdek):
-- Gwiazdki ŻÓŁTE/ZŁOTE = karta złota, posiadana: true
-- Gwiazdki FIOLETOWE/RÓŻOWE = karta diamentowa, posiadana: true  
-- Gwiazdki SZARE = karta nieposiadana: false
+POD tym paskiem z nazwą jest mały dekoracyjny pasek — to główny wyróżnik:
 
-ZASADA 2 — DUPLIKAT:
-- Żółta cyfra (+1, +2 itd.) przecinająca prawą ramkę karty = duplikaty: 1
-- Brak cyfry = duplikaty: 0
+ZŁOTY/ŻÓŁTY pasek pod nazwą = karta ZŁOTA i POSIADANA → typ: złota, posiadana: true
+SREBRNY/BIAŁY pasek pod nazwą = karta DIAMENTOWA i POSIADANA → typ: diamentowa, posiadana: true
+BRAK kolorowego paska (pasek ciemny/szary/niewidoczny) = karta NIEPOSIADANA → posiadana: false
+
+DUPLIKAT: żółta cyfra z plusem (np. +1, +2, +3) która wychodzi POZA prawą krawędź karty, przecinając ramkę po prawej stronie = duplikaty: 1. Brak takiej cyfry = duplikaty: 0.
 
 Talie:
 ${info}
