@@ -747,11 +747,6 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     const dawca=czlonkowie.find(c=>c.nazwa===dawcaNazwa);
     if(!dawca) return null;
 
-    // Kto już wysyła (wszyscy dawcy z planu)
-    const juzWysylajacy=new Set(wynik.planoweWymiany.map(w=>w.od));
-    // Kto już odbiera
-    const juzOdbierajacy=new Set(wynik.planoweWymiany.map(w=>w.do));
-
     // Szukaj kogokolwiek kto POTRZEBUJE karty którą dawca ma jako duplikat
     // Priorytet: fazy 1-2, największa nagroda
     const kandydaci=[];
@@ -1410,7 +1405,6 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
     const typ=typAkt==="złote"?"złota":"diamentowa";
     const oppTyp=typAkt==="złote"?"diamentowa":"złota";
     // Kto już wysyła (nie licząc podmieniany wymiany)
-    const juzWysylajacy=new Set(wymiany.filter((_,i)=>i!==wykluczonaWymiana._idx).map(w=>w.od));
     const kandydaci=[];
     czlonkowie.forEach(odbiorca=>{
       if(odbiorca.id===dawca.id) return;
