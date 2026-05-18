@@ -107,7 +107,9 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
 
   // Oblicz pauzę na podstawie liczby kluczy
   // 1 klucz = 6s, 2 klucze = 3s, 3+ klucze = 2s
-  const PAUZA = KLUCZE_API.length >= 3 ? 2000 : KLUCZE_API.length === 2 ? 3000 : 6000;
+  // Przerwa zależy od liczby kluczy — więcej kluczy = krótsza przerwa
+  // 1 klucz=6s, 2=4s, 3=3s, 4=2s, 5+=2s (bezpieczny bufor)
+  const PAUZA = KLUCZE_API.length >= 4 ? 2000 : KLUCZE_API.length === 3 ? 3000 : KLUCZE_API.length === 2 ? 4000 : 6000;
 
   const wyniki = [];
   let kolejneBledy = 0;
