@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 
@@ -113,6 +113,27 @@ export default function App() {
   const [trybWymiany, setTrybWymiany] = useState("priorytet");
   const [statusZapisu, setStatusZapisu] = useState("");
 
+  const [statusOnline, setStatusOnline] = useState({});
+
+  // Heartbeat obecności — co 30 sekund zapisuj że jesteś online
+  useEffect(() => {
+    if (!zalogowany) return;
+    const login = zalogowany.login;
+    setOnline(login);
+    const interval = setInterval(() => setOnline(login), 30000);
+    // Subskrybuj listę online
+    const unsub = subscribeOnline(setStatusOnline);
+    // Wyloguj się z online przy zamknięciu okna
+    const handleUnload = () => setOffline(login);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      clearInterval(interval);
+      unsub();
+      window.removeEventListener("beforeunload", handleUnload);
+      setOffline(login);
+    };
+  }, [zalogowany]);
+
   // Subskrypcja na żywo z Firebase — zawsze ufamy serwerowi
   useEffect(() => {
     let unsub = null;
@@ -195,10 +216,32 @@ export default function App() {
       <div style={{background:"rgba(0,0,0,0.75)",padding:"12px 16px",borderBottom:"2px solid #b8860b",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <div>
           <div style={{fontSize:19,fontWeight:"bold",color:"#ffd700",letterSpacing:2}}>🃏 GANG — MENADŻER WYMIAN</div>
-          <div style={{fontSize:11,color:"#666"}}>
-            <span style={{color:"#ffd700"}}>{zalogowany.login}</span>
-            <span style={{color:"#888"}}> ({zalogowany.rola})</span>
-            {statusZapisu && <span style={{marginLeft:10,color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
+          <div style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
+            <span><span style={{color:"#ffd700"}}>{zalogowany.login}</span> <span style={{color:"#888"}}>({zalogowany.rola})</span></span>
+            {statusZapisu && <span style={{color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
+            {/* Wskaźnik online */}
+            {(()=>{
+              const PROG = 90000; // 90 sekund = online
+              const teraz = Date.now();
+              const onlineNicki = Object.entries(statusOnline)
+                .filter(([,ts]) => teraz - ts < PROG)
+                .map(([nick]) => nick);
+              const liczba = onlineNicki.length;
+              return (
+                <span
+                  title={`Online: ${onlineNicki.join(", ") || "brak"}`}
+                  style={{
+                    display:"inline-flex",alignItems:"center",gap:4,
+                    padding:"2px 8px",borderRadius:12,
+                    background:"rgba(0,200,100,0.1)",border:"1px solid #0c633",
+                    cursor:"default",
+                  }}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#0c6",display:"inline-block",boxShadow:"0 0 4px #0c6"}}/>
+                  <span style={{color:"#0c6",fontWeight:"bold"}}>{liczba}</span>
+                  <span style={{color:"#555"}}>online</span>
+                </span>
+              );
+            })()}
           </div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
