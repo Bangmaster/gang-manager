@@ -346,9 +346,12 @@ function LoginScreen({onLogin, czlonkowie}) {
     const u=ADMIN_CREDENTIALS.find(c=>c.login===login&&c.haslo===haslo);
     if(u){onLogin(u);return;}
     if(login.trim().length>=2&&haslo===""){
-      // Znajdź oryginalny nick w bazie (case-insensitive)
       const oryginalny=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(login.trim()));
-      onLogin({login: oryginalny ? oryginalny.nazwa : login.trim(), rola:"czlonek"});
+      if(!oryginalny){
+        setBlad(`Nick "${login.trim()}" nie istnieje w gangu. Sprawdź pisownię.`);
+        return;
+      }
+      onLogin({login: oryginalny.nazwa, rola:"czlonek"});
       return;
     }
     setBlad("Błędne dane. Członek: tylko nick (bez hasła). Admin: login + hasło.");
@@ -1572,10 +1575,8 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           </div>
         </div>
       ):(
-        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8,padding:12,marginBottom:14,textAlign:"center"}}>
-          <div style={{fontSize:12,color:"#666"}}>Nie masz żadnej wymiany do wykonania w tej rundzie</div>
-          <div style={{fontSize:10,color:"#444",marginTop:4}}>Szukam po nicku: <span style={{color:"#888"}}>{mojNick}</span></div>
-          <div style={{fontSize:9,color:"#333",marginTop:2}}>Nadawcy w planie: {Object.keys(poNadawcach).join(", ")}</div>
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8,padding:12,marginBottom:14,textAlign:"center",fontSize:12,color:"#666"}}>
+          Nie masz żadnej wymiany do wykonania w tej rundzie
         </div>
       )}
 
