@@ -157,7 +157,50 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
   return wyniki;
 }
 
-export async function analyzeImage(file, wszystkieTalie) {
+// OCR nowej talii — rozpoznaje nazwę talii i karty ze screena
+export async function analyzeDeckStructure(file) {
+  if (KLUCZE_API.length === 0) return { sukces: false, blad: "🔑 Brak klucza API" };
+  try {
+    const { base64, mimeType } = await fileToBase64(file);
+    const prompt = `Rozpoznaj strukturę talii z gry The Gang.
+
+Na screenie widać ekran talii z nazwą u góry i 9 kartami w siatce 3x3.
+
+Rozpoznaj:
+1. Nazwę talii z napisu "TALIA WYDARZEŃ:" na górze
+2. Dla każdej z 9 kart:
+   - Nazwę (z paska na dole karty)
+   - Typ: złota (żółte gwiazdki) lub diamentowa (fioletowe gwiazdki)
+
+Karty mogą być posiadane lub nie — nie ważne, rozpoznaj WSZYSTKIE 9.
+
+Zwróć WYŁĄCZNIE JSON (bez markdown):
+{"talia":"nazwa talii","karty":[{"nazwa":"...","typ":"złota|diamentowa"},{"nazwa":"...","typ":"złota|diamentowa"}]}
+
+Zwróć dokładnie 9 kart.`;
+
+    const url = pobierzURL();
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+      })
+    });
+    if (!response.ok) throw new Error(`Błąd ${response.status}`);
+    const data = await response.json();
+    let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+    if (text.startsWith("```json")) text = text.slice(7);
+    else if (text.startsWith("```")) text = text.slice(3);
+    if (text.endsWith("```")) text = text.slice(0, -3);
+    const parsed = JSON.parse(text.trim());
+    nastepnyKlucz();
+    return { sukces: true, dane: parsed };
+  } catch (e) {
+    return { sukces: false, blad: e.message };
+  }
+}
   try {
     if (KLUCZE_API.length === 0) return { sukces: false, blad: "🔑 Brak klucza API", fileName: file.name };
     const { base64, mimeType } = await fileToBase64(file);
