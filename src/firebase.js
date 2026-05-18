@@ -14,6 +14,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 const GANG_DOC = doc(db, "gang", "main");
+const ONLINE_DOC = doc(db, "gang", "online"); // osobny doc dla obecności
 
 export async function loadGangData() {
   try {
@@ -39,9 +40,6 @@ export async function saveGangData(data) {
 
 // Zaznacz lub odznacz pojedynczą kartę (atomowa operacja — nie nadpisuje innych zmian)
 export async function setCardField(typ, key, value) {
-  // typ = "posiadane" lub "duplikaty"
-  // key = "osobaId_taliaId_kartaNazwa"
-  // value = true (zaznacz) lub null (odznacz)
   try {
     const fieldPath = `${typ}.${key}`;
     if (value === null) {
@@ -71,4 +69,34 @@ export function subscribeGangData(callback) {
   return onSnapshot(GANG_DOC, (snap) => {
     if (snap.exists()) callback(snap.data());
   }, (err) => console.error("Błąd subskrypcji:", err));
+}
+
+// === OBECNOŚĆ ONLINE ===
+// Zapisuje że użytkownik jest online (timestamp ostatniej aktywności)
+export async function setOnline(login) {
+  if (!login) return;
+  try {
+    await setDoc(ONLINE_DOC, {
+      [login]: Date.now()
+    }, { merge: true });
+  } catch (e) {
+    console.error("Błąd obecności:", e);
+  }
+}
+
+// Usuwa użytkownika z listy online
+export async function setOffline(login) {
+  if (!login) return;
+  try {
+    await updateDoc(ONLINE_DOC, { [login]: deleteField() });
+  } catch (e) {
+    console.error("Błąd offline:", e);
+  }
+}
+
+// Subskrybuje listę online — callback dostaje obiekt {login: timestamp}
+export function subscribeOnline(callback) {
+  return onSnapshot(ONLINE_DOC, (snap) => {
+    callback(snap.exists() ? snap.data() : {});
+  }, (err) => console.error("Błąd subskrypcji online:", err));
 }
