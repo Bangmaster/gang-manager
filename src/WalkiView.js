@@ -847,32 +847,4 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki }) {
   );
 }
 
-function generujTekstPodsumowania(p) {
-  if (!p) return "";
-  const linia = "─────────────────────";
-  let t = "";
-  t += `🏆 PODSUMOWANIE SEZONU 🏆\n`;
-  t += `${linia}\n`;
-  t += `📊 Analiza z ${p.lacznaWalka} walk gangu\n`;
-  t += `${linia}\n\n`;
 
-  t += `✨ CIEKAWOSTKI SEZONU:\n\n`;
-  p.ciekawostki.forEach(c => {
-    t += `${c.ikona} ${c.tytul.toUpperCase()}\n`;
-    t += `   ${c.opis}\n\n`;
-  });
-
-  t += `${linia}\n`;
-  t += `📊 PEŁNY RANKING SEZONU:\n\n`;
-  p.wszyscy.forEach((g, i) => {
-    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
-    const sr = formatLiczby(Math.round(g.obrazeniaLacznie / g.uczestnictwa));
-    t += `${medal} ${g.nazwa}\n`;
-    t += `   🔫 ${formatLiczby(g.obrazeniaLacznie)} łącznie  |  śr. ${sr}/walkę\n`;
-    t += `   🛡️ ${g.tarczeLacznie} tarcz  |  ${g.uczestnictwa}/${p.lacznaWalka} walk\n\n`;
-  });
-
-  t += `${linia}\n`;
-  t += `📱 Gang Manager — gang-manager-beta.vercel.app`;
-  return t;
-}
