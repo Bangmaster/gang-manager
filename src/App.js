@@ -181,8 +181,13 @@ export default function App() {
     {id:"dane",label:"📋 Dane gangu"},
     {id:"duplikaty",label:"🔄 Duplikaty"},
     {id:"aktywna",label:dane?.aktywnaWymiana?"📋 ROZPISKA ●":"📋 ROZPISKA"},
-    {id:"wynik",label:"⚡ Generuj"},
-    ...(isAdmin?[{id:"ocr",label:"📸 OCR talii"},{id:"walki",label:"🎯 Walki"},{id:"edycja",label:"⚙️ Talie"},{id:"czlonkowie",label:"👥 Członkowie"}]:[]),
+    {id:"walki",label:"🎯 Walki"},
+    ...(isAdmin?[
+      {id:"wynik",label:"⚡ Generuj"},
+      {id:"ocr",label:"📸 OCR talii"},
+      {id:"edycja",label:"⚙️ Talie"},
+      {id:"czlonkowie",label:"👥 Członkowie"},
+    ]:[]),
   ];
 
   return (
@@ -239,6 +244,11 @@ export default function App() {
           isAdmin={isAdmin}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
         />}
+        {zakładka==="walki"&&<WalkiView
+          czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
+          zapiszWalki={(now)=>zapiszStrukture("walki",now)}
+          isAdmin={isAdmin}
+        />}
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
         {zakładka==="wynik"&&isAdmin&&<WynikView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
@@ -255,11 +265,6 @@ export default function App() {
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           zapiszKarte={zapiszKarte}
-        />}
-        {zakładka==="walki"&&isAdmin&&<WalkiView
-          czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
-          zapiszWalki={(now)=>zapiszStrukture("walki",now)}
-          isAdmin={isAdmin}
         />}
         {zakładka==="czlonkowie"&&isAdmin&&<EdycjaCzlonkow
           czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszStrukture("czlonkowie",now)}
