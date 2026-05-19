@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
@@ -2024,8 +2024,8 @@ function SzybkieWprowadzanie({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,w
 
 // ---- POMYSŁ 3: Skaner na żywo ----
 function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaOsoba,setWybranaOsoba}) {
-  const videoRef=React.useRef(null);
-  const canvasRef=React.useRef(null);
+  const videoRef=useRef(null);
+  const canvasRef=useRef(null);
   const [aktywny,setAktywny]=useState(false);
   const [stream,setStream]=useState(null);
   const [status,setStatus]=useState("");
@@ -2132,7 +2132,7 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
     setOstatniWynik(null);
   };
 
-  React.useEffect(()=>()=>stream?.getTracks().forEach(t=>t.stop()),[stream]);
+  useEffect(()=>()=>stream?.getTracks().forEach(t=>t.stop()),[stream]);
 
   return (
     <div>
