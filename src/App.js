@@ -2031,7 +2031,6 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
   const [status,setStatus]=useState("");
   const [analizuje,setAnalizuje]=useState(false);
   const [ostatniWynik,setOstatniWynik]=useState(null);
-  const [wynikOcr,setWynikOcr]=useState(null);
   const [wybranaTalia,setWybranaTalia]=useState(null);
 
   const osoba=czlonkowie[wybranaOsoba];
