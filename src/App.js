@@ -217,6 +217,7 @@ export default function App() {
       {id:"ocr",label:"📸 OCR talii"},
       {id:"edycja",label:"⚙️ Talie"},
       {id:"czlonkowie",label:"👥 Członkowie"},
+      {id:"testy",label:"🧪 TESTY"},
     ]:[]),
   ];
 
@@ -320,6 +321,11 @@ export default function App() {
         />}
         {zakładka==="czlonkowie"&&isAdmin&&<EdycjaCzlonkow
           czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszStrukture("czlonkowie",now)}
+        />}
+        {zakładka==="testy"&&isAdmin&&<TestyView
+          talie={talieSorted} czlonkowie={dane.czlonkowie}
+          posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
+          zapiszKarte={zapiszKarte}
         />}
       </div>
     </div>
@@ -1847,6 +1853,368 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TESTY — Pomysł 1: Szybkie wprowadzanie + Pomysł 3: Skaner
+// ============================================================
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte}) {
+  const [tryb,setTryb]=useState("szybkie"); // szybkie | skaner
+  const [wybranaOsoba,setWybranaOsoba]=useState(0);
+  const [wybranaOsobaSkaner,setWybranaOsobaSkaner]=useState(0);
+  const [wybranaTalia,setWybranaTalia]=useState(0);
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,165,0,0.08)",border:"1px solid #fa055",borderRadius:10,padding:12,marginBottom:14}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#fa0",marginBottom:4}}>🧪 Strefa testów</div>
+        <div style={{fontSize:11,color:"#888"}}>Eksperymenty z nowymi sposobami wprowadzania danych. Działają równolegle z normalną apką.</div>
+      </div>
+
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <button onClick={()=>setTryb("szybkie")} style={{padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:12,background:tryb==="szybkie"?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",border:tryb==="szybkie"?"1px solid #ffd700":"1px solid #2a2a3a",color:tryb==="szybkie"?"#ffd700":"#666"}}>
+          ⚡ Szybkie wprowadzanie
+        </button>
+        <button onClick={()=>setTryb("skaner")} style={{padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:12,background:tryb==="skaner"?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.05)",border:tryb==="skaner"?"1px solid #0c6":"1px solid #2a2a3a",color:tryb==="skaner"?"#0c6":"#666"}}>
+          📷 Skaner na żywo
+        </button>
+      </div>
+
+      {tryb==="szybkie"&&<SzybkieWprowadzanie talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsoba} setWybranaOsoba={setWybranaOsoba} wybranaTalia={wybranaTalia} setWybranaTalia={setWybranaTalia}/>}
+      {tryb==="skaner"&&<SkanerNaZywo talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsobaSkaner} setWybranaOsoba={setWybranaOsobaSkaner}/>}
+    </div>
+  );
+}
+
+// ---- POMYSŁ 1: Szybkie wprowadzanie ----
+function SzybkieWprowadzanie({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaOsoba,setWybranaOsoba,wybranaTalia,setWybranaTalia}) {
+  const osoba=czlonkowie[wybranaOsoba];
+  const talia=talie[wybranaTalia];
+
+  const zaznaczWszystkie=(typ)=>{
+    if(!osoba||!talia) return;
+    const karty=talia.karty.filter(k=>k.typ===typ);
+    karty.forEach(k=>{
+      const key=`${osoba.id}_${talia.id}_${k.nazwa}`;
+      if(!posiadane[key]) zapiszKarte("posiadane",key,true);
+    });
+  };
+
+  const odznaczWszystkie=(typ)=>{
+    if(!osoba||!talia) return;
+    const karty=talia.karty.filter(k=>k.typ===typ);
+    karty.forEach(k=>{
+      const key=`${osoba.id}_${talia.id}_${k.nazwa}`;
+      if(posiadane[key]) zapiszKarte("posiadane",key,null);
+    });
+  };
+
+  const toggle=(kartaNazwa)=>{
+    if(!osoba||!talia) return;
+    const key=`${osoba.id}_${talia.id}_${kartaNazwa}`;
+    zapiszKarte("posiadane",key,posiadane[key]?null:true);
+  };
+
+  const kartyZlote=talia?.karty.filter(k=>k.typ==="złota")||[];
+  const kartyDia=talia?.karty.filter(k=>k.typ==="diamentowa")||[];
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>⚡ Szybkie wprowadzanie — zaznacz wszystkie karty osoby dla jednej talii</div>
+        <div style={{fontSize:11,color:"#888"}}>Wybierz osobę i talię → kliknij karty które ma lub użyj przycisków "Zaznacz wszystkie"</div>
+      </div>
+
+      {/* Wybór osoby */}
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>👤 Osoba:</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {czlonkowie.map((c,i)=>(
+            <button key={c.id} onClick={()=>setWybranaOsoba(i)} style={{
+              padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
+              background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.06)",
+              border:wybranaOsoba===i?"none":"1px solid #2a2a3a",
+              color:wybranaOsoba===i?"#000":"#888",fontWeight:wybranaOsoba===i?"bold":"normal",
+            }}>{c.nazwa}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Wybór talii */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>🃏 Talia:</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {talie.map((t,i)=>{
+            const pos=t.karty.filter(k=>posiadane[`${osoba?.id}_${t.id}_${k.nazwa}`]).length;
+            const pct=t.karty.length?Math.round((pos/t.karty.length)*100):0;
+            return (
+              <button key={t.id} onClick={()=>setWybranaTalia(i)} style={{
+                padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
+                background:wybranaTalia===i?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.04)",
+                border:wybranaTalia===i?"1px solid #ffd700":"1px solid #2a2a3a",
+                color:wybranaTalia===i?"#ffd700":"#666",
+              }}>{t.nazwa} <span style={{color:pct===100?"#0c6":"#555",fontSize:10}}>{pct}%</span></button>
+            );
+          })}
+        </div>
+      </div>
+
+      {osoba&&talia&&(
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>{osoba.nazwa} — {talia.nazwa}</div>
+          </div>
+
+          {/* Złote karty */}
+          {kartyZlote.length>0&&(
+            <div style={{marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <span style={{fontSize:11,color:"#b8860b",fontWeight:"bold"}}>⭐ Złote ({kartyZlote.filter(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length}/{kartyZlote.length})</span>
+                <button onClick={()=>zaznaczWszystkie("złota")} style={{padding:"2px 8px",fontSize:10,borderRadius:4,background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",color:"#ffd700",cursor:"pointer"}}>✓ Wszystkie</button>
+                <button onClick={()=>odznaczWszystkie("złota")} style={{padding:"2px 8px",fontSize:10,borderRadius:4,background:"rgba(255,50,50,0.1)",border:"1px solid #f5544455",color:"#f55",cursor:"pointer"}}>✗ Wyczyść</button>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {kartyZlote.map(k=>{
+                  const ma=posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`];
+                  return (
+                    <button key={k.nazwa} onClick={()=>toggle(k.nazwa)} style={{
+                      padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
+                      background:ma?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.04)",
+                      border:ma?"none":"2px dashed #333",
+                      color:ma?"#000":"#444",fontWeight:ma?"bold":"normal",
+                      transition:"all 0.15s",
+                    }}>{ma?"✓ ":""}{k.nazwa}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Diamentowe karty */}
+          {kartyDia.length>0&&(
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <span style={{fontSize:11,color:"#87CEEB",fontWeight:"bold"}}>💎 Diamentowe ({kartyDia.filter(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length}/{kartyDia.length})</span>
+                <button onClick={()=>zaznaczWszystkie("diamentowa")} style={{padding:"2px 8px",fontSize:10,borderRadius:4,background:"rgba(135,206,235,0.15)",border:"1px solid #87CEEB55",color:"#87CEEB",cursor:"pointer"}}>✓ Wszystkie</button>
+                <button onClick={()=>odznaczWszystkie("diamentowa")} style={{padding:"2px 8px",fontSize:10,borderRadius:4,background:"rgba(255,50,50,0.1)",border:"1px solid #f5544455",color:"#f55",cursor:"pointer"}}>✗ Wyczyść</button>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {kartyDia.map(k=>{
+                  const ma=posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`];
+                  return (
+                    <button key={k.nazwa} onClick={()=>toggle(k.nazwa)} style={{
+                      padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
+                      background:ma?"linear-gradient(135deg,#1a3a8f,#87CEEB)":"rgba(255,255,255,0.04)",
+                      border:ma?"none":"2px dashed #333",
+                      color:ma?"#fff":"#444",fontWeight:ma?"bold":"normal",
+                      transition:"all 0.15s",
+                    }}>{ma?"✓ ":""}{k.nazwa}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- POMYSŁ 3: Skaner na żywo ----
+function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaOsoba,setWybranaOsoba}) {
+  const videoRef=React.useRef(null);
+  const canvasRef=React.useRef(null);
+  const [aktywny,setAktywny]=useState(false);
+  const [stream,setStream]=useState(null);
+  const [status,setStatus]=useState("");
+  const [analizuje,setAnalizuje]=useState(false);
+  const [ostatniWynik,setOstatniWynik]=useState(null);
+  const [wynikOcr,setWynikOcr]=useState(null);
+  const [wybranaTalia,setWybranaTalia]=useState(null);
+
+  const osoba=czlonkowie[wybranaOsoba];
+
+  const startKamery=async()=>{
+    try {
+      const s=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}}
+      });
+      setStream(s);
+      if(videoRef.current) videoRef.current.srcObject=s;
+      setAktywny(true);
+      setStatus("📷 Kamera aktywna — skieruj na ekran laptopa z talią");
+    } catch(e) {
+      setStatus("❌ Brak dostępu do kamery: "+e.message);
+    }
+  };
+
+  const stopKamery=()=>{
+    stream?.getTracks().forEach(t=>t.stop());
+    setStream(null);
+    setAktywny(false);
+    setStatus("");
+  };
+
+  const zrobZdjecie=async()=>{
+    if(!videoRef.current||!canvasRef.current) return;
+    const v=videoRef.current;
+    const c=canvasRef.current;
+    c.width=v.videoWidth;
+    c.height=v.videoHeight;
+    c.getContext("2d").drawImage(v,0,0);
+    const base64=c.toDataURL("image/jpeg",0.9).split(",")[1];
+
+    setAnalizuje(true);
+    setStatus("🤖 Analizuję...");
+
+    try {
+      const resp=await fetch("/api/gemini",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          prompt:`Rozpoznaj talię The Gang na zdjęciu ekranu.
+Każda karta ma gwiazdki na górze:
+- Kolorowe gwiazdki (żółte/fioletowe) = posiadana: true
+- Szare gwiazdki = posiadana: false
+- Żółta cyfra widoczna na karcie = duplikat: true
+
+Talie: ${talie.map(t=>`${t.nazwa}: ${t.karty.map(k=>'"'+k.nazwa+'"('+k.typ[0]+')').join(",")}`).join("\n")}
+Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"duplikat":true|false}]}`,
+          base64,mimeType:"image/jpeg"
+        })
+      });
+      const data=await resp.json();
+      let text=(data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+      if(text.startsWith("```json")) text=text.slice(7);
+      if(text.startsWith("```")) text=text.slice(3);
+      if(text.endsWith("```")) text=text.slice(0,-3);
+      const parsed=JSON.parse(text.trim());
+      setOstatniWynik(parsed);
+      // Znajdź talię
+      const taliaMatch=talie.find(t=>normalizuj(t.nazwa)===normalizuj(parsed.talia)||t.nazwa.toLowerCase().includes(parsed.talia.toLowerCase().substring(0,6)));
+      setWybranaTalia(taliaMatch||null);
+      setStatus(`✅ Rozpoznano: ${parsed.talia} — sprawdź i zatwierdź`);
+    } catch(e) {
+      setStatus("❌ Błąd: "+e.message);
+    }
+    setAnalizuje(false);
+  };
+
+  const zatwierdz=async()=>{
+    if(!ostatniWynik||!osoba||!wybranaTalia) return;
+    let zmiany=0;
+    for(const k of ostatniWynik.karty){
+      const kartaMatch=wybranaTalia.karty.find(kk=>
+        normalizuj(kk.nazwa)===normalizuj(k.nazwa)||
+        kk.nazwa.toLowerCase().includes(k.nazwa.toLowerCase().substring(0,5))
+      );
+      if(!kartaMatch) continue;
+      const key=`${osoba.id}_${wybranaTalia.id}_${kartaMatch.nazwa}`;
+      // Posiadana
+      if(k.posiadana&&!posiadane[key]){
+        await zapiszKarte("posiadane",key,true); zmiany++;
+      } else if(!k.posiadana&&posiadane[key]){
+        await zapiszKarte("posiadane",key,null); zmiany++;
+      }
+      // Duplikat
+      if(k.posiadana){
+        const dupKey=key;
+        if(k.duplikat&&!duplikaty?.[dupKey]){
+          await zapiszKarte("duplikaty",dupKey,true); zmiany++;
+        } else if(!k.duplikat&&duplikaty?.[dupKey]){
+          await zapiszKarte("duplikaty",dupKey,null); zmiany++;
+        }
+      }
+    }
+    setStatus(`✅ Zapisano ${zmiany} zmian dla ${osoba.nazwa} — ${wybranaTalia.nazwa}`);
+    setOstatniWynik(null);
+  };
+
+  React.useEffect(()=>()=>stream?.getTracks().forEach(t=>t.stop()),[stream]);
+
+  return (
+    <div>
+      <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c655",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#0c6",marginBottom:4}}>📷 Skaner na żywo — telefon jako skaner</div>
+        <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
+          1. Odpal grę na laptopie i otwórz talię którą chcesz skanować<br/>
+          2. Wybierz osobę poniżej<br/>
+          3. Włącz kamerę → skieruj telefon na ekran laptopa<br/>
+          4. Kliknij 📸 Skanuj → AI rozpozna karty<br/>
+          5. Sprawdź wynik i zatwierdź
+        </div>
+      </div>
+
+      {/* Wybór osoby */}
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>👤 Czyje karty skanujesz:</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {czlonkowie.map((c,i)=>(
+            <button key={c.id} onClick={()=>setWybranaOsoba(i)} style={{
+              padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
+              background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.06)",
+              border:wybranaOsoba===i?"none":"1px solid #2a2a3a",
+              color:wybranaOsoba===i?"#000":"#888",
+            }}>{c.nazwa}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Przyciski kamery */}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+        {!aktywny?(
+          <button onClick={startKamery} style={{padding:"10px 20px",background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+            📷 Włącz kamerę
+          </button>
+        ):(
+          <>
+            <button onClick={zrobZdjecie} disabled={analizuje} style={{padding:"10px 20px",background:analizuje?"#333":"linear-gradient(135deg,#ffd700,#b8860b)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:analizuje?"not-allowed":"pointer",fontSize:13}}>
+              {analizuje?"🤖 Analizuję...":"📸 Skanuj"}
+            </button>
+            <button onClick={stopKamery} style={{padding:"10px 16px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544455",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:13}}>
+              ⏹ Stop
+            </button>
+          </>
+        )}
+      </div>
+
+      {status&&<div style={{fontSize:12,color:status.includes("❌")?"#f55":status.includes("✅")?"#0c6":"#fa0",marginBottom:10,padding:"6px 10px",background:"rgba(0,0,0,0.2)",borderRadius:6}}>{status}</div>}
+
+      {/* Podgląd kamery */}
+      {aktywny&&(
+        <div style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"2px solid #0c6",position:"relative"}}>
+          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:300,objectFit:"cover"}}/>
+          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.7)",padding:"3px 8px",borderRadius:4,fontSize:10,color:"#0c6"}}>● LIVE</div>
+        </div>
+      )}
+      <canvas ref={canvasRef} style={{display:"none"}}/>
+
+      {/* Wynik skanowania */}
+      {ostatniWynik&&wybranaTalia&&(
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
+            Rozpoznano: <span style={{color:"#0c6"}}>{wybranaTalia.nazwa}</span> dla <span style={{color:"#ffd700"}}>{osoba?.nazwa}</span>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10}}>
+            {ostatniWynik.karty.map((k,i)=>(
+              <span key={i} style={{
+                padding:"4px 10px",borderRadius:5,fontSize:11,
+                background:k.posiadana?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.04)",
+                border:k.posiadana?"1px solid #0c655":"1px solid #333",
+                color:k.posiadana?"#0c6":"#555",
+              }}>
+                {k.posiadana?"✓ ":""}{k.nazwa}
+                {k.duplikat&&<span style={{color:"#87CEEB",marginLeft:4}}>+dup</span>}
+              </span>
+            ))}
+          </div>
+          <button onClick={zatwierdz} style={{width:"100%",padding:10,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+            ✅ Zatwierdź i zapisz do danych gangu
+          </button>
+        </div>
+      )}
     </div>
   );
 }
