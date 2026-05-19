@@ -2084,8 +2084,13 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
           base64,mimeType:"image/jpeg"
         })
       });
+      if(!resp.ok){
+        const errText=await resp.text();
+        throw new Error(`Serwer ${resp.status}: ${errText.substring(0,150)}`);
+      }
       const data=await resp.json();
       let text=(data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+      if(!text) throw new Error("AI nie zwróciło odpowiedzi — spróbuj ponownie");
       if(text.startsWith("```json")) text=text.slice(7);
       if(text.startsWith("```")) text=text.slice(3);
       if(text.endsWith("```")) text=text.slice(0,-3);
