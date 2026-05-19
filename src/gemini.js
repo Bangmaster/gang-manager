@@ -35,24 +35,22 @@ function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
     `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
   ).join("\n");
-  return `Rozpoznaj karty z gry The Gang na screenie talii (siatka 3x3).
+  return `Każda karta w grze The Gang ma na górze GWIAZDKI. Patrz TYLKO na gwiazdki.
 
-KROK 1 — czy karta jest POSIADANA?
-- BRAK: szary środek bez obrazka, z napisem "GANG" lub "THE GANG" → posiadana: false
-- POSIADANA: kolorowy obrazek w środku karty → posiadana: true
+POSIADANIE — wypełnienie gwiazdek:
+- Gwiazdki KOLOROWE (wypełnione żółtym, złotym lub fioletowym kolorem) = posiadana: true
+- Gwiazdki SZARE (puste, tylko kontur, bez koloru w środku) = posiadana: false
 
-KROK 2 — jaki TYP posiadanej karty? (patrz na pasek NA DOLE karty, tuż pod nazwą)
-- ZŁOTY/ŻÓŁTY pasek = typ: złota
-- SREBRNY/NIEBIESKI/BIAŁY pasek = typ: diamentowa
-
-KROK 3 — DUPLIKAT? (tylko dla posiadanych)
-- Na karcie widoczna cyfra (1, 2, 3...) = duplikaty: 1
+DUPLIKAT — żółta cyfra (1-9) widoczna gdziekolwiek na karcie:
+- Widzisz cyfrę = duplikaty: 1
 - Brak cyfry = duplikaty: 0
+
+Typ karty (złota/diamentowa) — weź z bazy poniżej, NIE zgaduj.
 
 Talie (z=złota, d=diamentowa):
 ${info}
 
-Zwróć WYŁĄCZNIE JSON (bez markdown):
+Zidentyfikuj talię z napisu na górze ekranu. Zwróć WYŁĄCZNIE JSON:
 {"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
 }
 
@@ -64,7 +62,7 @@ async function geminiRequest(prompt, base64, mimeType) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+      generationConfig: { temperature: 0, maxOutputTokens: 8192 }
     })
   });
   if (!response.ok) {
@@ -185,7 +183,7 @@ Zwróć dokładnie 9 kart.`;
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+        generationConfig: { temperature: 0, maxOutputTokens: 2048 }
       })
     });
     if (!response.ok) throw new Error(`Błąd ${response.status}`);
