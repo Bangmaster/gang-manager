@@ -2022,7 +2022,7 @@ function SzybkieWprowadzanie({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,w
   );
 }
 
-// ---- POMYSŁ 3: Skaner na żywo ----
+// ---- POMYSŁ 3: Skaner na żywo z trybem kolejki ----
 function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaOsoba,setWybranaOsoba}) {
   const videoRef=useRef(null);
   const canvasRef=useRef(null);
@@ -2030,8 +2030,9 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
   const [stream,setStream]=useState(null);
   const [status,setStatus]=useState("");
   const [analizuje,setAnalizuje]=useState(false);
-  const [ostatniWynik,setOstatniWynik]=useState(null);
-  const [wybranaTalia,setWybranaTalia]=useState(null);
+  const [kolejka,setKolejka]=useState([]); // [{base64, thumb, wynik}]
+  const [postep,setPostep]=useState(null); // {current, total}
+  const [wynikiFinal,setWynikiFinal]=useState([]); // po analizie wszystkich
 
   const osoba=czlonkowie[wybranaOsoba];
 
@@ -2042,8 +2043,7 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
       });
       setStream(s);
       setAktywny(true);
-      setStatus("📷 Kamera aktywna — skieruj na ekran laptopa z talią");
-      // Ustaw srcObject po renderze
+      setStatus("📷 Kamera aktywna — skieruj na talię i klikaj 📸 Dodaj");
       setTimeout(()=>{
         if(videoRef.current){
           videoRef.current.srcObject=s;
@@ -2062,89 +2062,98 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
     setStatus("");
   };
 
-  const zrobZdjecie=async()=>{
+  const dodajDoKolejki=()=>{
     if(!videoRef.current||!canvasRef.current) return;
     const v=videoRef.current;
-    // Sprawdź czy kamera faktycznie streamuje
     if(v.readyState<2||v.videoWidth===0){
-      setStatus("⚠️ Kamera jeszcze się ładuje — poczekaj chwilę i spróbuj ponownie");
+      setStatus("⚠️ Kamera się ładuje — poczekaj chwilę");
       return;
     }
     const c=canvasRef.current;
-    c.width=v.videoWidth;
-    c.height=v.videoHeight;
+    c.width=v.videoWidth; c.height=v.videoHeight;
     c.getContext("2d").drawImage(v,0,0);
-    const base64=c.toDataURL("image/jpeg",0.9).split(",")[1];
+    const base64=c.toDataURL("image/jpeg",0.85).split(",")[1];
+    // Miniaturka
+    const tc=document.createElement("canvas");
+    tc.width=120; tc.height=80;
+    tc.getContext("2d").drawImage(c,0,0,120,80);
+    const thumb=tc.toDataURL("image/jpeg",0.6);
+    setKolejka(prev=>[...prev,{base64,thumb,wynik:null}]);
+    setStatus(`✅ Dodano zdjęcie ${kolejka.length+1} do kolejki — przejdź do następnej talii`);
+  };
 
+  const usunZKolejki=(idx)=>{
+    setKolejka(prev=>prev.filter((_,i)=>i!==idx));
+  };
+
+  const analizujWszystkie=async()=>{
+    if(!kolejka.length||!osoba) return;
     setAnalizuje(true);
-    setStatus("🤖 Analizuję...");
+    setWynikiFinal([]);
+    const wyniki=[];
 
-    try {
-      const resp=await fetch("/api/gemini",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          prompt:`Rozpoznaj talię The Gang na zdjęciu ekranu.
+    for(let i=0;i<kolejka.length;i++){
+      setPostep({current:i+1,total:kolejka.length});
+      setStatus(`🤖 Analizuję ${i+1}/${kolejka.length}...`);
+      try {
+        const resp=await fetch("/api/gemini",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            prompt:`Rozpoznaj talię The Gang na zdjęciu ekranu.
 Każda karta ma gwiazdki na górze:
 - Kolorowe gwiazdki (żółte/fioletowe) = posiadana: true
 - Szare gwiazdki = posiadana: false
 - Żółta cyfra widoczna na karcie = duplikat: true
-
 Talie: ${talie.map(t=>`${t.nazwa}: ${t.karty.map(k=>'"'+k.nazwa+'"('+k.typ[0]+')').join(",")}`).join("\n")}
 Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"duplikat":true|false}]}`,
-          base64,mimeType:"image/jpeg"
-        })
-      });
-      if(!resp.ok){
-        const errText=await resp.text();
-        throw new Error(`Serwer ${resp.status}: ${errText.substring(0,150)}`);
+            base64:kolejka[i].base64, mimeType:"image/jpeg"
+          })
+        });
+        if(!resp.ok) throw new Error(`Serwer ${resp.status}`);
+        const data=await resp.json();
+        let text=(data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+        if(text.startsWith("```json")) text=text.slice(7);
+        if(text.startsWith("```")) text=text.slice(3);
+        if(text.endsWith("```")) text=text.slice(0,-3);
+        const parsed=JSON.parse(text.trim());
+        const taliaMatch=talie.find(t=>normalizuj(t.nazwa)===normalizuj(parsed.talia)||
+          t.nazwa.toLowerCase().includes((parsed.talia||"").toLowerCase().substring(0,6)));
+        wyniki.push({...parsed,taliaMatch,thumb:kolejka[i].thumb,ok:true});
+      } catch(e) {
+        wyniki.push({talia:"?",karty:[],taliaMatch:null,thumb:kolejka[i].thumb,ok:false,blad:e.message});
       }
-      const data=await resp.json();
-      let text=(data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
-      if(!text) throw new Error("AI nie zwróciło odpowiedzi — spróbuj ponownie");
-      if(text.startsWith("```json")) text=text.slice(7);
-      if(text.startsWith("```")) text=text.slice(3);
-      if(text.endsWith("```")) text=text.slice(0,-3);
-      const parsed=JSON.parse(text.trim());
-      setOstatniWynik(parsed);
-      // Znajdź talię
-      const taliaMatch=talie.find(t=>normalizuj(t.nazwa)===normalizuj(parsed.talia)||t.nazwa.toLowerCase().includes(parsed.talia.toLowerCase().substring(0,6)));
-      setWybranaTalia(taliaMatch||null);
-      setStatus(`✅ Rozpoznano: ${parsed.talia} — sprawdź i zatwierdź`);
-    } catch(e) {
-      setStatus("❌ Błąd: "+e.message);
+      // Pauza między zapytaniami
+      if(i<kolejka.length-1) await new Promise(r=>setTimeout(r,2000));
     }
+    setWynikiFinal(wyniki);
+    setPostep(null);
     setAnalizuje(false);
+    const ok=wyniki.filter(w=>w.ok).length;
+    setStatus(`✅ Analiza zakończona: ${ok}/${wyniki.length} talii rozpoznanych`);
   };
 
   const zatwierdz=async()=>{
-    if(!ostatniWynik||!osoba||!wybranaTalia) return;
+    if(!wynikiFinal.length||!osoba) return;
     let zmiany=0;
-    for(const k of ostatniWynik.karty){
-      const kartaMatch=wybranaTalia.karty.find(kk=>
-        normalizuj(kk.nazwa)===normalizuj(k.nazwa)||
-        kk.nazwa.toLowerCase().includes(k.nazwa.toLowerCase().substring(0,5))
-      );
-      if(!kartaMatch) continue;
-      const key=`${osoba.id}_${wybranaTalia.id}_${kartaMatch.nazwa}`;
-      // Posiadana
-      if(k.posiadana&&!posiadane[key]){
-        await zapiszKarte("posiadane",key,true); zmiany++;
-      } else if(!k.posiadana&&posiadane[key]){
-        await zapiszKarte("posiadane",key,null); zmiany++;
-      }
-      // Duplikat
-      if(k.posiadana){
-        const dupKey=key;
-        if(k.duplikat&&!duplikaty?.[dupKey]){
-          await zapiszKarte("duplikaty",dupKey,true); zmiany++;
-        } else if(!k.duplikat&&duplikaty?.[dupKey]){
-          await zapiszKarte("duplikaty",dupKey,null); zmiany++;
-        }
+    for(const w of wynikiFinal){
+      if(!w.ok||!w.taliaMatch) continue;
+      for(const k of w.karty){
+        const kartaMatch=w.taliaMatch.karty.find(kk=>
+          normalizuj(kk.nazwa)===normalizuj(k.nazwa)||
+          kk.nazwa.toLowerCase().includes((k.nazwa||"").toLowerCase().substring(0,5))
+        );
+        if(!kartaMatch) continue;
+        const key=`${osoba.id}_${w.taliaMatch.id}_${kartaMatch.nazwa}`;
+        if(k.posiadana&&!posiadane[key]){ await zapiszKarte("posiadane",key,true); zmiany++; }
+        else if(!k.posiadana&&posiadane[key]){ await zapiszKarte("posiadane",key,null); zmiany++; }
+        if(k.posiadana&&k.duplikat&&!duplikaty?.[key]){ await zapiszKarte("duplikaty",key,true); zmiany++; }
+        else if(k.posiadana&&!k.duplikat&&duplikaty?.[key]){ await zapiszKarte("duplikaty",key,null); zmiany++; }
       }
     }
-    setStatus(`✅ Zapisano ${zmiany} zmian dla ${osoba.nazwa} — ${wybranaTalia.nazwa}`);
-    setOstatniWynik(null);
+    setStatus(`🎉 Zapisano ${zmiany} zmian dla ${osoba.nazwa}!`);
+    setWynikiFinal([]);
+    setKolejka([]);
   };
 
   useEffect(()=>{
@@ -2153,19 +2162,18 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
       videoRef.current.play().catch(()=>{});
     }
   },[stream]);
-
   useEffect(()=>()=>stream?.getTracks().forEach(t=>t.stop()),[stream]);
 
   return (
     <div>
       <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c655",borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontSize:12,fontWeight:"bold",color:"#0c6",marginBottom:4}}>📷 Skaner na żywo — telefon jako skaner</div>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#0c6",marginBottom:4}}>📷 Skaner na żywo — tryb kolejki</div>
         <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
-          1. Odpal grę na laptopie i otwórz talię którą chcesz skanować<br/>
-          2. Wybierz osobę poniżej<br/>
-          3. Włącz kamerę → skieruj telefon na ekran laptopa<br/>
-          4. Kliknij 📸 Skanuj → AI rozpozna karty<br/>
-          5. Sprawdź wynik i zatwierdź
+          1. Odpal grę na laptopie, otwórz talię<br/>
+          2. Kliknij 📸 Dodaj zdjęcie — przejdź do następnej talii<br/>
+          3. Powtarzaj dla wszystkich talii (max 15)<br/>
+          4. Kliknij 🤖 Analizuj wszystkie → AI analizuje kolejno<br/>
+          5. Sprawdź wyniki → ✅ Zatwierdź i zapisz
         </div>
       </div>
 
@@ -2184,7 +2192,7 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
         </div>
       </div>
 
-      {/* Przyciski kamery */}
+      {/* Przyciski */}
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         {!aktywny?(
           <button onClick={startKamery} style={{padding:"10px 20px",background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
@@ -2192,48 +2200,102 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
           </button>
         ):(
           <>
-            <button onClick={zrobZdjecie} disabled={analizuje} style={{padding:"10px 20px",background:analizuje?"#333":"linear-gradient(135deg,#ffd700,#b8860b)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:analizuje?"not-allowed":"pointer",fontSize:13}}>
-              {analizuje?"🤖 Analizuję...":"📸 Skanuj"}
+            <button onClick={dodajDoKolejki} style={{padding:"10px 20px",background:"linear-gradient(135deg,#ffd700,#b8860b)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+              📸 Dodaj zdjęcie ({kolejka.length})
             </button>
             <button onClick={stopKamery} style={{padding:"10px 16px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544455",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:13}}>
               ⏹ Stop
             </button>
           </>
         )}
+        {kolejka.length>0&&!analizuje&&(
+          <button onClick={analizujWszystkie} style={{padding:"10px 20px",background:"linear-gradient(135deg,#4169E1,#87CEEB)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+            🤖 Analizuj wszystkie ({kolejka.length})
+          </button>
+        )}
+        {kolejka.length>0&&!analizuje&&(
+          <button onClick={()=>setKolejka([])} style={{padding:"10px 12px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:12}}>
+            🗑 Wyczyść
+          </button>
+        )}
       </div>
 
-      {status&&<div style={{fontSize:12,color:status.includes("❌")?"#f55":status.includes("✅")?"#0c6":"#fa0",marginBottom:10,padding:"6px 10px",background:"rgba(0,0,0,0.2)",borderRadius:6}}>{status}</div>}
+      {status&&<div style={{fontSize:12,color:status.includes("❌")?"#f55":status.includes("✅")||status.includes("🎉")?"#0c6":"#fa0",marginBottom:10,padding:"6px 10px",background:"rgba(0,0,0,0.2)",borderRadius:6}}>{status}</div>}
+
+      {/* Pasek postępu analizy */}
+      {postep&&(
+        <div style={{marginBottom:12,background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"10px 12px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#aaa",marginBottom:6}}>
+            <span>🤖 Analizuję {postep.current}/{postep.total}...</span>
+            <span>{Math.round((postep.current/postep.total)*100)}%</span>
+          </div>
+          <div style={{height:8,background:"#12122a",borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${(postep.current/postep.total)*100}%`,background:"linear-gradient(90deg,#4169E1,#87CEEB)",transition:"width 0.3s",borderRadius:4}}/>
+          </div>
+        </div>
+      )}
+
+      {/* Miniaturki kolejki */}
+      {kolejka.length>0&&!wynikiFinal.length&&(
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>📋 Kolejka ({kolejka.length} zdjęć):</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {kolejka.map((z,i)=>(
+              <div key={i} style={{position:"relative"}}>
+                <img src={z.thumb} alt={`talia ${i+1}`} style={{width:80,height:54,borderRadius:4,border:"1px solid #2a2a3a",objectFit:"cover"}}/>
+                <div style={{position:"absolute",top:2,left:2,background:"rgba(0,0,0,0.7)",borderRadius:3,padding:"0 4px",fontSize:9,color:"#ffd700"}}>{i+1}</div>
+                <button onClick={()=>usunZKolejki(i)} style={{position:"absolute",top:2,right:2,background:"rgba(255,50,50,0.8)",border:"none",borderRadius:3,color:"#fff",fontSize:9,cursor:"pointer",padding:"0 3px"}}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Podgląd kamery */}
       {aktywny&&(
         <div style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"2px solid #0c6",position:"relative"}}>
-          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:300,objectFit:"cover"}}/>
+          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:280,objectFit:"cover"}}/>
           <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.7)",padding:"3px 8px",borderRadius:4,fontSize:10,color:"#0c6"}}>● LIVE</div>
+          {kolejka.length>0&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.7)",padding:"3px 8px",borderRadius:4,fontSize:10,color:"#ffd700"}}>📋 {kolejka.length}</div>}
         </div>
       )}
       <canvas ref={canvasRef} style={{display:"none"}}/>
 
-      {/* Wynik skanowania */}
-      {ostatniWynik&&wybranaTalia&&(
+      {/* Wyniki analizy */}
+      {wynikiFinal.length>0&&(
         <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
-            Rozpoznano: <span style={{color:"#0c6"}}>{wybranaTalia.nazwa}</span> dla <span style={{color:"#ffd700"}}>{osoba?.nazwa}</span>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+            🔍 Wyniki dla <span style={{color:"#0c6"}}>{osoba?.nazwa}</span> — sprawdź i zatwierdź
           </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10}}>
-            {ostatniWynik.karty.map((k,i)=>(
-              <span key={i} style={{
-                padding:"4px 10px",borderRadius:5,fontSize:11,
-                background:k.posiadana?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.04)",
-                border:k.posiadana?"1px solid #0c655":"1px solid #333",
-                color:k.posiadana?"#0c6":"#555",
-              }}>
-                {k.posiadana?"✓ ":""}{k.nazwa}
-                {k.duplikat&&<span style={{color:"#87CEEB",marginLeft:4}}>+dup</span>}
-              </span>
-            ))}
-          </div>
-          <button onClick={zatwierdz} style={{width:"100%",padding:10,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
-            ✅ Zatwierdź i zapisz do danych gangu
+          {wynikiFinal.map((w,i)=>(
+            <div key={i} style={{marginBottom:8,padding:"8px 10px",background:w.ok?"rgba(0,200,100,0.05)":"rgba(255,50,50,0.05)",border:`1px solid ${w.ok?"#0c633":"#f5544433"}`,borderRadius:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                {w.thumb&&<img src={w.thumb} alt="" style={{width:50,height:34,borderRadius:3,objectFit:"cover"}}/>}
+                <div>
+                  <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"#ffd700":"#f55"}}>
+                    {w.ok?`✓ ${w.taliaMatch?.nazwa||w.talia}`:`❌ ${w.talia} — nie rozpoznano`}
+                  </div>
+                  {w.blad&&<div style={{fontSize:10,color:"#f55"}}>{w.blad}</div>}
+                </div>
+              </div>
+              {w.ok&&w.karty&&(
+                <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                  {w.karty.map((k,j)=>(
+                    <span key={j} style={{
+                      padding:"2px 7px",borderRadius:4,fontSize:10,
+                      background:k.posiadana?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.03)",
+                      border:k.posiadana?"1px solid #0c633":"1px solid #2a2a3a",
+                      color:k.posiadana?"#0c6":"#444",
+                    }}>
+                      {k.posiadana?"✓ ":""}{k.nazwa}{k.duplikat?" +dup":""}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          <button onClick={zatwierdz} style={{width:"100%",marginTop:8,padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14}}>
+            ✅ Zatwierdź i zapisz wszystko do danych gangu
           </button>
         </div>
       )}
