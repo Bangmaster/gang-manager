@@ -542,7 +542,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[]}) {
+function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],ignorujTrudne=false}) {
   const typ=typWymiany==="złote"?"złota":"diamentowa";
   const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
 
@@ -565,7 +565,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       });
       potrzeby.sort((a,b)=>{
         if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
-        return (a.trudna?1:0)-(b.trudna?1:0);
+        return ignorujTrudne ? 0 : (a.trudna?1:0)-(b.trudna?1:0);
       });
       potrzeby.forEach(({talia,karta,nagroda,trudna})=>{
         let dawca=null;
@@ -603,7 +603,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     kandydaciReszta.sort((a,b)=>{
       if(a.faza!==b.faza) return a.faza-b.faza;
       if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
-      return (a.trudna?1:0)-(b.trudna?1:0);
+      return ignorujTrudne ? 0 : (a.trudna?1:0)-(b.trudna?1:0);
     });
     for(const k of kandydaciReszta){
       let dawca=null;
@@ -674,7 +674,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         if (a.brakT.length !== b.brakT.length) return a.brakT.length - b.brakT.length;
         // Talie trudne na końcu
         const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
-        return aT - bT;
+        return ignorujTrudne ? 0 : aT - bT;
       });
 
     // Próbuj zamknąć talie po kolei
@@ -760,7 +760,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     kandidaci.sort((a, b) => {
       if (a.faza !== b.faza) return a.faza - b.faza;
       const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
-      if (aT !== bT) return aT - bT;
+      if (aT !== bT) return ignorujTrudne ? 0 : aT - bT;
       if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
       return a.brakTCount - b.brakTCount;
     });
@@ -824,6 +824,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [skopiowano,setSkopiowano]=useState(false);
   const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
+  const [ignorujTrudne,setIgnorujTrudne]=useState(false);
   const [vipKolejka,setVipKolejka]=useState([]); // lista id osób w kolejności priorytetu
 
   const toggleTalia=(id)=>{
@@ -918,7 +919,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
 
   const generuj=()=>{
     const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[]}));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],ignorujTrudne}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -956,7 +957,18 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         ))}
       </div>
 
-      {/* Panel VIP — kolejka priorytetów */}
+      {/* Opcja ignoruj trudne */}
+      <div style={{marginBottom:12}}>
+        <button onClick={()=>setIgnorujTrudne(p=>!p)} style={{
+          padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
+          background:ignorujTrudne?"rgba(255,100,0,0.2)":"rgba(255,255,255,0.05)",
+          border:ignorujTrudne?"1px solid #ff6400":"1px solid #2a2a3a",
+          color:ignorujTrudne?"#ff6400":"#555",
+        }}>
+          {ignorujTrudne?"🔥 Trudne traktowane jak zwykłe (włączone)":"⚠️ Ignoruj oznaczenie trudnych talii"}
+        </button>
+        {ignorujTrudne&&<span style={{fontSize:11,color:"#888",marginLeft:8}}>talie nr {[10,11,12,14,15].join(",")} będą traktowane normalnie</span>}
+      </div>
       {trybWymiany==="vip"&&(
         <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70044",borderRadius:10,padding:12,marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
@@ -2022,7 +2034,6 @@ function SzybkieWprowadzanie({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,w
   );
 }
 
-// ---- POMYSŁ 3: Skaner na żywo z trybem kolejki ----
 function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaOsoba,setWybranaOsoba}) {
   const videoRef=useRef(null);
   const canvasRef=useRef(null);
@@ -2030,9 +2041,13 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
   const [stream,setStream]=useState(null);
   const [status,setStatus]=useState("");
   const [analizuje,setAnalizuje]=useState(false);
-  const [kolejka,setKolejka]=useState([]); // [{base64, thumb, wynik}]
-  const [postep,setPostep]=useState(null); // {current, total}
-  const [wynikiFinal,setWynikiFinal]=useState([]); // po analizie wszystkich
+  const [kolejka,setKolejka]=useState([]);
+  const [postep,setPostep]=useState(null);
+  const [wynikiFinal,setWynikiFinal]=useState([]);
+  const [autoSkan,setAutoSkan]=useState(false);
+  const [odliczanie,setOdliczanie]=useState(null);
+  const autoRef=useRef(null);
+  const odliczRef=useRef(null);
 
   const osoba=czlonkowie[wybranaOsoba];
 
@@ -2056,30 +2071,75 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
   };
 
   const stopKamery=()=>{
+    stopAutoSkan();
     stream?.getTracks().forEach(t=>t.stop());
     setStream(null);
     setAktywny(false);
     setStatus("");
   };
 
-  const dodajDoKolejki=()=>{
-    if(!videoRef.current||!canvasRef.current) return;
+  const zrobSnapshot=()=>{
+    if(!videoRef.current||!canvasRef.current) return null;
     const v=videoRef.current;
-    if(v.readyState<2||v.videoWidth===0){
-      setStatus("⚠️ Kamera się ładuje — poczekaj chwilę");
-      return;
-    }
+    if(v.readyState<2||v.videoWidth===0) return null;
     const c=canvasRef.current;
     c.width=v.videoWidth; c.height=v.videoHeight;
     c.getContext("2d").drawImage(v,0,0);
     const base64=c.toDataURL("image/jpeg",0.85).split(",")[1];
-    // Miniaturka
     const tc=document.createElement("canvas");
     tc.width=120; tc.height=80;
     tc.getContext("2d").drawImage(c,0,0,120,80);
     const thumb=tc.toDataURL("image/jpeg",0.6);
-    setKolejka(prev=>[...prev,{base64,thumb,wynik:null}]);
-    setStatus(`✅ Dodano zdjęcie ${kolejka.length+1} do kolejki — przejdź do następnej talii`);
+    return {base64,thumb};
+  };
+
+  const dodajDoKolejki=()=>{
+    const snap=zrobSnapshot();
+    if(!snap){ setStatus("⚠️ Kamera się ładuje — poczekaj chwilę"); return; }
+    setKolejka(prev=>[...prev,{...snap,wynik:null}]);
+    setStatus(`✅ Dodano zdjęcie — kolejka: ${kolejka.length+1}`);
+  };
+
+  const startAutoSkan=()=>{
+    if(!aktywny) return;
+    setAutoSkan(true);
+    setStatus("🔄 Auto-skanowanie co 2s — przełączaj talie na laptopie!");
+    // Odliczanie wizualne
+    let count=2;
+    setOdliczanie(count);
+    odliczRef.current=setInterval(()=>{
+      count--;
+      if(count<=0) count=2;
+      setOdliczanie(count);
+    },1000);
+    // Robienie zdjęć co 2 sekundy
+    autoRef.current=setInterval(()=>{
+      const snap=zrobSnapshot();
+      if(snap){
+        setKolejka(prev=>{
+          const nowaKolejka=[...prev,{...snap,wynik:null}];
+          setStatus(`🔄 Auto: ${nowaKolejka.length}/15 zdjęć — przełącz talię!`);
+          // Auto-stop po 15 zdjęciach
+          if(nowaKolejka.length>=15){
+            clearInterval(autoRef.current);
+            clearInterval(odliczRef.current);
+            setAutoSkan(false);
+            setOdliczanie(null);
+            setStatus("✅ Zebrano 15 zdjęć — kliknij 🤖 Analizuj!");
+          }
+          return nowaKolejka;
+        });
+      }
+    },2000);
+  };
+
+  const stopAutoSkan=()=>{
+    clearInterval(autoRef.current);
+    clearInterval(odliczRef.current);
+    setAutoSkan(false);
+    setOdliczanie(null);
+    autoRef.current=null;
+    odliczRef.current=null;
   };
 
   const usunZKolejki=(idx)=>{
@@ -2091,7 +2151,6 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
     setAnalizuje(true);
     setWynikiFinal([]);
     const wyniki=[];
-
     for(let i=0;i<kolejka.length;i++){
       setPostep({current:i+1,total:kolejka.length});
       setStatus(`🤖 Analizuję ${i+1}/${kolejka.length}...`);
@@ -2123,7 +2182,6 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
       } catch(e) {
         wyniki.push({talia:"?",karty:[],taliaMatch:null,thumb:kolejka[i].thumb,ok:false,blad:e.message});
       }
-      // Pauza między zapytaniami
       if(i<kolejka.length-1) await new Promise(r=>setTimeout(r,2000));
     }
     setWynikiFinal(wyniki);
@@ -2162,18 +2220,15 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
       videoRef.current.play().catch(()=>{});
     }
   },[stream]);
-  useEffect(()=>()=>stream?.getTracks().forEach(t=>t.stop()),[stream]);
+  useEffect(()=>()=>{ stopAutoSkan(); stream?.getTracks().forEach(t=>t.stop()); },[]);
 
   return (
     <div>
       <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c655",borderRadius:10,padding:12,marginBottom:12}}>
         <div style={{fontSize:12,fontWeight:"bold",color:"#0c6",marginBottom:4}}>📷 Skaner na żywo — tryb kolejki</div>
         <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
-          1. Odpal grę na laptopie, otwórz talię<br/>
-          2. Kliknij 📸 Dodaj zdjęcie — przejdź do następnej talii<br/>
-          3. Powtarzaj dla wszystkich talii (max 15)<br/>
-          4. Kliknij 🤖 Analizuj wszystkie → AI analizuje kolejno<br/>
-          5. Sprawdź wyniki → ✅ Zatwierdź i zapisz
+          <strong style={{color:"#ffd700"}}>Tryb AUTO (zalecany):</strong> Oprzyj telefon o coś → kliknij 🔄 Auto → przełączaj talie na laptopie co 2s<br/>
+          <strong style={{color:"#aaa"}}>Tryb ręczny:</strong> Klikaj 📸 Dodaj dla każdej talii osobno
         </div>
       </div>
 
@@ -2192,35 +2247,44 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
         </div>
       </div>
 
-      {/* Przyciski */}
-      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+      {/* Przyciski kamery */}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
         {!aktywny?(
           <button onClick={startKamery} style={{padding:"10px 20px",background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
             📷 Włącz kamerę
           </button>
         ):(
           <>
-            <button onClick={dodajDoKolejki} style={{padding:"10px 20px",background:"linear-gradient(135deg,#ffd700,#b8860b)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
-              📸 Dodaj zdjęcie ({kolejka.length})
+            {!autoSkan?(
+              <button onClick={startAutoSkan} style={{padding:"10px 20px",background:"linear-gradient(135deg,#4169E1,#87CEEB)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+                🔄 Auto (co 2s)
+              </button>
+            ):(
+              <button onClick={stopAutoSkan} style={{padding:"10px 20px",background:"linear-gradient(135deg,#f55,#fa0)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+                ⏹ Stop auto
+              </button>
+            )}
+            <button onClick={dodajDoKolejki} style={{padding:"10px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:8,color:"#ffd700",cursor:"pointer",fontSize:13}}>
+              📸 Dodaj ręcznie
             </button>
-            <button onClick={stopKamery} style={{padding:"10px 16px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544455",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:13}}>
+            <button onClick={stopKamery} style={{padding:"10px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544455",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:12}}>
               ⏹ Stop
             </button>
           </>
         )}
         {kolejka.length>0&&!analizuje&&(
-          <button onClick={analizujWszystkie} style={{padding:"10px 20px",background:"linear-gradient(135deg,#4169E1,#87CEEB)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
-            🤖 Analizuj wszystkie ({kolejka.length})
-          </button>
-        )}
-        {kolejka.length>0&&!analizuje&&(
-          <button onClick={()=>setKolejka([])} style={{padding:"10px 12px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:12}}>
-            🗑 Wyczyść
-          </button>
+          <>
+            <button onClick={analizujWszystkie} style={{padding:"10px 20px",background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+              🤖 Analizuj ({kolejka.length})
+            </button>
+            <button onClick={()=>setKolejka([])} style={{padding:"10px 10px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:12}}>
+              🗑
+            </button>
+          </>
         )}
       </div>
 
-      {status&&<div style={{fontSize:12,color:status.includes("❌")?"#f55":status.includes("✅")||status.includes("🎉")?"#0c6":"#fa0",marginBottom:10,padding:"6px 10px",background:"rgba(0,0,0,0.2)",borderRadius:6}}>{status}</div>}
+      {status&&<div style={{fontSize:12,color:status.includes("❌")?"#f55":status.includes("✅")||status.includes("🎉")?"#0c6":status.includes("🔄")?"#87CEEB":"#fa0",marginBottom:10,padding:"6px 10px",background:"rgba(0,0,0,0.2)",borderRadius:6}}>{status}</div>}
 
       {/* Pasek postępu analizy */}
       {postep&&(
@@ -2230,10 +2294,27 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
             <span>{Math.round((postep.current/postep.total)*100)}%</span>
           </div>
           <div style={{height:8,background:"#12122a",borderRadius:4,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${(postep.current/postep.total)*100}%`,background:"linear-gradient(90deg,#4169E1,#87CEEB)",transition:"width 0.3s",borderRadius:4}}/>
+            <div style={{height:"100%",width:`${(postep.current/postep.total)*100}%`,background:"linear-gradient(90deg,#0c6,#0fa)",transition:"width 0.3s",borderRadius:4}}/>
           </div>
         </div>
       )}
+
+      {/* Podgląd kamery z odliczaniem */}
+      {aktywny&&(
+        <div style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:`2px solid ${autoSkan?"#87CEEB":"#0c6"}`,position:"relative"}}>
+          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:280,objectFit:"cover"}}/>
+          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.7)",padding:"3px 8px",borderRadius:4,fontSize:10,color:autoSkan?"#87CEEB":"#0c6"}}>
+            {autoSkan?"🔄 AUTO":"● LIVE"}
+          </div>
+          {odliczanie!==null&&(
+            <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:72,fontWeight:"bold",color:"rgba(255,215,0,0.9)",textShadow:"0 0 20px #000"}}>
+              {odliczanie}
+            </div>
+          )}
+          {kolejka.length>0&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.8)",padding:"4px 10px",borderRadius:4,fontSize:12,color:"#ffd700",fontWeight:"bold"}}>📋 {kolejka.length}</div>}
+        </div>
+      )}
+      <canvas ref={canvasRef} style={{display:"none"}}/>
 
       {/* Miniaturki kolejki */}
       {kolejka.length>0&&!wynikiFinal.length&&(
@@ -2251,31 +2332,18 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
         </div>
       )}
 
-      {/* Podgląd kamery */}
-      {aktywny&&(
-        <div style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"2px solid #0c6",position:"relative"}}>
-          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:280,objectFit:"cover"}}/>
-          <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.7)",padding:"3px 8px",borderRadius:4,fontSize:10,color:"#0c6"}}>● LIVE</div>
-          {kolejka.length>0&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.7)",padding:"3px 8px",borderRadius:4,fontSize:10,color:"#ffd700"}}>📋 {kolejka.length}</div>}
-        </div>
-      )}
-      <canvas ref={canvasRef} style={{display:"none"}}/>
-
-      {/* Wyniki analizy */}
+      {/* Wyniki */}
       {wynikiFinal.length>0&&(
         <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
           <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
-            🔍 Wyniki dla <span style={{color:"#0c6"}}>{osoba?.nazwa}</span> — sprawdź i zatwierdź
+            🔍 Wyniki dla <span style={{color:"#0c6"}}>{osoba?.nazwa}</span>
           </div>
           {wynikiFinal.map((w,i)=>(
             <div key={i} style={{marginBottom:8,padding:"8px 10px",background:w.ok?"rgba(0,200,100,0.05)":"rgba(255,50,50,0.05)",border:`1px solid ${w.ok?"#0c633":"#f5544433"}`,borderRadius:8}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:w.ok?6:0}}>
                 {w.thumb&&<img src={w.thumb} alt="" style={{width:50,height:34,borderRadius:3,objectFit:"cover"}}/>}
-                <div>
-                  <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"#ffd700":"#f55"}}>
-                    {w.ok?`✓ ${w.taliaMatch?.nazwa||w.talia}`:`❌ ${w.talia} — nie rozpoznano`}
-                  </div>
-                  {w.blad&&<div style={{fontSize:10,color:"#f55"}}>{w.blad}</div>}
+                <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"#ffd700":"#f55"}}>
+                  {w.ok?`✓ ${w.taliaMatch?.nazwa||w.talia}`:`❌ Nie rozpoznano — ${w.blad||""}`}
                 </div>
               </div>
               {w.ok&&w.karty&&(
@@ -2286,16 +2354,14 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
                       background:k.posiadana?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.03)",
                       border:k.posiadana?"1px solid #0c633":"1px solid #2a2a3a",
                       color:k.posiadana?"#0c6":"#444",
-                    }}>
-                      {k.posiadana?"✓ ":""}{k.nazwa}{k.duplikat?" +dup":""}
-                    </span>
+                    }}>{k.posiadana?"✓ ":""}{k.nazwa}{k.duplikat?" +dup":""}</span>
                   ))}
                 </div>
               )}
             </div>
           ))}
           <button onClick={zatwierdz} style={{width:"100%",marginTop:8,padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14}}>
-            ✅ Zatwierdź i zapisz wszystko do danych gangu
+            ✅ Zatwierdź i zapisz wszystko
           </button>
         </div>
       )}
