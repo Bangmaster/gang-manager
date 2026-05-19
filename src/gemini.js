@@ -9,7 +9,7 @@ const KLUCZE_API = [
   process.env.REACT_APP_GEMINI_API_KEY_5 || "",
 ].filter(k => k.length > 0);
 
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-2.5-flash";
 let aktualnyKluczIdx = 0;
 
 function pobierzURL() {
