@@ -2041,9 +2041,15 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
         video:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}}
       });
       setStream(s);
-      if(videoRef.current) videoRef.current.srcObject=s;
       setAktywny(true);
       setStatus("📷 Kamera aktywna — skieruj na ekran laptopa z talią");
+      // Ustaw srcObject po renderze
+      setTimeout(()=>{
+        if(videoRef.current){
+          videoRef.current.srcObject=s;
+          videoRef.current.play().catch(()=>{});
+        }
+      },100);
     } catch(e) {
       setStatus("❌ Brak dostępu do kamery: "+e.message);
     }
@@ -2059,6 +2065,11 @@ function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaO
   const zrobZdjecie=async()=>{
     if(!videoRef.current||!canvasRef.current) return;
     const v=videoRef.current;
+    // Sprawdź czy kamera faktycznie streamuje
+    if(v.readyState<2||v.videoWidth===0){
+      setStatus("⚠️ Kamera jeszcze się ładuje — poczekaj chwilę i spróbuj ponownie");
+      return;
+    }
     const c=canvasRef.current;
     c.width=v.videoWidth;
     c.height=v.videoHeight;
@@ -2135,6 +2146,13 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
     setStatus(`✅ Zapisano ${zmiany} zmian dla ${osoba.nazwa} — ${wybranaTalia.nazwa}`);
     setOstatniWynik(null);
   };
+
+  useEffect(()=>{
+    if(stream&&videoRef.current){
+      videoRef.current.srcObject=stream;
+      videoRef.current.play().catch(()=>{});
+    }
+  },[stream]);
 
   useEffect(()=>()=>stream?.getTracks().forEach(t=>t.stop()),[stream]);
 
