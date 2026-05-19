@@ -278,8 +278,7 @@ export default function App() {
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
-          typWymiany={typWymiany} zalogowany={zalogowany}
-          zapiszKarte={zapiszKarte}
+          zalogowany={zalogowany} zapiszKarte={zapiszKarte}
         />}
         {zakładka==="duplikaty"&&<DuplikatyView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
@@ -295,6 +294,7 @@ export default function App() {
           typWymiany={typWymiany}
           isAdmin={isAdmin}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
+          zapiszKarte={zapiszKarte}
         />}
         {zakładka==="walki"&&<WalkiView
           czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
@@ -377,42 +377,51 @@ function LoginScreen({onLogin, czlonkowie}) {
   );
 }
 
-function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapiszKarte,zalogowany}) {
+function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany}) {
   const isAdmin = zalogowany.rola==="admin"||zalogowany.rola==="zastepca";
-
-  // Członek może edytować tylko swoje (po nazwie)
   const swojaOsoba = czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(zalogowany.login));
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
   const [wybranaOsoba,setWybranaOsoba]=useState(startIdx);
+  const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
     if(tryb==="posiadane"){
       if(posiadane[key]){
-        // Odznacz kartę i równocześnie usuń ją z duplikatów
         zapiszKarte("posiadane", key, null);
         if(duplikaty[key]) zapiszKarte("duplikaty", key, null);
       } else {
         zapiszKarte("posiadane", key, true);
       }
     } else {
-      // duplikat
       if(duplikaty[key]) zapiszKarte("duplikaty", key, null);
       else zapiszKarte("duplikaty", key, true);
     }
   };
 
   const osoba=czlonkowie[wybranaOsoba];
-  const typ=typWymiany==="złote"?"złota":"diamentowa";
-  // Tylko admin i zastępca mogą edytować karty
   const mozeEdytowac = isAdmin;
 
   return (
     <div>
-      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#ffd700"}}>
-        Tryb: <strong>{typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}</strong>
-        {!isAdmin && <span style={{color:"#aaa",marginLeft:10}}>— możesz edytować tylko swoje karty</span>}
+      {/* Filtry typów */}
+      <div style={{display:"flex",gap:6,marginBottom:10}}>
+        {[
+          {id:"wszystkie",label:"🃏 Wszystkie"},
+          {id:"złote",label:"⭐ Złote"},
+          {id:"diamentowe",label:"💎 Diamentowe"},
+        ].map(f=>(
+          <button key={f.id} onClick={()=>setFiltrTyp(f.id)} style={{
+            padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:12,
+            background:filtrTyp===f.id?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
+            border:filtrTyp===f.id?"1px solid #ffd700":"1px solid #2a2a3a",
+            color:filtrTyp===f.id?"#ffd700":"#666",
+          }}>{f.label}</button>
+        ))}
+        {!isAdmin && <span style={{fontSize:11,color:"#555",alignSelf:"center",marginLeft:4}}>🔒 tylko podgląd</span>}
       </div>
+
+      {/* Lista członków */}
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
         {czlonkowie.map((c,i)=>{
           const swoja = swojaOsoba && c.id===swojaOsoba.id;
@@ -434,18 +443,53 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapiszKarte,z
             {!mozeEdytowac && <span style={{fontSize:11,color:"#f55",fontWeight:"normal"}}>🔒 tylko podgląd</span>}
           </div>
           {talie.map(talia=>{
-            const kartyT=talia.karty.filter(k=>k.typ===typ);
-            if(!kartyT.length) return null;
-            const posC=kartyT.filter(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
-            const dupC=kartyT.filter(k=>duplikaty[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
-            const brak=kartyT.length-posC;
-            const trudna=TRUDNE_NUMERY.includes(talia.numer);
+            // Filtruj karty wg wybranego typu
+            const kartyAll = talia.karty.filter(k=>
+              filtrTyp==="wszystkie" ? true :
+              filtrTyp==="złote" ? k.typ==="złota" : k.typ==="diamentowa"
+            );
+            if(!kartyAll.length) return null;
+
+            const kartyZlote = kartyAll.filter(k=>k.typ==="złota");
+            const kartyDia = kartyAll.filter(k=>k.typ==="diamentowa");
+            const posC = kartyAll.filter(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
+            const dupC = kartyAll.filter(k=>duplikaty[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
+            const brak = kartyAll.length - posC;
+            const trudna = TRUDNE_NUMERY.includes(talia.numer);
+
+            const renderKarty=(karty)=>(
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                {karty.map(karta=>{
+                  const key=`${osoba.id}_${talia.id}_${karta.nazwa}`;
+                  const ma=posiadane[key]; const dup=duplikaty[key];
+                  return (
+                    <div key={karta.nazwa} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                      <button disabled={!mozeEdytowac} onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane")} style={{
+                        padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
+                        maxWidth:90,textAlign:"center",lineHeight:1.2,
+                        background:ma?(karta.typ==="złota"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)"):"rgba(255,255,255,0.04)",
+                        border:ma?"none":"1px solid #2a2a3a",
+                        color:ma?(karta.typ==="złota"?"#000":"#fff"):"#444",
+                        fontWeight:ma?"bold":"normal",opacity:mozeEdytowac?1:0.7,
+                      }}>{karta.nazwa}</button>
+                      {ma&&<button disabled={!mozeEdytowac} onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"duplikat")} style={{
+                        padding:"1px 6px",fontSize:9,borderRadius:4,cursor:mozeEdytowac?"pointer":"not-allowed",
+                        background:dup?"linear-gradient(135deg,#4169E1,#87CEEB)":"rgba(65,105,225,0.1)",
+                        border:dup?"none":"1px dashed #4169E155",color:dup?"#fff":"#4169E1",opacity:mozeEdytowac?1:0.7,
+                      }}>{dup?"💎dup":"+dup"}</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+
             return (
               <div key={talia.id} style={{
                 marginBottom:10,borderRadius:8,padding:"10px 12px",
                 background:brak===0?"rgba(0,200,100,0.1)":brak<=2?"rgba(255,165,0,0.09)":"rgba(255,255,255,0.02)",
                 border:brak===0?"1px solid #0c655":brak<=2?"1px solid #fa050":"1px solid #202035",
               }}>
+                {/* Nagłówek talii */}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:10,background:trudna?"rgba(255,50,50,0.18)":"rgba(255,215,0,0.1)",border:`1px solid ${trudna?"#f55":"#b8860b"}`,borderRadius:4,padding:"1px 5px",color:trudna?"#f55":"#b8860b"}}>#{talia.numer}</span>
@@ -453,37 +497,36 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,typWymiany,zapiszKarte,z
                     <span style={{fontSize:11,color:"#666"}}>🎯{talia.nagroda_amunicja?.toLocaleString()}</span>
                   </div>
                   <div style={{fontSize:12}}>
-                    <span style={{color:brak===0?"#0c6":"#ffd700"}}>{posC}/{kartyT.length}</span>
+                    <span style={{color:brak===0?"#0c6":"#ffd700"}}>{posC}/{kartyAll.length}</span>
                     {dupC>0&&<span style={{color:"#87CEEB",marginLeft:6}}>+{dupC}dup</span>}
                     {brak===0&&<span style={{color:"#0c6",marginLeft:8}}>✓</span>}
                     {brak>0&&brak<=2&&<span style={{color:"#fa0",marginLeft:8}}>⚡{brak} brak</span>}
                   </div>
                 </div>
                 <div style={{height:3,background:"#12122a",borderRadius:2,marginBottom:8}}>
-                  <div style={{height:"100%",width:`${kartyT.length?(posC/kartyT.length)*100:0}%`,background:brak===0?"#0c6":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:2}}/>
+                  <div style={{height:"100%",width:`${kartyAll.length?(posC/kartyAll.length)*100:0}%`,background:brak===0?"#0c6":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:2}}/>
                 </div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                  {kartyT.map(karta=>{
-                    const key=`${osoba.id}_${talia.id}_${karta.nazwa}`;
-                    const ma=posiadane[key];const dup=duplikaty[key];
-                    return (
-                      <div key={karta.nazwa} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                        <button disabled={!mozeEdytowac} onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane")} style={{
-                          padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",maxWidth:90,textAlign:"center",lineHeight:1.2,
-                          background:ma?(karta.typ==="złota"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)"):"rgba(255,255,255,0.04)",
-                          border:ma?"none":"1px solid #2a2a3a",
-                          color:ma?(karta.typ==="złota"?"#000":"#fff"):"#444",
-                          fontWeight:ma?"bold":"normal",opacity:mozeEdytowac?1:0.7,
-                        }}>{karta.nazwa}</button>
-                        {ma&&<button disabled={!mozeEdytowac} onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"duplikat")} style={{
-                          padding:"1px 6px",fontSize:9,borderRadius:4,cursor:mozeEdytowac?"pointer":"not-allowed",
-                          background:dup?"linear-gradient(135deg,#4169E1,#87CEEB)":"rgba(65,105,225,0.1)",
-                          border:dup?"none":"1px dashed #4169E155",color:dup?"#fff":"#4169E1",opacity:mozeEdytowac?1:0.7,
-                        }}>{dup?"💎dup":"+dup"}</button>}
-                      </div>
-                    );
-                  })}
-                </div>
+
+                {/* Złote karty */}
+                {kartyZlote.length>0&&(
+                  <div style={{marginBottom:kartyDia.length>0?8:0}}>
+                    {filtrTyp==="wszystkie"&&<div style={{fontSize:10,color:"#b8860b",marginBottom:4}}>⭐ Złote</div>}
+                    {renderKarty(kartyZlote)}
+                  </div>
+                )}
+
+                {/* Separator jeśli oba typy */}
+                {kartyZlote.length>0&&kartyDia.length>0&&(
+                  <div style={{borderTop:"1px solid #1a1a2e",marginBottom:8}}/>
+                )}
+
+                {/* Diamentowe karty */}
+                {kartyDia.length>0&&(
+                  <div>
+                    {filtrTyp==="wszystkie"&&<div style={{fontSize:10,color:"#87CEEB",marginBottom:4}}>💎 Diamentowe</div>}
+                    {renderKarty(kartyDia)}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1518,7 +1561,7 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
   );
 }
 
-function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna}) {
+function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszKarte}) {
   const [zamykanie,setZamykanie]=useState(false);
   const [podmienIdx,setPodmienIdx]=useState(null); // indeks wymiany do podmiany
 
@@ -1553,11 +1596,46 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
   const wszystkichNadawcow=Object.keys(poNadawcach).length;
 
   const potwierdz=async()=>{
+    // 1. Oznacz jako potwierdzone
     await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[mojNick]:true}});
+
+    // 2. Automatycznie zaznacz kartę jako posiadaną przez odbiorcę w danych gangu
+    if(mojePozycje&&zapiszKarte){
+      for(const w of mojePozycje){
+        const odbiorca=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(w.do));
+        const talia=talie.find(t=>normalizuj(t.nazwa)===normalizuj(w.talia));
+        if(odbiorca&&talia){
+          const karta=talia.karty.find(k=>normalizuj(k.nazwa)===normalizuj(w.karta));
+          if(karta){
+            const key=`${odbiorca.id}_${talia.id}_${karta.nazwa}`;
+            if(!posiadane[key]) await zapiszKarte("posiadane", key, true);
+          }
+        }
+      }
+    }
+  };
+  const potwierdzeZaKogos=async(nadawca,wartoscPotw)=>{
+    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[nadawca]:wartoscPotw}});
+    // Jeśli admin potwierdza (nie cofa) — zaznacz kartę w danych gangu
+    if(wartoscPotw&&zapiszKarte){
+      const wymianyNadawcy=poNadawcach[nadawca]||[];
+      for(const w of wymianyNadawcy){
+        const odbiorca=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(w.do));
+        const talia=talie.find(t=>normalizuj(t.nazwa)===normalizuj(w.talia));
+        if(odbiorca&&talia){
+          const karta=talia.karty.find(k=>normalizuj(k.nazwa)===normalizuj(w.karta));
+          if(karta){
+            const key=`${odbiorca.id}_${talia.id}_${karta.nazwa}`;
+            if(!posiadane[key]) await zapiszKarte("posiadane", key, true);
+          }
+        }
+      }
+    }
   };
   const cofnijPotwierdzenie=async()=>{
     await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[mojNick]:false}});
   };
+
   const zamknijWymiane=async()=>{
     if(!window.confirm("Zamknąć aktywną wymianę? Zniknie dla wszystkich.")) return;
     setZamykanie(true);
@@ -1687,7 +1765,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
               {/* Nagłówek nadawcy */}
               <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px"}}>
                 {isAdmin?(
-                  <button onClick={()=>zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[nadawca]:!potw}})}
+                  <button onClick={()=>potwierdzeZaKogos(nadawca,!potw)}
                     style={{fontSize:16,background:"none",border:"none",cursor:"pointer",padding:0}}
                     title={potw?"Cofnij potwierdzenie":"Potwierdź za tę osobę"}>
                     {potw?"✅":"⏳"}
