@@ -1,11 +1,7 @@
 // Logika rozpoznawania kart — klucze API są na serwerze (api/gemini.js)
 // Frontend NIE ma dostępu do kluczy Gemini
 
-let aktualnyKluczIdx = 0;
-
-function nastepnyKlucz() {
-  aktualnyKluczIdx++;
-}
+function nastepnyKlucz() {} // no-op — rotacja kluczy jest na serwerze
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
