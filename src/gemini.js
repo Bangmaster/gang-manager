@@ -35,20 +35,24 @@ function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
     `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
   ).join("\n");
-  return `Rozpoznaj karty z gry The Gang. Każda karta ma pomarańczowy pasek z nazwą na dole.
+  return `Rozpoznaj karty z gry The Gang na screenie talii (siatka 3x3).
 
-POD tym paskiem z nazwą jest mały dekoracyjny pasek — to główny wyróżnik:
+KROK 1 — czy karta jest POSIADANA?
+- BRAK: szary środek bez obrazka, z napisem "GANG" lub "THE GANG" → posiadana: false
+- POSIADANA: kolorowy obrazek w środku karty → posiadana: true
 
-ZŁOTY/ŻÓŁTY pasek pod nazwą = karta ZŁOTA i POSIADANA → typ: złota, posiadana: true
-SREBRNY/BIAŁY pasek pod nazwą = karta DIAMENTOWA i POSIADANA → typ: diamentowa, posiadana: true
-BRAK kolorowego paska (pasek ciemny/szary/niewidoczny) = karta NIEPOSIADANA → posiadana: false
+KROK 2 — jaki TYP posiadanej karty? (patrz na pasek NA DOLE karty, tuż pod nazwą)
+- ZŁOTY/ŻÓŁTY pasek = typ: złota
+- SREBRNY/NIEBIESKI/BIAŁY pasek = typ: diamentowa
 
-DUPLIKAT: żółta cyfra z plusem (np. +1, +2, +3) która wychodzi POZA prawą krawędź karty, przecinając ramkę po prawej stronie = duplikaty: 1. Brak takiej cyfry = duplikaty: 0.
+KROK 3 — DUPLIKAT? (tylko dla posiadanych)
+- Na karcie widoczna cyfra (1, 2, 3...) = duplikaty: 1
+- Brak cyfry = duplikaty: 0
 
-Talie:
+Talie (z=złota, d=diamentowa):
 ${info}
 
-Zwróć WYŁĄCZNIE JSON:
+Zwróć WYŁĄCZNIE JSON (bez markdown):
 {"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
 }
 
