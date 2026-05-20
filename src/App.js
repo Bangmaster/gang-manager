@@ -229,6 +229,11 @@ export default function App() {
           <div style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
             <span><span style={{color:"#ffd700"}}>{zalogowany.login}</span> <span style={{color:"#888"}}>({zalogowany.rola})</span></span>
             {statusZapisu && <span style={{color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
+            {/* Tip dnia */}
+            <span style={{fontSize:10,color:"#444",fontStyle:"italic",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
+              title={TIPY[Math.floor(Date.now()/43200000)%TIPY.length]}>
+              {TIPY[Math.floor(Date.now()/43200000)%TIPY.length]}
+            </span>
             {/* Wskaźnik online */}
             {(()=>{
               const PROG = 90000; // 90 sekund = online
@@ -326,6 +331,10 @@ export default function App() {
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           zapiszKarte={zapiszKarte}
+          zapiszStrukture={zapiszStrukture}
+          aktywnaWymiana={dane.aktywnaWymiana}
+          walki={dane.walki||[]}
+          typWymiany={typWymiany}
         />}
       </div>
     </div>
@@ -344,10 +353,43 @@ function LoadingScreen() {
   );
 }
 
+const CYTATY=[
+  "Nie pytaj co gang może zrobić dla Ciebie — pytaj komu możesz wysłać duplikat.",
+  "Witaj w gangu. Twoje karty nas interesują bardziej niż Ty.",
+  "Motto ™FAM™: Wymieniam więc jestem.",
+  "Uwaga: admin widzi wszystko. Łącznie z tym że nie potwierdziłeś wymiany od 3 dni.",
+  "W życiu są dwie pewne rzeczy: śmierć i to że Bangmasta będzie pytał czy wysłałeś kartę.",
+  "Karta sama się nie wyśle. Chyba że jesteś Sonnym.",
+  "Nie masz duplikatów? Nie ma problemu. Problem masz gdy je masz i nie wysyłasz.",
+  "Gang nie pyta skąd masz duplikaty. Gang pyta dlaczego jeszcze ich nie wysłałeś.",
+  "Zamknięta talia to nie cel — to minimalny standard.",
+  "Każda niezatwierdzona wymiana to łza na policzku admina.",
+  "Przed potwierdzeniem wymiany odetchnij. Po potwierdzeniu też.",
+  "™FAM™ — bo rodzina to ci co wysyłają karty na czas.",
+  "Pamiętaj: admin ma dostęp do Twoich danych. I do Twojego ego gdy nie wysyłasz.",
+  "Sezon się kończy. Talie nie zamykają się same. Mamy cię na oku.",
+  "Wysłałeś kartę? Brawo. Teraz potwierdź to w apce, bo admin nie wróżbita.",
+];
+
+const TIPY=[
+  "💡 Tip dnia: Zakładka ROZPISKA — sprawdź czy masz coś do wysłania!",
+  "💡 Tip dnia: Duplikaty to waluta gangu. Im więcej masz tym bardziej jesteś lubiany.",
+  "💡 Tip dnia: Użyj skanera w zakładce TESTY — 15 talii w 30 sekund!",
+  "💡 Tip dnia: Złote dni i diamentowe dni — przełączaj przycisk ZŁOTE/DIAMENTOWE.",
+  "💡 Tip dnia: Jeśli karta wpadła z paczki — admin może podmienić wymianę w ROZPISCE.",
+  "💡 Tip dnia: Im szybciej potwierdzisz wymianę tym szybciej gang dostanie ammo.",
+  "💡 Tip dnia: Sprawdź zakładkę Duplikaty — może ktoś szuka karty którą masz!",
+  "💡 Tip dnia: Podsumowanie sezonu w zakładce Walki — kto jest królem obrażeń?",
+  "💡 Tip dnia: Talia zamknięta przez cały gang = nagroda dla wszystkich. Warto się starać!",
+  "💡 Tip dnia: Admin może zaznaczać potwierdzenia za innych w ROZPISCE — popros jeśli nie możesz.",
+];
+
 function LoginScreen({onLogin, czlonkowie}) {
   const [login,setLogin]=useState("");
   const [haslo,setHaslo]=useState("");
   const [blad,setBlad]=useState("");
+  const cytat=CYTATY[Math.floor(Date.now()/86400000)%CYTATY.length];
+  const tip=TIPY[Math.floor(Date.now()/43200000)%TIPY.length];
 
   const zaloguj=()=>{
     const u=ADMIN_CREDENTIALS.find(c=>c.login===login&&c.haslo===haslo);
@@ -366,18 +408,33 @@ function LoginScreen({onLogin, czlonkowie}) {
 
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c29,#302b63,#24243e)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Georgia',serif",padding:20}}>
-      <div style={{background:"rgba(0,0,0,0.65)",border:"2px solid #b8860b",borderRadius:16,padding:32,width:"100%",maxWidth:320,textAlign:"center",boxSizing:"border-box"}}>
-        <div style={{fontSize:44,marginBottom:6}}>🃏</div>
-        <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700",marginBottom:2}}>GANG</div>
-        <div style={{fontSize:12,color:"#666",marginBottom:24}}>Menadżer wymian kart</div>
-        <input value={login} onChange={e=>setLogin(e.target.value)} placeholder="Twój nick / login admina"
-          style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:14,marginBottom:10,boxSizing:"border-box"}}/>
-        <input value={haslo} onChange={e=>setHaslo(e.target.value)} type="password" placeholder="Hasło (tylko admin)"
-          onKeyDown={e=>e.key==="Enter"&&zaloguj()}
-          style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:14,marginBottom:10,boxSizing:"border-box"}}/>
-        {blad&&<div style={{color:"#f55",fontSize:12,marginBottom:10}}>{blad}</div>}
-        <button onClick={zaloguj} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:8,fontWeight:"bold",fontSize:15,cursor:"pointer",color:"#000"}}>Wejdź</button>
-        <div style={{fontSize:11,color:"#444",marginTop:16,lineHeight:1.6}}>Członek: wpisz nick, bez hasła.<br/>Admin: login + hasło.</div>
+      <div style={{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:12}}>
+        {/* Cytat dnia */}
+        <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid #b8860b44",borderRadius:10,padding:"12px 16px",textAlign:"center"}}>
+          <div style={{fontSize:16,marginBottom:6}}>🃏</div>
+          <div style={{fontSize:11,color:"#b8860b",fontStyle:"italic",lineHeight:1.5}}>"{cytat}"</div>
+        </div>
+
+        {/* Panel logowania */}
+        <div style={{background:"rgba(0,0,0,0.65)",border:"2px solid #b8860b",borderRadius:16,padding:28,textAlign:"center",boxSizing:"border-box"}}>
+          <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700",marginBottom:2}}>GANG MANAGER</div>
+          <div style={{fontSize:11,color:"#555",marginBottom:20}}>™FAM™ Menadżer wymian kart</div>
+          <input value={login} onChange={e=>setLogin(e.target.value)} placeholder="Twój nick / login admina"
+            style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:14,marginBottom:10,boxSizing:"border-box"}}/>
+          <input value={haslo} onChange={e=>setHaslo(e.target.value)} type="password" placeholder="Hasło (tylko admin)"
+            onKeyDown={e=>e.key==="Enter"&&zaloguj()}
+            style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:14,marginBottom:10,boxSizing:"border-box"}}/>
+          {blad&&<div style={{color:"#f55",fontSize:12,marginBottom:10}}>{blad}</div>}
+          <button onClick={zaloguj} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:8,fontWeight:"bold",fontSize:15,cursor:"pointer",color:"#000"}}>
+            Wejdź do gangu 💪
+          </button>
+          <div style={{fontSize:11,color:"#444",marginTop:14,lineHeight:1.6}}>Członek: wpisz nick, bez hasła.<br/>Admin: login + hasło.</div>
+        </div>
+
+        {/* Tip dnia */}
+        <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a3a",borderRadius:8,padding:"10px 14px",textAlign:"center"}}>
+          <div style={{fontSize:11,color:"#666",lineHeight:1.5}}>{tip}</div>
+        </div>
       </div>
     </div>
   );
@@ -444,10 +501,11 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
 
       {osoba&&(
         <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
-          <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+          <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
             <span>✏️ {osoba.nazwa}</span>
             {!mozeEdytowac && <span style={{fontSize:11,color:"#f55",fontWeight:"normal"}}>🔒 tylko podgląd</span>}
           </div>
+          <OsiagnieciaWidget talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zalogowany={zalogowany}/>
           {talie.map(talia=>{
             // Filtruj karty wg wybranego typu
             const kartyAll = talia.karty.filter(k=>
@@ -1870,32 +1928,49 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 }
 
 // ============================================================
-// TESTY — Pomysł 1: Szybkie wprowadzanie + Pomysł 3: Skaner
+// TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte}) {
-  const [tryb,setTryb]=useState("szybkie"); // szybkie | skaner
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany}) {
+  const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaOsobaSkaner,setWybranaOsobaSkaner]=useState(0);
   const [wybranaTalia,setWybranaTalia]=useState(0);
+
+  const przyciski=[
+    {id:"szybkie",label:"⚡ Szybkie"},
+    {id:"skaner",label:"📷 Skaner"},
+    {id:"postep",label:"📊 Postęp"},
+    {id:"kalkulator",label:"🧮 Kalkulator"},
+    {id:"historia",label:"📜 Historia"},
+    {id:"reset",label:"🔄 Reset"},
+    {id:"push",label:"🔔 Powiadomienia"},
+  ];
 
   return (
     <div>
       <div style={{background:"rgba(255,165,0,0.08)",border:"1px solid #fa055",borderRadius:10,padding:12,marginBottom:14}}>
         <div style={{fontSize:13,fontWeight:"bold",color:"#fa0",marginBottom:4}}>🧪 Strefa testów</div>
-        <div style={{fontSize:11,color:"#888"}}>Eksperymenty z nowymi sposobami wprowadzania danych. Działają równolegle z normalną apką.</div>
+        <div style={{fontSize:11,color:"#888"}}>Eksperymenty i nowe funkcje. Działają równolegle z normalną apką.</div>
       </div>
 
-      <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <button onClick={()=>setTryb("szybkie")} style={{padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:12,background:tryb==="szybkie"?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",border:tryb==="szybkie"?"1px solid #ffd700":"1px solid #2a2a3a",color:tryb==="szybkie"?"#ffd700":"#666"}}>
-          ⚡ Szybkie wprowadzanie
-        </button>
-        <button onClick={()=>setTryb("skaner")} style={{padding:"8px 16px",borderRadius:8,cursor:"pointer",fontSize:12,background:tryb==="skaner"?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.05)",border:tryb==="skaner"?"1px solid #0c6":"1px solid #2a2a3a",color:tryb==="skaner"?"#0c6":"#666"}}>
-          📷 Skaner na żywo
-        </button>
+      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+        {przyciski.map(p=>(
+          <button key={p.id} onClick={()=>setTryb(p.id)} style={{
+            padding:"7px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
+            background:tryb===p.id?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
+            border:tryb===p.id?"1px solid #ffd700":"1px solid #2a2a3a",
+            color:tryb===p.id?"#ffd700":"#666",
+          }}>{p.label}</button>
+        ))}
       </div>
 
       {tryb==="szybkie"&&<SzybkieWprowadzanie talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsoba} setWybranaOsoba={setWybranaOsoba} wybranaTalia={wybranaTalia} setWybranaTalia={setWybranaTalia}/>}
       {tryb==="skaner"&&<SkanerNaZywo talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsobaSkaner} setWybranaOsoba={setWybranaOsobaSkaner}/>}
+      {tryb==="postep"&&<PostepSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane}/>}
+      {tryb==="kalkulator"&&<KalkulatorSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} typWymiany={typWymiany}/>}
+      {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
+      {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
+      {tryb==="push"&&<PowiadomieniaPush/>}
     </div>
   );
 }
@@ -2220,16 +2295,12 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
       videoRef.current.play().catch(()=>{});
     }
   },[stream]);
-  useEffect(()=>()=>{ stopAutoSkan(); stream?.getTracks().forEach(t=>t.stop()); },[]);
+  useEffect(()=>()=>{ stopAutoSkan(); stream?.getTracks().forEach(t=>t.stop()); },[stream]);// eslint-disable-line
 
   return (
     <div>
-      <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c655",borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontSize:12,fontWeight:"bold",color:"#0c6",marginBottom:4}}>📷 Skaner na żywo — tryb kolejki</div>
-        <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
-          <strong style={{color:"#ffd700"}}>Tryb AUTO (zalecany):</strong> Oprzyj telefon o coś → kliknij 🔄 Auto → przełączaj talie na laptopie co 2s<br/>
-          <strong style={{color:"#aaa"}}>Tryb ręczny:</strong> Klikaj 📸 Dodaj dla każdej talii osobno
-        </div>
+      <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c655",borderRadius:10,padding:10,marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#0c6"}}>📷 Skaner — oprzyj telefon, kliknij 🔄 Auto, przełączaj talie co 2s</div>
       </div>
 
       {/* Wybór osoby */}
@@ -2302,7 +2373,7 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
       {/* Podgląd kamery z odliczaniem */}
       {aktywny&&(
         <div style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:`2px solid ${autoSkan?"#87CEEB":"#0c6"}`,position:"relative"}}>
-          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:280,objectFit:"cover"}}/>
+          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:420,objectFit:"cover"}}/>
           <div style={{position:"absolute",top:8,left:8,background:"rgba(0,0,0,0.7)",padding:"3px 8px",borderRadius:4,fontSize:10,color:autoSkan?"#87CEEB":"#0c6"}}>
             {autoSkan?"🔄 AUTO":"● LIVE"}
           </div>
@@ -2365,6 +2436,439 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// POSTĘP SEZONU
+// ============================================================
+function PostepSezonu({talie,czlonkowie,posiadane}) {
+  // Łączna amunicja możliwa do zdobycia
+  const lacznaMozliwa=talie.reduce((s,t)=>s+(t.nagroda_amunicja||0),0);
+
+  // Statystyki per osoba
+  const stats=czlonkowie.map(osoba=>{
+    let zamkniete=0,ammo=0,kartyPosiadane=0,kartyTotal=0;
+    talie.forEach(talia=>{
+      const wszystkie=talia.karty.length;
+      const pos=talia.karty.filter(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
+      kartyPosiadane+=pos;
+      kartyTotal+=wszystkie;
+      if(pos===wszystkie&&wszystkie>0){zamkniete++;ammo+=(talia.nagroda_amunicja||0);}
+    });
+    return {nazwa:osoba.nazwa,zamkniete,ammo,kartyPosiadane,kartyTotal,pct:kartyTotal?Math.round((kartyPosiadane/kartyTotal)*100):0};
+  }).sort((a,b)=>b.zamkniete-a.zamkniete||b.kartyPosiadane-a.kartyPosiadane);
+
+  // Talie posortowane po % zamknięcia w gangu
+  const talieStats=talie.map(talia=>{
+    const zamkniete=czlonkowie.filter(o=>talia.karty.length>0&&talia.karty.every(k=>posiadane[`${o.id}_${talia.id}_${k.nazwa}`])).length;
+    return {...talia,zamkniete,pct:Math.round((zamkniete/Math.max(1,czlonkowie.length))*100)};
+  }).sort((a,b)=>b.pct-a.pct);
+
+  const maxAmmo=stats[0]?.ammo||1;
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📊 Postęp sezonu gangu</div>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
+            <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700"}}>{talie.length}</div>
+            <div style={{fontSize:11,color:"#888"}}>talii w sezonie</div>
+          </div>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
+            <div style={{fontSize:22,fontWeight:"bold",color:"#0c6"}}>{lacznaMozliwa.toLocaleString()}</div>
+            <div style={{fontSize:11,color:"#888"}}>max amunicja</div>
+          </div>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
+            <div style={{fontSize:22,fontWeight:"bold",color:"#87CEEB"}}>{czlonkowie.length}</div>
+            <div style={{fontSize:11,color:"#888"}}>członków</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Ranking członków */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>🏆 Ranking postępu</div>
+        {stats.map((s,i)=>(
+          <div key={s.nazwa} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:4,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8}}>
+            <span style={{fontSize:12,color:"#666",width:20}}>{i+1}.</span>
+            <span style={{fontSize:12,flex:1,color:"#ddd"}}>{s.nazwa}</span>
+            <span style={{fontSize:11,color:"#ffd700"}}>{s.zamkniete}/{talie.length} talii</span>
+            <span style={{fontSize:11,color:"#0c6",marginLeft:4}}>{s.ammo.toLocaleString()} 💰</span>
+            <div style={{width:60,height:6,background:"#12122a",borderRadius:3,overflow:"hidden",marginLeft:4}}>
+              <div style={{height:"100%",width:`${(s.ammo/lacznaMozliwa)*100}%`,background:"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
+            </div>
+            <span style={{fontSize:10,color:"#555",width:30}}>{s.pct}%</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Postęp talii */}
+      <div>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>📋 Postęp talii (% gangu ma zamkniętą)</div>
+        {talieStats.map(t=>(
+          <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",marginBottom:3,background:"rgba(0,0,0,0.15)",borderRadius:6}}>
+            <span style={{fontSize:11,flex:1,color:t.pct===100?"#0c6":t.pct>=50?"#ffd700":"#888"}}>{t.nazwa}</span>
+            <span style={{fontSize:11,color:"#666"}}>{t.zamkniete}/{czlonkowie.length}</span>
+            <div style={{width:80,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${t.pct}%`,background:t.pct===100?"#0c6":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
+            </div>
+            <span style={{fontSize:10,color:t.pct===100?"#0c6":"#555",width:35}}>{t.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// KALKULATOR SEZONU
+// ============================================================
+function KalkulatorSezonu({talie,czlonkowie,posiadane,duplikaty,typWymiany}) {
+  const typ=typWymiany==="złote"?"złota":"diamentowa";
+
+  // Ile ammo gang może jeszcze zdobyć
+  const potencjal=talie.map(talia=>{
+    const osobyBezTalii=czlonkowie.filter(osoba=>{
+      return talia.karty.some(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+    });
+    // Ile kart brakuje łącznie
+    const brakujaceKarty=czlonkowie.reduce((s,osoba)=>{
+      return s+talia.karty.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
+    },0);
+    // Kto jest blisko zamknięcia (brakuje 1-2 kart danego typu)
+    const bliskoZamkniecia=czlonkowie.filter(osoba=>{
+      const brakT=talia.karty.filter(k=>k.typ===typ&&!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
+      return brakT>0&&brakT<=2;
+    });
+    return {...talia,osobyBezTalii:osobyBezTalii.length,brakujaceKarty,bliskoZamkniecia};
+  }).sort((a,b)=>(b.nagroda_amunicja||0)-(a.nagroda_amunicja||0));
+
+  const juzZamkniete=talie.filter(t=>czlonkowie.every(o=>t.karty.every(k=>posiadane[`${o.id}_${t.id}_${k.nazwa}`]))).length;
+  const dostepneAmmo=talie.reduce((s,t)=>{
+    const ktosNieMa=czlonkowie.some(o=>t.karty.some(k=>!posiadane[`${o.id}_${t.id}_${k.nazwa}`]));
+    return s+(ktosNieMa?(t.nagroda_amunicja||0):0);
+  },0);
+
+  return (
+    <div>
+      <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c655",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#0c6",marginBottom:10}}>🧮 Kalkulator potencjału sezonu</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:130}}>
+            <div style={{fontSize:20,fontWeight:"bold",color:"#0c6"}}>{juzZamkniete}/{talie.length}</div>
+            <div style={{fontSize:11,color:"#888"}}>talii zamkniętych przez cały gang</div>
+          </div>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:130}}>
+            <div style={{fontSize:20,fontWeight:"bold",color:"#ffd700"}}>{dostepneAmmo.toLocaleString()}</div>
+            <div style={{fontSize:11,color:"#888"}}>ammo wciąż do zdobycia</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>💰 Talie według potencjału ammo</div>
+      {potencjal.map(t=>{
+        const wszyscyMaja=t.osobyBezTalii===0;
+        return (
+          <div key={t.id} style={{marginBottom:6,padding:"10px 12px",background:wszyscyMaja?"rgba(0,200,100,0.06)":"rgba(0,0,0,0.2)",border:`1px solid ${wszyscyMaja?"#0c633":"#2a2a3a"}`,borderRadius:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
+              <div>
+                <span style={{fontSize:12,fontWeight:"bold",color:wszyscyMaja?"#0c6":"#ddd"}}>{t.nazwa}</span>
+                {wszyscyMaja&&<span style={{fontSize:10,color:"#0c6",marginLeft:6}}>✓ Wszyscy mają</span>}
+              </div>
+              <span style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>+{(t.nagroda_amunicja||0).toLocaleString()} 💰</span>
+            </div>
+            {!wszyscyMaja&&(
+              <div style={{marginTop:6,fontSize:11,color:"#888"}}>
+                <span style={{color:"#fa0"}}>{t.osobyBezTalii} osób</span> nie ma zamkniętej •
+                {t.bliskoZamkniecia.length>0&&<span style={{color:"#0c6",marginLeft:4}}>🎯 {t.bliskoZamkniecia.length} blisko ({t.bliskoZamkniecia.map(o=>o.nazwa).join(", ")})</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================
+// HISTORIA WYMIAN
+// ============================================================
+function HistoriaWymian({zapiszStrukture,aktywnaWymiana}) {
+  const [historia,setHistoria]=useState(()=>{
+    try{ return JSON.parse(localStorage.getItem("gang_historia_wymian")||"[]"); }
+    catch{ return []; }
+  });
+
+  const archiwizuj=async()=>{
+    if(!aktywnaWymiana) return;
+    const wpis={
+      id:Date.now(),
+      data:aktywnaWymiana.data||new Date().toISOString(),
+      typWymiany:aktywnaWymiana.typWymiany,
+      wymiany:aktywnaWymiana.wymiany||[],
+      potwierdzone:aktywnaWymiana.potwierdzone||{},
+      potwierdzonychCount:Object.values(aktywnaWymiana.potwierdzone||{}).filter(Boolean).length,
+      lacznieWymian:(aktywnaWymiana.wymiany||[]).length,
+    };
+    const nowaHistoria=[wpis,...historia].slice(0,50); // max 50 wpisów
+    setHistoria(nowaHistoria);
+    localStorage.setItem("gang_historia_wymian",JSON.stringify(nowaHistoria));
+    alert("✅ Wymiana zarchiwizowana!");
+  };
+
+  const usunWpis=(id)=>{
+    const nowa=historia.filter(w=>w.id!==id);
+    setHistoria(nowa);
+    localStorage.setItem("gang_historia_wymian",JSON.stringify(nowa));
+  };
+
+  return (
+    <div>
+      <div style={{background:"rgba(135,206,235,0.06)",border:"1px solid #87CEEB33",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#87CEEB",marginBottom:6}}>📜 Historia wymian</div>
+        <div style={{fontSize:11,color:"#888",marginBottom:10}}>Archiwum poprzednich wymian. Przechowyane lokalnie w przeglądarce.</div>
+        {aktywnaWymiana?(
+          <button onClick={archiwizuj} style={{padding:"8px 16px",background:"linear-gradient(135deg,#87CEEB,#4169E1)",border:"none",borderRadius:6,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:"bold"}}>
+            📥 Archiwizuj aktywną wymianę
+          </button>
+        ):(
+          <div style={{fontSize:11,color:"#555"}}>Brak aktywnej wymiany do archiwizacji</div>
+        )}
+      </div>
+
+      {historia.length===0?(
+        <div style={{textAlign:"center",padding:30,color:"#555",fontSize:12}}>Brak zapisanych wymian</div>
+      ):historia.map(w=>(
+        <div key={w.id} style={{marginBottom:8,padding:"10px 12px",background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <div>
+              <span style={{fontSize:12,fontWeight:"bold",color:"#ddd"}}>{new Date(w.data).toLocaleString("pl-PL")}</span>
+              <span style={{fontSize:11,color:"#888",marginLeft:8}}>{w.typWymiany==="złote"?"⭐ Złote":"💎 Diamentowe"}</span>
+            </div>
+            <button onClick={()=>usunWpis(w.id)} style={{background:"none",border:"none",color:"#f5544466",cursor:"pointer",fontSize:12}}>✕</button>
+          </div>
+          <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>
+            📤 {w.lacznieWymian} wymian • ✅ {w.potwierdzonychCount}/{w.lacznieWymian} potwierdziło
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+            {(w.wymiany||[]).map((x,i)=>(
+              <span key={i} style={{
+                fontSize:10,padding:"1px 6px",borderRadius:4,
+                background:w.potwierdzone?.[x.od]?"rgba(0,200,100,0.1)":"rgba(255,255,255,0.04)",
+                border:w.potwierdzone?.[x.od]?"1px solid #0c633":"1px solid #2a2a3a",
+                color:w.potwierdzone?.[x.od]?"#0c6":"#555",
+              }}>{x.od}→{x.do}</span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
+// RESET SEZONU
+// ============================================================
+function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
+  const [krok,setKrok]=useState(0); // 0=info, 1=potwierdzenie, 2=sukces
+  const [resetujace,setResetujace]=useState(false);
+
+  const wykonajReset=async()=>{
+    setResetujace(true);
+    // Wyczyść posiadane i duplikaty — zachowaj talie i członków
+    await zapiszStrukture("posiadane",{});
+    await zapiszStrukture("duplikaty",{});
+    await zapiszStrukture("aktywnaWymiana",null);
+    setResetujace(false);
+    setKrok(2);
+  };
+
+  const kartyCount=talie.reduce((s,t)=>s+t.karty.length,0);
+  const rekordowCount=czlonkowie.length*kartyCount;
+
+  if(krok===2) return (
+    <div style={{textAlign:"center",padding:30}}>
+      <div style={{fontSize:40,marginBottom:10}}>🎉</div>
+      <div style={{fontSize:16,fontWeight:"bold",color:"#0c6",marginBottom:8}}>Reset sezonu zakończony!</div>
+      <div style={{fontSize:12,color:"#888",marginBottom:16}}>Wszystkie karty i duplikaty wyczyszczone. Talie i członkowie zachowani.</div>
+      <button onClick={()=>setKrok(0)} style={{padding:"8px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:6,color:"#ffd700",cursor:"pointer",fontSize:12}}>
+        ← Wróć
+      </button>
+    </div>
+  );
+
+  if(krok===1) return (
+    <div style={{background:"rgba(255,50,50,0.08)",border:"2px solid #f55",borderRadius:10,padding:20}}>
+      <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:10}}>⚠️ Ostatnia szansa — jesteś pewny?</div>
+      <div style={{fontSize:12,color:"#aaa",marginBottom:16,lineHeight:1.6}}>
+        Zostanie wymazanych <strong style={{color:"#f55"}}>{rekordowCount} rekordów</strong> kart dla {czlonkowie.length} osób.<br/>
+        Talie ({talie.length}), członkowie i historia walk pozostają.<br/>
+        <strong>Tej operacji nie można cofnąć!</strong>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={wykonajReset} disabled={resetujace} style={{flex:1,padding:12,background:"linear-gradient(135deg,#f55,#f00)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+          {resetujace?"⏳ Resetuję...":"🗑️ TAK, resetuj sezon"}
+        </button>
+        <button onClick={()=>setKrok(0)} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid #333",borderRadius:8,color:"#888",cursor:"pointer",fontSize:13}}>
+          Anuluj
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:8}}>🔄 Reset sezonu</div>
+        <div style={{fontSize:11,color:"#888",lineHeight:1.7}}>
+          Używasz gdy zaczyna się nowy sezon i chcesz wyczyścić dane kart.<br/>
+          <strong style={{color:"#aaa"}}>Co zostanie wyczyszczone:</strong><br/>
+          • Wszystkie posiadane karty ({rekordowCount} rekordów)<br/>
+          • Wszystkie duplikaty<br/>
+          • Aktywna wymiana (jeśli istnieje)<br/><br/>
+          <strong style={{color:"#aaa"}}>Co zostanie zachowane:</strong><br/>
+          • Talie i karty ({talie.length} talii, {kartyCount} kart)<br/>
+          • Członkowie gangu ({czlonkowie.length} osób)<br/>
+          • Historia walk<br/>
+          • Ustawienia
+        </div>
+      </div>
+      <button onClick={()=>setKrok(1)} style={{width:"100%",padding:14,background:"rgba(255,50,50,0.15)",border:"2px solid #f5544455",borderRadius:10,color:"#f55",cursor:"pointer",fontSize:14,fontWeight:"bold"}}>
+        🔄 Rozpocznij reset sezonu
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// POWIADOMIENIA PUSH
+// ============================================================
+function PowiadomieniaPush() {
+  const [status,setStatus]=useState("idle"); // idle | requesting | granted | denied
+  const [subskrypcja,setSubskrypcja]=useState(null);
+
+  useEffect(()=>{
+    if("Notification" in window){
+      if(Notification.permission==="granted") setStatus("granted");
+      else if(Notification.permission==="denied") setStatus("denied");
+    }
+  },[]);
+
+  const popros=async()=>{
+    if(!("Notification" in window)){
+      setStatus("denied");
+      return;
+    }
+    setStatus("requesting");
+    const result=await Notification.requestPermission();
+    setStatus(result==="granted"?"granted":"denied");
+  };
+
+  const testPowiadomienie=()=>{
+    if(Notification.permission==="granted"){
+      new Notification("🃏 Gang Manager", {
+        body:"Nowa wymiana kart jest gotowa! Sprawdź ROZPISKĘ.",
+        icon:"/favicon.ico",
+        badge:"/favicon.ico",
+      });
+    }
+  };
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:6}}>🔔 Powiadomienia push</div>
+        <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
+          Otrzymuj powiadomienia gdy admin opublikuje nową ROZPISKĘ.<br/>
+          Każdy członek gangu musi włączyć powiadomienia na swoim telefonie.
+        </div>
+      </div>
+
+      {status==="idle"&&(
+        <div style={{textAlign:"center",padding:20}}>
+          <div style={{fontSize:40,marginBottom:12}}>🔔</div>
+          <div style={{fontSize:13,color:"#aaa",marginBottom:16}}>Włącz powiadomienia żeby wiedzieć gdy jest nowa wymiana</div>
+          <button onClick={popros} style={{padding:"12px 24px",background:"linear-gradient(135deg,#fa0,#f55)",border:"none",borderRadius:10,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14}}>
+            🔔 Włącz powiadomienia
+          </button>
+        </div>
+      )}
+
+      {status==="requesting"&&(
+        <div style={{textAlign:"center",padding:30,color:"#fa0",fontSize:13}}>
+          ⏳ Czekam na zgodę...
+        </div>
+      )}
+
+      {status==="granted"&&(
+        <div style={{textAlign:"center",padding:20}}>
+          <div style={{fontSize:40,marginBottom:10}}>✅</div>
+          <div style={{fontSize:14,fontWeight:"bold",color:"#0c6",marginBottom:6}}>Powiadomienia włączone!</div>
+          <div style={{fontSize:11,color:"#888",marginBottom:16}}>Dostaniesz powiadomienie gdy pojawi się nowa ROZPISKA</div>
+          <button onClick={testPowiadomienie} style={{padding:"8px 18px",background:"rgba(0,200,100,0.15)",border:"1px solid #0c655",borderRadius:6,color:"#0c6",cursor:"pointer",fontSize:12}}>
+            🧪 Wyślij testowe powiadomienie
+          </button>
+          <div style={{fontSize:10,color:"#555",marginTop:12}}>
+            ℹ️ Powiadomienia działają gdy apka jest otwarta w przeglądarce.<br/>
+            Dla powiadomień w tle potrzebna byłaby aplikacja natywna.
+          </div>
+        </div>
+      )}
+
+      {status==="denied"&&(
+        <div style={{textAlign:"center",padding:20}}>
+          <div style={{fontSize:40,marginBottom:10}}>❌</div>
+          <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:6}}>Powiadomienia zablokowane</div>
+          <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
+            Przeglądarka zablokowała powiadomienia.<br/>
+            Żeby odblokować: Ustawienia przeglądarki → Prywatność → Powiadomienia → gang-manager-beta.vercel.app → Zezwól
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// OSIĄGNIĘCIA
+// ============================================================
+const OSIAGNIECIA_DEF=[
+  {id:"kolekcjoner",ikona:"🏆",nazwa:"Kolekcjoner",opis:"Zamknij 5 talii",check:(s)=>s.zamkniete>=5},
+  {id:"mega_kolekcjoner",ikona:"👑",nazwa:"Mega Kolekcjoner",opis:"Zamknij 10 talii",check:(s)=>s.zamkniete>=10},
+  {id:"legenda",ikona:"🌟",nazwa:"Legenda gangu",opis:"Zamknij wszystkie talie",check:(s,total)=>s.zamkniete>=total},
+  {id:"hojny",ikona:"🎁",nazwa:"Hojny dawca",opis:"Potwierdź 10 wymian",check:(s)=>s.wyslanychKart>=10},
+  {id:"mega_hojny",ikona:"💝",nazwa:"Filantrop",opis:"Potwierdź 25 wymian",check:(s)=>s.wyslanychKart>=25},
+  {id:"kompletny",ikona:"💎",nazwa:"Perfekcjonista",opis:"Miej ponad 90% kart jednego typu",check:(s)=>s.pctKart>=90},
+  {id:"duplikator",ikona:"📦",nazwa:"Magazynier",opis:"Miej 10+ duplikatów",check:(s)=>s.duplikaty>=10},
+  {id:"speedrun",ikona:"⚡",nazwa:"Speedrunner",opis:"Potwierdź wymianę w pierwszym dniu",check:(s)=>s.szybkiePotw>0},
+];
+
+function OsiagnieciaWidget({talie,czlonkowie,posiadane,duplikaty,zalogowany}) {
+  const osoba=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(zalogowany.login));
+  if(!osoba) return null;
+
+  const zamkniete=talie.filter(t=>t.karty.every(k=>posiadane[`${osoba.id}_${t.id}_${k.nazwa}`])).length;
+  const duplikatyCount=Object.keys(duplikaty).filter(k=>k.startsWith(osoba.id)).length;
+  const allKarty=talie.reduce((s,t)=>s+t.karty.length,0);
+  const posKarty=talie.reduce((s,t)=>s+t.karty.filter(k=>posiadane[`${osoba.id}_${t.id}_${k.nazwa}`]).length,0);
+  const stats={zamkniete,duplikaty:duplikatyCount,pctKart:allKarty?Math.round((posKarty/allKarty)*100):0,wyslanychKart:0,szybkiePotw:0};
+
+  const odblokowane=OSIAGNIECIA_DEF.filter(a=>a.check(stats,talie.length));
+  if(!odblokowane.length) return null;
+
+  return (
+    <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:8,padding:"8px 12px",marginBottom:10}}>
+      <div style={{fontSize:11,color:"#b8860b",marginBottom:6}}>🏆 Twoje osiągnięcia</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {odblokowane.map(a=>(
+          <span key={a.id} title={a.opis} style={{fontSize:11,padding:"3px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b55",borderRadius:12,color:"#ffd700",cursor:"default"}}>
+            {a.ikona} {a.nazwa}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
