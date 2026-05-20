@@ -2017,7 +2017,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                             )}
                             {!alt.zamknieTalie&&alt.progBonus>0&&(
                               <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"rgba(255,165,0,0.15)",border:"1px solid #fa055",color:"#fa0",fontWeight:"bold",width:"100%",marginBottom:2}}>
-                                🎯 BLISKI PROGU — +{alt.progBonus.toLocaleString()} ammo za próg!
+                                🎯 PRÓG {obliczProg(liczKartyOsoby(czlonkowie.find(c=>c.nazwa===alt.do)?.id,talie,posiadane)).nastepnyProg?.prog} kart — brakuje {obliczProg(liczKartyOsoby(czlonkowie.find(c=>c.nazwa===alt.do)?.id,talie,posiadane)).brakujeDoProg} do progu (+{alt.progBonus.toLocaleString()} ammo)
                               </span>
                             )}
                             <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:alt.faza===15?"#ff4488":["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>
