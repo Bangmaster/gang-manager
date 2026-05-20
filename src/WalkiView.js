@@ -847,4 +847,3 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki }) {
   );
 }
 
-
