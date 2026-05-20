@@ -2466,8 +2466,6 @@ function PostepSezonu({talie,czlonkowie,posiadane}) {
     return {...talia,zamkniete,pct:Math.round((zamkniete/Math.max(1,czlonkowie.length))*100)};
   }).sort((a,b)=>b.pct-a.pct);
 
-  const maxAmmo=stats[0]?.ammo||1;
-
   return (
     <div>
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:10,padding:14,marginBottom:14}}>
@@ -2747,8 +2745,7 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
 // POWIADOMIENIA PUSH
 // ============================================================
 function PowiadomieniaPush() {
-  const [status,setStatus]=useState("idle"); // idle | requesting | granted | denied
-  const [subskrypcja,setSubskrypcja]=useState(null);
+  const [status,setStatus]=useState("idle");
 
   useEffect(()=>{
     if("Notification" in window){
