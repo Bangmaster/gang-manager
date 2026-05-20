@@ -1823,10 +1823,19 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
     const oppTyp=typAkt==="złote"?"diamentowa":"złota";
 
     // Zbuduj mapę: kto już dostaje jaką kartę (z pominięciem podmienianej wymiany)
-    const juzOtrzymuje=new Set(); // "odbiorca_talia_karta"
+    const juzOtrzymuje=new Set();
+    // Symuluj posiadane PO wszystkich wymianach (bez podmienianej)
+    const symPosiadane={...posiadane};
     wymiany.forEach((w,i)=>{
       if(i!==wykluczonaWymiana._idx){
         juzOtrzymuje.add(`${w.do}_${w.talia}_${w.karta}`);
+        // Zaznacz kartę jako posiadaną w symulacji
+        const odbiorca=czlonkowie.find(c=>c.nazwa===w.do);
+        const talia=talie.find(t=>t.nazwa===w.talia);
+        if(odbiorca&&talia){
+          const karta=talia.karty.find(k=>k.nazwa===w.karta);
+          if(karta) symPosiadane[`${odbiorca.id}_${talia.id}_${karta.nazwa}`]=true;
+        }
       }
     });
 
@@ -1840,21 +1849,25 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
         const brakO=kartyO.filter(k=>!posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]);
         brakT.forEach(karta=>{
           if(!duplikaty[`${dawca.id}_${talia.id}_${karta.nazwa}`]) return;
-          // Nie proponuj jeśli ktokolwiek już wysyła tę kartę do tego odbiorcy
-          if(juzOtrzymuje.has(`${odbiorca.nazwa}_${talia.nazwa}_${karta.nazwa}`)){
-            return; // Ktoś inny już to wysyła — pomiń
-          }
+          if(juzOtrzymuje.has(`${odbiorca.nazwa}_${talia.nazwa}_${karta.nazwa}`)) return;
           const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
           const zamknieTalie=brakT.length===1&&brakO.length===0;
-          // Sprawdź progi
-          const progInfo=obliczProg(liczKartyOsoby(odbiorca.id,talie,posiadane));
-          const bliskoProg=progInfo.nastepnyProg&&progInfo.brakujeDoProg<=2;
-          const progBonus=bliskoProg&&progInfo.brakujeDoProg<=1?progInfo.ammoProg:0;
+          // Prog liczony PO wszystkich wymianach w planie (symulacja)
+          const liczbaPoWymianach=liczKartyOsoby(odbiorca.id,talie,symPosiadane);
+          const progInfo=obliczProg(liczbaPoWymianach);
+          // Czy ta konkretna karta przekroczy próg?
+          const liczbaPoTejKarcie=liczbaPoWymianach+(posiadane[`${odbiorca.id}_${talia.id}_${karta.nazwa}`]?0:1);
+          const progPrzed=obliczProg(liczbaPoWymianach);
+          const progPo=obliczProg(liczbaPoTejKarcie);
+          const nowyProgTaKarta=progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
+          const progBonus=nowyProgTaKarta?(progPo.ostatniProg?.ammo||0):0;
+          const brakujeDoProg=progInfo.brakujeDoProg;
+          const nastepnyProg=progInfo.nastepnyProg;
           kandydaci.push({
             od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,
             nagroda:talia.nagroda_amunicja||0,faza,brakTCount:brakT.length,
             brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer),
-            zamknieTalie,bliskoProg,progBonus,
+            zamknieTalie,progBonus,brakujeDoProg,nastepnyProg,
           });
         });
       });
@@ -2017,7 +2030,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                             )}
                             {!alt.zamknieTalie&&alt.progBonus>0&&(
                               <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"rgba(255,165,0,0.15)",border:"1px solid #fa055",color:"#fa0",fontWeight:"bold",width:"100%",marginBottom:2}}>
-                                🎯 PRÓG {obliczProg(liczKartyOsoby(czlonkowie.find(c=>c.nazwa===alt.do)?.id,talie,posiadane)).nastepnyProg?.prog} kart — brakuje {obliczProg(liczKartyOsoby(czlonkowie.find(c=>c.nazwa===alt.do)?.id,talie,posiadane)).brakujeDoProg} do progu (+{alt.progBonus.toLocaleString()} ammo)
+                                🎯 PRÓG {alt.nastepnyProg?.prog} kart — brakuje {alt.brakujeDoProg} do progu (+{alt.progBonus.toLocaleString()} ammo)
                               </span>
                             )}
                             <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:alt.faza===15?"#ff4488":["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>
