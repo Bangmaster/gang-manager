@@ -19,6 +19,40 @@ function normalizuj(s) {
 
 const TRUDNE_NUMERY = [10, 11, 12, 14, 15];
 
+const PROGI = [
+  {prog:20, ammo:100},
+  {prog:40, ammo:250},
+  {prog:60, ammo:500},
+  {prog:80, ammo:1000},
+  {prog:100, ammo:2500},
+  {prog:110, ammo:3500},
+  {prog:120, ammo:5000},
+];
+
+// Liczy unikalne posiadane karty osoby (bez duplikatów)
+function liczKartyOsoby(osobaId, talie, posiadane) {
+  let count=0;
+  talie.forEach(talia=>{
+    talia.karty.forEach(karta=>{
+      if(posiadane[`${osobaId}_${talia.id}_${karta.nazwa}`]) count++;
+    });
+  });
+  return count;
+}
+
+// Sprawdza najbliższy próg i ile kart brakuje
+function obliczProg(obecnaLiczba) {
+  const nastepny = PROGI.find(p => p.prog > obecnaLiczba);
+  const ostatni = [...PROGI].reverse().find(p => p.prog <= obecnaLiczba);
+  return {
+    obecna: obecnaLiczba,
+    nastepnyProg: nastepny || null,
+    brakujeDoProg: nastepny ? nastepny.prog - obecnaLiczba : 0,
+    ostatniProg: ostatni || null,
+    ammoProg: nastepny ? nastepny.ammo : 0,
+  };
+}
+
 const DOMYSLNE_TALIE = [
   { id: "miejskie_legendy", numer: 1, nazwa: "Miejskie legendy", nagroda_amunicja: 500, karty: [
     {nazwa:"Tajemnicze zniknięcia",typ:"złota"},{nazwa:"Obserwacje kryptydów",typ:"złota"},{nazwa:"Nawiedzone lokacje",typ:"złota"},
@@ -604,6 +638,25 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
   const typ=typWymiany==="złote"?"złota":"diamentowa";
   const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
 
+  // Oblicz progi dla każdej osoby
+  const progiOsob={};
+  czlonkowie.forEach(osoba=>{
+    const liczba=liczKartyOsoby(osoba.id,talie,posiadane);
+    progiOsob[osoba.id]=obliczProg(liczba);
+  });
+
+  // Oblicz efektywną nagrodę: nagroda talii + ewentualna nagroda za próg
+  const obliczEfektywnaНagrode=(osobaId, taliaId, brakujaceKarty)=>{
+    const prog=progiOsob[osobaId];
+    const nagroda=talie.find(t=>t.id===taliaId)?.nagroda_amunicja||0;
+    // Czy ta wymiana (dostając brakujace karty) przekroczy próg?
+    let bonusProg=0;
+    if(prog.nastepnyProg && prog.brakujeDoProg<=brakujaceKarty){
+      bonusProg=prog.ammoProg;
+    }
+    return nagroda+bonusProg;
+  };
+
   // TRYB VIP — kolejka priorytetów
   if(tryb==="vip" && vipKolejka.length>0) {
     const planoweWymiany=[];
@@ -651,7 +704,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         const brakT=kartyT.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
         const brakO=kartyO.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
         if(!brakT.length) return;
-        const faza=obliczFaze(brakT.length,brakO.length);
+        const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
         if(faza>2) return;
         brakT.forEach(karta=>{
           kandydaciReszta.push({osoba,talia,karta,faza,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
@@ -805,21 +858,28 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     // TRYB "PRIORYTET" (1-2 brakujące) — bez zmian
     const kandidaci = [];
     staneTalii.forEach(s => {
-      const faza = obliczFaze(s.brakT.length, s.brakO.length);
+      const faza = obliczFaze(s.brakT.length, s.brakO.length, typWymiany);
+      const efNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, s.brakT.length);
+      const progInfo = progiOsob[s.osoba.id];
+      const bliskoProg = progInfo?.nastepnyProg && progInfo.brakujeDoProg <= 2;
       s.brakT.forEach(karta => {
         kandidaci.push({
           osoba: s.osoba, talia: s.talia, karta, faza,
           brakTCount: s.brakT.length, brakOCount: s.brakO.length,
-          nagroda: s.nagroda, trudna: s.trudna,
+          nagroda: s.nagroda, efNagroda, trudna: s.trudna,
+          bliskoProg, progBonus: efNagroda - s.nagroda,
         });
       });
     });
 
     kandidaci.sort((a, b) => {
-      if (a.faza !== b.faza) return a.faza - b.faza;
+      // Zamień fazę 15 na 1.5 dla sortowania
+      const fa = a.faza===15 ? 1.5 : a.faza;
+      const fb = b.faza===15 ? 1.5 : b.faza;
+      if (fa !== fb) return fa - fb;
       const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
-      if (aT !== bT) return ignorujTrudne ? 0 : aT - bT;
-      if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
+      if (!ignorujTrudne && aT !== bT) return aT - bT;
+      if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
       return a.brakTCount - b.brakTCount;
     });
 
@@ -838,7 +898,8 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
           karta: k.karta.nazwa, talia: k.talia.nazwa,
           nagroda: k.nagroda, faza: k.faza,
           brakTCount: k.brakTCount, brakOCount: k.brakOCount,
-          trudna: k.trudna,
+          trudna: k.trudna, progBonus: k.progBonus||0,
+          bliskoProg: k.bliskoProg||false,
         });
       } else if (k.brakTCount <= 2) {
         nieobsluzone.push(k);
@@ -857,24 +918,39 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     talie.forEach(talia=>{
       const kPrzed=talia.karty.every(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
       const kPo=talia.karty.every(k=>symPos[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-      if(!kPrzed&&kPo) zamknieciaInfo.push({osoba:osoba.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja});
+      if(!kPrzed&&kPo){
+        // Sprawdź czy przy okazji przekroczy próg
+        const liczbaPoWymianie=liczKartyOsoby(osoba.id,talie,symPos);
+        const progPrzed=obliczProg(liczKartyOsoby(osoba.id,talie,posiadane));
+        const progPo=obliczProg(liczbaPoWymianie);
+        const nowyProg=progPo.ostatniProg?.prog > (progPrzed.ostatniProg?.prog||0);
+        zamknieciaInfo.push({
+          osoba:osoba.nazwa, talia:talia.nazwa, nagroda:talia.nagroda_amunicja,
+          nowyProg: nowyProg ? progPo.ostatniProg : null,
+        });
+      }
     });
   });
 
   return {planoweWymiany,nieobsluzone,zamknieciaInfo};
 }
 
-function obliczFaze(brakT,brakO){
-  // FAZA 1-2: Talia może zostać ZAMKNIĘTA tą wymianą (komplet drugiego typu już zebrany)
-  if(brakT===1&&brakO===0) return 1; // Wymiana zamknie talię! NAJWYŻSZY PRIORYTET
-  if(brakT===2&&brakO===0) return 2; // Brakuje 2, ale druga karta przyjdzie w kolejnej wymianie
+function obliczFaze(brakT,brakO,typWymiany){
+  const isDiament = typWymiany==="diamentowe";
 
-  // FAZA 3-4: Talia BLISKO zamknięcia (brakuje też 1-2 drugiego typu)
-  // Osoba może domknąć talię gdy dostanie też brakujące diamentowe innym dniem
+  // FAZA 1: Wymiana zamknie talię natychmiast
+  if(brakT===1&&brakO===0) return 1;
+  if(brakT===2&&brakO===0) return 2;
+
+  // FAZA 1.5 (tylko przy diamentowej wymianie):
+  // Brakuje 1 diamentowej + tylko 1 złotej → złotą wyślemy w następnej złotej wymianie
+  // To jest bardziej opłacalne niż zamknięcie innej talii za mniejszą nagrodę
+  if(isDiament&&brakT===1&&brakO===1) return 15; // 1.5 → 15 w liczbach całkowitych
+
+  // FAZA 3-4: Talia blisko zamknięcia
   if(brakT===1&&brakO>=1&&brakO<=2) return 3;
   if(brakT===2&&brakO>=1&&brakO<=2) return 4;
 
-  // FAZA 5: Daleko od zamknięcia (brakuje też 3+ drugiego typu lub brakuje 3+ tego typu)
   return 5;
 }
 
@@ -936,7 +1012,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         brakT.forEach(karta=>{
           // Dawca musi mieć duplikat tej karty
           if(!duplikaty[`${dawca.id}_${talia.id}_${karta.nazwa}`]) return;
-          const faza=obliczFaze(brakT.length,brakO.length);
+          const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
           kandydaci.push({
             od:dawcaNazwa, do:odbiorca.nazwa,
             karta:karta.nazwa, talia:talia.nazwa,
@@ -989,6 +1065,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const etykietyFaz={
     1:{t:"🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 karty + komplet innych typów",k:"#f55"},
     2:{t:"🟠 FAZA 2 — Brakuje 2 kart + komplet innych typów (talia blisko)",k:"#ff7a00"},
+    15:{t:"💎 FAZA 1.5 — Brakuje 1 diamentowej + 1 złotej → złotą wyślemy w następnej wymianie!",k:"#ff4488"},
     3:{t:"🟡 FAZA 3 — Brakuje 1 karty + 1-2 innych typów do uzupełnienia",k:"#fa0"},
     4:{t:"🟡 FAZA 4 — Brakuje 2 kart + 1-2 innych typów do uzupełnienia",k:"#d4b800"},
     5:{t:"🔵 FAZA 5 — Talia daleka od zamknięcia (3+ braków)",k:"#6af"},
@@ -1066,10 +1143,18 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 const brakCount=talie.filter(t=>!wylaczoneTalie.has(t.id)).reduce((s,talia)=>
                   s+talia.karty.filter(k=>k.typ===typ&&!posiadane[`${id}_${talia.id}_${k.nazwa}`]).length
                 ,0);
+                const progInfo=obliczProg(liczKartyOsoby(id,talie,posiadane));
                 return (
                   <div key={id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(255,215,0,0.06)",borderRadius:6,marginBottom:4}}>
                     <span style={{fontSize:14,fontWeight:"bold",color:"#ffd700",width:20}}>{idx+1}.</span>
-                    <span style={{flex:1,fontSize:12,color:"#ddd"}}>{osoba?.nazwa}</span>
+                    <div style={{flex:1}}>
+                      <span style={{fontSize:12,color:"#ddd"}}>{osoba?.nazwa}</span>
+                      {progInfo.nastepnyProg&&progInfo.brakujeDoProg<=5&&(
+                        <span style={{fontSize:10,color:"#fa0",marginLeft:6,background:"rgba(255,165,0,0.12)",padding:"1px 5px",borderRadius:4}}>
+                          🎯 próg {progInfo.nastepnyProg.prog}: brakuje {progInfo.brakujeDoProg} kart (+{progInfo.ammoProg.toLocaleString()})
+                        </span>
+                      )}
+                    </div>
                     <span style={{fontSize:11,color:"#f55"}}>−{brakCount} kart</span>
                     <div style={{display:"flex",gap:2}}>
                       <button onClick={()=>przesunVip(id,-1)} disabled={idx===0}
@@ -1135,13 +1220,23 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           <div style={{background:"rgba(0,200,100,0.1)",border:"1px solid #0c6",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
             <div style={{fontWeight:"bold",color:"#0c6",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
             {wynik.zamknieciaInfo.map((z,i)=>(
-              <div key={i} style={{fontSize:13,padding:"3px 0",color:"#ccc"}}>
+              <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #12122a"}}>
                 🎉 <strong style={{color:"#ffd700"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
-                <span style={{color:"#0c6",marginLeft:6}}>+{z.nagroda?.toLocaleString()} amunicji!</span>
+                <span style={{color:"#0c6",marginLeft:6}}>+{z.nagroda?.toLocaleString()} 💰</span>
+                {z.nowyProg&&(
+                  <span style={{marginLeft:8,background:"rgba(255,165,0,0.2)",border:"1px solid #fa0",borderRadius:6,padding:"1px 6px",fontSize:11,color:"#fa0"}}>
+                    🎯 PRÓG {z.nowyProg.prog} kart! +{z.nowyProg.ammo.toLocaleString()} 💰
+                  </span>
+                )}
               </div>
             ))}
-            <div style={{marginTop:8,fontWeight:"bold",color:"#0c6",fontSize:14}}>
-              Łącznie: +{wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0).toLocaleString()} amunicji dla gangu 🎯
+            <div style={{marginTop:8,fontWeight:"bold",color:"#0c6",fontSize:13}}>
+              Łącznie z talii: +{wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0).toLocaleString()} 💰
+              {wynik.zamknieciaInfo.some(z=>z.nowyProg)&&(
+                <span style={{color:"#fa0",marginLeft:8}}>
+                  + progi: +{wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>s+z.nowyProg.ammo,0).toLocaleString()} 💰
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -1182,7 +1277,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           }}>{publikowanie?"⏳ Zapisuję...":"📤 Opublikuj dla gangu"}</button>
         </div>
 
-        {[1,2,3,4,5,10,11,20,21].map(faza=>{
+        {[1,15,2,3,4,5,10,11,20,21].map(faza=>{
           const w=wynik.planoweWymiany.filter(x=>x.faza===faza);
           if(!w.length) return null;
           const e=etykietyFaz[faza]||{t:`Faza ${faza}`,k:"#aaa"};
@@ -1203,6 +1298,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                         <span style={{fontSize:11,color:"#555"}}>[{x.talia}]</span>
                         {x.brakOCount>0&&<span style={{fontSize:10,color:"#87CEEB",background:"rgba(65,105,225,0.12)",padding:"1px 6px",borderRadius:10}}>jeszcze brak {x.brakOCount} {typWymiany==="złote"?"💎":"⭐"}</span>}
                         {x.trudna&&<span style={{fontSize:10,color:"#f55"}}>⚠️trudna</span>}
+                        {x.bliskoProg&&x.progBonus>0&&<span style={{fontSize:10,color:"#fa0",background:"rgba(255,165,0,0.15)",padding:"1px 6px",borderRadius:10,border:"1px solid #fa055"}}>🎯 +{x.progBonus.toLocaleString()} próg!</span>}
                         <span style={{fontSize:11,color:"#fa0"}}>🎯{x.nagroda?.toLocaleString()}</span>
                         <div style={{marginLeft:"auto",display:"flex",gap:4}}>
                           <button onClick={()=>setPodmienDawce(pokazujPodmien?null:{globalIdx,dawca:x.od})} style={{
@@ -1725,7 +1821,15 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
     if(!dawca||!talie) return [];
     const typ=typAkt==="złote"?"złota":"diamentowa";
     const oppTyp=typAkt==="złote"?"diamentowa":"złota";
-    // Kto już wysyła (nie licząc podmieniany wymiany)
+
+    // Zbuduj mapę: kto już dostaje jaką kartę (z pominięciem podmienianej wymiany)
+    const juzOtrzymuje=new Set(); // "odbiorca_talia_karta"
+    wymiany.forEach((w,i)=>{
+      if(i!==wykluczonaWymiana._idx){
+        juzOtrzymuje.add(`${w.do}_${w.talia}_${w.karta}`);
+      }
+    });
+
     const kandydaci=[];
     czlonkowie.forEach(odbiorca=>{
       if(odbiorca.id===dawca.id) return;
@@ -1736,22 +1840,33 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
         const brakO=kartyO.filter(k=>!posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]);
         brakT.forEach(karta=>{
           if(!duplikaty[`${dawca.id}_${talia.id}_${karta.nazwa}`]) return;
-          // Nie proponuj tej samej wymiany co jest już w planie
-          const juzJest=wymiany.some((w,i)=>i!==wykluczonaWymiana._idx&&w.od===dawcaNazwa&&w.do===odbiorca.nazwa&&w.karta===karta.nazwa);
-          if(juzJest) return;
-          const faza=obliczFaze(brakT.length,brakO.length);
+          // Nie proponuj jeśli ktokolwiek już wysyła tę kartę do tego odbiorcy
+          if(juzOtrzymuje.has(`${odbiorca.nazwa}_${talia.nazwa}_${karta.nazwa}`)){
+            return; // Ktoś inny już to wysyła — pomiń
+          }
+          const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
           const zamknieTalie=brakT.length===1&&brakO.length===0;
-          kandydaci.push({od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja||0,faza,brakTCount:brakT.length,brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer),zamknieTalie});
+          // Sprawdź progi
+          const progInfo=obliczProg(liczKartyOsoby(odbiorca.id,talie,posiadane));
+          const bliskoProg=progInfo.nastepnyProg&&progInfo.brakujeDoProg<=2;
+          const progBonus=bliskoProg&&progInfo.brakujeDoProg<=1?progInfo.ammoProg:0;
+          kandydaci.push({
+            od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,
+            nagroda:talia.nagroda_amunicja||0,faza,brakTCount:brakT.length,
+            brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer),
+            zamknieTalie,bliskoProg,progBonus,
+          });
         });
       });
     });
     return kandydaci.sort((a,b)=>{
-      // Najpierw te które zamkną talię
       if(b.zamknieTalie!==a.zamknieTalie) return (b.zamknieTalie?1:0)-(a.zamknieTalie?1:0);
-      if(a.faza!==b.faza) return a.faza-b.faza;
+      if(b.progBonus!==a.progBonus) return b.progBonus-a.progBonus;
+      const fa=a.faza===15?1.5:a.faza, fb=b.faza===15?1.5:b.faza;
+      if(fa!==fb) return fa-fb;
       if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
       return a.brakTCount-b.brakTCount;
-    }).slice(0,6);
+    }).slice(0,8);
   };
 
   const podmienWymiane=async(staryIdx,nowaWymiana)=>{
@@ -1893,24 +2008,32 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                           <div key={ai} style={{
                             display:"flex",alignItems:"center",gap:6,padding:"6px 0",
                             borderBottom:"1px solid #12122a22",flexWrap:"wrap",
-                            background:alt.zamknieTalie?"rgba(0,200,100,0.05)":"transparent",
+                            background:alt.zamknieTalie?"rgba(0,200,100,0.05)":alt.progBonus?"rgba(255,165,0,0.03)":"transparent",
                           }}>
                             {alt.zamknieTalie&&(
                               <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"rgba(0,200,100,0.2)",border:"1px solid #0c6",color:"#0c6",fontWeight:"bold",width:"100%",marginBottom:2}}>
-                                🏆 ZAMKNIE TALIĘ — +{alt.nagroda?.toLocaleString()} amunicji dla gangu!
+                                🏆 ZAMKNIE TALIĘ — +{alt.nagroda?.toLocaleString()} amunicji!
                               </span>
                             )}
-                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>F{alt.faza}</span>
+                            {!alt.zamknieTalie&&alt.progBonus>0&&(
+                              <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"rgba(255,165,0,0.15)",border:"1px solid #fa055",color:"#fa0",fontWeight:"bold",width:"100%",marginBottom:2}}>
+                                🎯 BLISKI PROGU — +{alt.progBonus.toLocaleString()} ammo za próg!
+                              </span>
+                            )}
+                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:alt.faza===15?"#ff4488":["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>
+                              {alt.faza===15?"F1.5":`F${alt.faza}`}
+                            </span>
                             <span style={{fontSize:11,flex:1,color:"#ddd"}}>
                               <strong style={{color:"#ffd700"}}>{alt.karta}</strong>
                               <span style={{color:"#888"}}> → {alt.do}</span>
                               <span style={{fontSize:10,color:"#555",marginLeft:4}}>[{alt.talia}]</span>
                             </span>
-                            {!alt.zamknieTalie&&<span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>}
+                            {!alt.zamknieTalie&&!alt.progBonus&&<span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>}
                             <button onClick={()=>podmienWymiane(w._idx,alt)} style={{
                               padding:"3px 10px",fontSize:11,fontWeight:"bold",borderRadius:4,cursor:"pointer",
-                              background:alt.zamknieTalie?"rgba(0,200,100,0.25)":"rgba(0,200,100,0.15)",
-                              border:`1px solid ${alt.zamknieTalie?"#0c6":"#0c644"}`,color:"#0c6",
+                              background:alt.zamknieTalie?"rgba(0,200,100,0.25)":alt.progBonus?"rgba(255,165,0,0.2)":"rgba(0,200,100,0.15)",
+                              border:`1px solid ${alt.zamknieTalie?"#0c6":alt.progBonus?"#fa0":"#0c644"}`,
+                              color:alt.zamknieTalie?"#0c6":alt.progBonus?"#fa0":"#0c6",
                             }}>✓ Wybierz</button>
                           </div>
                         ))}
