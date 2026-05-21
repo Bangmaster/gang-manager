@@ -2080,6 +2080,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"historia",label:"📜 Historia"},
     {id:"reset",label:"🔄 Reset"},
     {id:"push",label:"🔔 Powiadomienia"},
+    {id:"kalendarz",label:"📅 Kalendarz"},
   ];
 
   return (
@@ -2107,6 +2108,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
+      {tryb==="kalendarz"&&<KalendarzEventow/>}
     </div>
   );
 }
@@ -3002,6 +3004,199 @@ function OsiagnieciaWidget({talie,czlonkowie,posiadane,duplikaty,zalogowany}) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// KALENDARZ EVENTÓW
+// ============================================================
+function KalendarzEventow() {
+  const dzis = new Date();
+  const [rok, setRok] = useState(dzis.getFullYear());
+  const [miesiac, setMiesiac] = useState(dzis.getMonth()); // 0-11
+  const [wybranyDzien, setWybranyDzien] = useState(null);
+  const [eventy, setEventy] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gang_kalendarz") || "{}"); }
+    catch { return {}; }
+  });
+  const [nowyEvent, setNowyEvent] = useState("");
+  const [typEvent, setTypEvent] = useState("złote");
+
+  const zapiszEventy = (nowe) => {
+    setEventy(nowe);
+    localStorage.setItem("gang_kalendarz", JSON.stringify(nowe));
+  };
+
+  const nazwyMiesiecy = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
+  const nazwyDni = ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"];
+
+  // Generuj dni miesiąca
+  const pierwszyDzien = new Date(rok, miesiac, 1).getDay(); // 0=nd, 1=pn...
+  const offsetPn = (pierwszyDzien === 0 ? 6 : pierwszyDzien - 1); // offset od poniedziałku
+  const liczbaDni = new Date(rok, miesiac + 1, 0).getDate();
+
+  const kluczDnia = (d) => `${rok}-${String(miesiac+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+
+  const dodajEvent = () => {
+    if (!nowyEvent.trim() || !wybranyDzien) return;
+    const klucz = kluczDnia(wybranyDzien);
+    const nowe = { ...eventy };
+    if (!nowe[klucz]) nowe[klucz] = [];
+    nowe[klucz] = [...nowe[klucz], { tekst: nowyEvent.trim(), typ: typEvent, id: Date.now() }];
+    zapiszEventy(nowe);
+    setNowyEvent("");
+  };
+
+  const usunEvent = (klucz, id) => {
+    const nowe = { ...eventy };
+    nowe[klucz] = (nowe[klucz] || []).filter(e => e.id !== id);
+    if (!nowe[klucz].length) delete nowe[klucz];
+    zapiszEventy(nowe);
+  };
+
+  const kolorTypu = { złote: "#ffd700", diamentowe: "#87CEEB", inne: "#0c6", walka: "#f55" };
+  const ikonTypu = { złote: "⭐", diamentowe: "💎", inne: "📌", walka: "⚔️" };
+
+  const wybranyKlucz = wybranyDzien ? kluczDnia(wybranyDzien) : null;
+  const eventyWybranego = wybranyKlucz ? (eventy[wybranyKlucz] || []) : [];
+  const dzisiajKlucz = `${dzis.getFullYear()}-${String(dzis.getMonth()+1).padStart(2,"0")}-${String(dzis.getDate()).padStart(2,"0")}`;
+
+  return (
+    <div>
+      <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#6496ff",marginBottom:4}}>📅 Kalendarz eventów gangu</div>
+        <div style={{fontSize:11,color:"#888"}}>Zapisuj złote/diamentowe dni wymiany, walki i inne eventy. Dane zapisywane lokalnie w przeglądarce.</div>
+      </div>
+
+      {/* Nawigacja miesiąca */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <button onClick={()=>{ if(miesiac===0){setMiesiac(11);setRok(r=>r-1);}else setMiesiac(m=>m-1); }} style={{padding:"6px 12px",background:"rgba(255,255,255,0.07)",border:"1px solid #2a2a3a",borderRadius:6,color:"#aaa",cursor:"pointer",fontSize:13}}>◀</button>
+        <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700"}}>{nazwyMiesiecy[miesiac]} {rok}</div>
+        <button onClick={()=>{ if(miesiac===11){setMiesiac(0);setRok(r=>r+1);}else setMiesiac(m=>m+1); }} style={{padding:"6px 12px",background:"rgba(255,255,255,0.07)",border:"1px solid #2a2a3a",borderRadius:6,color:"#aaa",cursor:"pointer",fontSize:13}}>▶</button>
+      </div>
+
+      {/* Siatka kalendarza */}
+      <div style={{marginBottom:14}}>
+        {/* Nagłówki dni */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+          {nazwyDni.map(d=>(
+            <div key={d} style={{textAlign:"center",fontSize:11,color:"#555",padding:"4px 0"}}>{d}</div>
+          ))}
+        </div>
+        {/* Dni */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+          {/* Puste komórki przed pierwszym dniem */}
+          {Array(offsetPn).fill(null).map((_,i)=>(
+            <div key={`empty-${i}`}/>
+          ))}
+          {/* Dni miesiąca */}
+          {Array(liczbaDni).fill(null).map((_,i)=>{
+            const d = i+1;
+            const klucz = kluczDnia(d);
+            const dniEventy = eventy[klucz] || [];
+            const jestDzis = klucz === dzisiajKlucz;
+            const wybrany = wybranyDzien === d;
+            return (
+              <div key={d} onClick={()=>setWybranyDzien(wybrany?null:d)} style={{
+                borderRadius:6,padding:"4px 2px",minHeight:44,cursor:"pointer",textAlign:"center",
+                background:wybrany?"rgba(255,215,0,0.2)":jestDzis?"rgba(0,200,100,0.1)":"rgba(255,255,255,0.03)",
+                border:wybrany?"1px solid #ffd700":jestDzis?"1px solid #0c655":"1px solid #1a1a2e",
+                transition:"all 0.1s",
+              }}>
+                <div style={{fontSize:12,fontWeight:jestDzis?"bold":"normal",color:jestDzis?"#0c6":wybrany?"#ffd700":"#aaa",marginBottom:2}}>{d}</div>
+                <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:1}}>
+                  {dniEventy.slice(0,3).map(e=>(
+                    <span key={e.id} style={{fontSize:8,color:kolorTypu[e.typ]||"#aaa"}}>{ikonTypu[e.typ]||"•"}</span>
+                  ))}
+                  {dniEventy.length>3&&<span style={{fontSize:8,color:"#555"}}>+{dniEventy.length-3}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Panel wybranego dnia */}
+      {wybranyDzien&&(
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+            📅 {wybranyDzien} {nazwyMiesiecy[miesiac]} {rok}
+            {wybranyKlucz===dzisiajKlucz&&<span style={{marginLeft:8,fontSize:11,color:"#0c6"}}>• Dzisiaj</span>}
+          </div>
+
+          {/* Istniejące eventy */}
+          {eventyWybranego.length===0?(
+            <div style={{fontSize:12,color:"#555",marginBottom:10,textAlign:"center"}}>Brak eventów tego dnia</div>
+          ):eventyWybranego.map(e=>(
+            <div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",marginBottom:4,background:"rgba(255,255,255,0.04)",border:`1px solid ${kolorTypu[e.typ]||"#333"}33`,borderRadius:6}}>
+              <span style={{fontSize:14}}>{ikonTypu[e.typ]||"📌"}</span>
+              <span style={{flex:1,fontSize:12,color:"#ddd"}}>{e.tekst}</span>
+              <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:`${kolorTypu[e.typ]||"#aaa"}22`,color:kolorTypu[e.typ]||"#aaa"}}>{e.typ}</span>
+              <button onClick={()=>usunEvent(wybranyKlucz,e.id)} style={{background:"none",border:"none",color:"#f5544466",cursor:"pointer",fontSize:13}}>✕</button>
+            </div>
+          ))}
+
+          {/* Dodaj nowy event */}
+          <div style={{marginTop:10,borderTop:"1px solid #1a1a2e",paddingTop:10}}>
+            <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>+ Dodaj event:</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+              {Object.entries(ikonTypu).map(([typ,ikona])=>(
+                <button key={typ} onClick={()=>setTypEvent(typ)} style={{
+                  padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
+                  background:typEvent===typ?`${kolorTypu[typ]}22`:"rgba(255,255,255,0.05)",
+                  border:typEvent===typ?`1px solid ${kolorTypu[typ]}`:"1px solid #2a2a3a",
+                  color:typEvent===typ?kolorTypu[typ]:"#666",
+                }}>{ikona} {typ}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <input value={nowyEvent} onChange={e=>setNowyEvent(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&dodajEvent()}
+                placeholder="Opis eventu..." style={{
+                  flex:1,padding:"8px 10px",background:"#12122a",border:"1px solid #333",
+                  borderRadius:6,color:"#fff",fontSize:12,
+                }}/>
+              <button onClick={dodajEvent} style={{padding:"8px 14px",background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:6,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:12}}>
+                + Dodaj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nadchodzące eventy */}
+      {(()=>{
+        const nadchodzace=[];
+        for(let d=0;d<30;d++){
+          const dt=new Date(dzis);
+          dt.setDate(dt.getDate()+d);
+          const k=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+          if(eventy[k]?.length){
+            nadchodzace.push({data:dt,klucz:k,eventy:eventy[k],dzisiaj:k===dzisiajKlucz});
+          }
+        }
+        if(!nadchodzace.length) return null;
+        return (
+          <div style={{marginTop:14,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
+            <div style={{fontSize:12,fontWeight:"bold",color:"#6496ff",marginBottom:8}}>📋 Nadchodzące eventy (30 dni)</div>
+            {nadchodzace.map(({data,klucz,eventy:ev,dzisiaj})=>(
+              <div key={klucz} style={{marginBottom:6,padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:6,borderLeft:`3px solid ${dzisiaj?"#0c6":"#6496ff"}`}}>
+                <div style={{fontSize:11,color:dzisiaj?"#0c6":"#6496ff",fontWeight:"bold",marginBottom:3}}>
+                  {dzisiaj?"🟢 Dzisiaj":"📅"} {data.getDate()} {nazwyMiesiecy[data.getMonth()]}
+                </div>
+                {ev.map(e=>(
+                  <div key={e.id} style={{fontSize:11,color:"#aaa",display:"flex",alignItems:"center",gap:4}}>
+                    <span>{ikonTypu[e.typ]}</span>
+                    <span style={{color:kolorTypu[e.typ]||"#aaa"}}>[{e.typ}]</span>
+                    <span>{e.tekst}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
