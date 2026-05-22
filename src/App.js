@@ -861,6 +861,13 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     // Przebieg 1: dla każdej talii/osoby z brakT>1 zarezerwuj tylu dawców ile potrzeba
     // Przebieg 2: reszta dawców przydzielana normalnie po fazach
 
+    // Kolejność priorytetów faz — od najważniejszej
+    const priorytetFazy = (faza) => {
+      const kolejnosc = [10,20,11,12,21,22,31,32,41,42,51,52];
+      const idx = kolejnosc.indexOf(faza);
+      return idx === -1 ? 99 : idx;
+    };
+
     // Zbierz wszystkie potrzeby pogrupowane po (osoba, talia)
     const potrzebyGrup = staneTalii
       .map(s => {
@@ -873,8 +880,10 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         };
       })
       .sort((a, b) => {
-        // Sortuj: faza → efektywna nagroda → trudna
-        if (a.faza !== b.faza) return a.faza - b.faza;
+        // Sortuj wg priorytetu fazy (nie wartości numerycznej!)
+        const pa = priorytetFazy(a.faza), pb = priorytetFazy(b.faza);
+        if (pa !== pb) return pa - pb;
+        // W tej samej fazie — większa nagroda najpierw
         if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
         if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
         return 0;
