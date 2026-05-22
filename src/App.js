@@ -369,6 +369,7 @@ export default function App() {
           aktywnaWymiana={dane.aktywnaWymiana}
           walki={dane.walki||[]}
           typWymiany={typWymiany}
+          dane={dane}
         />}
       </div>
     </div>
@@ -855,51 +856,58 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       }
     }
   } else {
-    // TRYB "PRIORYTET" (1-2 brakujące) — bez zmian
-    const kandidaci = [];
-    staneTalii.forEach(s => {
-      const faza = obliczFaze(s.brakT.length, s.brakO.length, typWymiany);
-      const efNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, s.brakT.length);
-      const progInfo = progiOsob[s.osoba.id];
-      const bliskoProg = progInfo?.nastepnyProg && progInfo.brakujeDoProg <= 2;
-      s.brakT.forEach(karta => {
-        kandidaci.push({
-          osoba: s.osoba, talia: s.talia, karta, faza,
-          brakTCount: s.brakT.length, brakOCount: s.brakO.length,
-          nagroda: s.nagroda, efNagroda, trudna: s.trudna,
-          bliskoProg, progBonus: efNagroda - s.nagroda,
-        });
-      });
-    });
+    // TRYB "PRIORYTET"
+    // Iteruj fazy po kolei od najważniejszej, w każdej fazie sortuj po nagrodzie.
+    // Dla każdej talii przydzielaj WSZYSTKIE brakujące karty (każda od innego dawcy).
+    // Dawca wysyła tylko 1 kartę, odbiorca może dostać wiele kart z różnych talii.
 
-    kandidaci.sort((a, b) => {
-      if (a.faza !== b.faza) return a.faza - b.faza;
-      const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
-      if (!ignorujTrudne && aT !== bT) return aT - bT;
-      if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
-      return a.brakTCount - b.brakTCount;
-    });
+    const fazyPoKolei = [10,20,11,12,21,22,31,32,41,42,51,52];
 
-    for (const k of kandidaci) {
-      const key = `${k.osoba.id}_${k.talia.id}_${k.karta.nazwa}`;
-      if (posiadane[key]) continue;
-      let dawca = null;
-      for (const o2 of czlonkowie) {
-        if (o2.id === k.osoba.id || wysylajacy.has(o2.id)) continue;
-        if (duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) { dawca = o2; break; }
-      }
-      if (dawca) {
-        wysylajacy.add(dawca.id);
-        planoweWymiany.push({
-          od: dawca.nazwa, do: k.osoba.nazwa,
-          karta: k.karta.nazwa, talia: k.talia.nazwa,
-          nagroda: k.nagroda, faza: k.faza,
-          brakTCount: k.brakTCount, brakOCount: k.brakOCount,
-          trudna: k.trudna, progBonus: k.progBonus||0,
-          bliskoProg: k.bliskoProg||false,
+    for (const fazaDocelowa of fazyPoKolei) {
+      const wTejFazie = staneTalii
+        .filter(s => obliczFaze(s.brakT.length, s.brakO.length, typWymiany) === fazaDocelowa)
+        .map(s => {
+          const efNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, s.brakT.length);
+          const progInfo = progiOsob[s.osoba.id];
+          return { ...s, efNagroda, bliskoProg: !!(progInfo?.nastepnyProg && progInfo.brakujeDoProg <= 2), progBonus: efNagroda - s.nagroda };
+        })
+        .sort((a, b) => {
+          if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
+          if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
+          return a.brakT.length - b.brakT.length;
         });
-      } else if (k.brakTCount <= 2) {
-        nieobsluzone.push(k);
+
+      for (const s of wTejFazie) {
+        for (const karta of s.brakT) {
+          const key = `${s.osoba.id}_${s.talia.id}_${karta.nazwa}`;
+          if (posiadane[key]) continue;
+          if (planoweWymiany.some(w => w.do===s.osoba.nazwa && w.talia===s.talia.nazwa && w.karta===karta.nazwa)) continue;
+
+          const juzIdzie = planoweWymiany.filter(w => w.do===s.osoba.nazwa && w.talia===s.talia.nazwa).length;
+          const aktBrakT = Math.max(1, s.brakT.length - juzIdzie);
+          const aktFaza = obliczFaze(aktBrakT, s.brakO.length, typWymiany);
+          const aktEfNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, aktBrakT);
+
+          let dawca = null;
+          for (const o2 of czlonkowie) {
+            if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
+            if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) { dawca = o2; break; }
+          }
+
+          if (dawca) {
+            wysylajacy.add(dawca.id);
+            planoweWymiany.push({
+              od: dawca.nazwa, do: s.osoba.nazwa,
+              karta: karta.nazwa, talia: s.talia.nazwa,
+              nagroda: s.nagroda, faza: aktFaza,
+              brakTCount: aktBrakT, brakOCount: s.brakO.length,
+              trudna: s.trudna, progBonus: aktEfNagroda - s.nagroda,
+              bliskoProg: s.bliskoProg||false,
+            });
+          } else if (s.brakT.length <= 3) {
+            nieobsluzone.push({ osoba: s.osoba, talia: s.talia, karta, brakTCount: s.brakT.length });
+          }
+        }
       }
     }
   }
@@ -2086,7 +2094,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 // ============================================================
 // TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany}) {
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaOsobaSkaner,setWybranaOsobaSkaner]=useState(0);
@@ -2130,7 +2138,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
-      {tryb==="kalendarz"&&<KalendarzEventow/>}
+      {tryb==="kalendarz"&&<KalendarzEventow zapiszStrukture={zapiszStrukture} dane={dane}/>}
     </div>
   );
 }
@@ -3033,21 +3041,19 @@ function OsiagnieciaWidget({talie,czlonkowie,posiadane,duplikaty,zalogowany}) {
 // ============================================================
 // KALENDARZ EVENTÓW
 // ============================================================
-function KalendarzEventow() {
+function KalendarzEventow({zapiszStrukture, dane}) {
   const dzis = new Date();
   const [rok, setRok] = useState(dzis.getFullYear());
-  const [miesiac, setMiesiac] = useState(dzis.getMonth()); // 0-11
+  const [miesiac, setMiesiac] = useState(dzis.getMonth());
   const [wybranyDzien, setWybranyDzien] = useState(null);
-  const [eventy, setEventy] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gang_kalendarz") || "{}"); }
-    catch { return {}; }
-  });
   const [nowyEvent, setNowyEvent] = useState("");
   const [typEvent, setTypEvent] = useState("złote");
 
+  // Eventy z Firebase (realtime przez dane.kalendarz)
+  const eventy = dane?.kalendarz || {};
+
   const zapiszEventy = (nowe) => {
-    setEventy(nowe);
-    localStorage.setItem("gang_kalendarz", JSON.stringify(nowe));
+    zapiszStrukture("kalendarz", nowe);
   };
 
   const nazwyMiesiecy = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
