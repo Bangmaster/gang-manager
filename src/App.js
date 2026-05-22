@@ -856,19 +856,16 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       }
     }
   } else {
-    // TRYB "PRIORYTET"
-    // Dwuprzebiegowy algorytm:
-    // Przebieg 1: dla każdej talii/osoby z brakT>1 zarezerwuj tylu dawców ile potrzeba
-    // Przebieg 2: reszta dawców przydzielana normalnie po fazach
+    // TRYB "PRIORYTET" — Greedy optimizer z podmianą dawców
+    // Gdy brak wolnego dawcy — sprawdź czy zajęty dawca ma alternatywę
+    // i jeśli tak, podmień go tam gdzie jest mniej ważny
 
-    // Kolejność priorytetów faz — od najważniejszej
     const priorytetFazy = (faza) => {
-      const kolejnosc = [10,20,11,12,21,22,31,32,41,42,51,52];
+      const kolejnosc = [20,10,21,11,22,12,31,32,41,42,51,52];
       const idx = kolejnosc.indexOf(faza);
       return idx === -1 ? 99 : idx;
     };
 
-    // Zbierz wszystkie potrzeby pogrupowane po (osoba, talia)
     const potrzebyGrup = staneTalii
       .map(s => {
         const efNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, s.brakT.length);
@@ -880,14 +877,30 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         };
       })
       .sort((a, b) => {
-        // Sortuj wg priorytetu fazy (nie wartości numerycznej!)
+        const aZamknie = (a.faza===10||a.faza===20) ? 1 : 0;
+        const bZamknie = (b.faza===10||b.faza===20) ? 1 : 0;
+        if (aZamknie !== bZamknie) return bZamknie - aZamknie;
+        if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
+        if (b.brakT.length !== a.brakT.length) return b.brakT.length - a.brakT.length;
         const pa = priorytetFazy(a.faza), pb = priorytetFazy(b.faza);
         if (pa !== pb) return pa - pb;
-        // W tej samej fazie — większa nagroda najpierw
-        if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
         if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
         return 0;
       });
+
+    // Znajdź alternatywnego dawcę dla istniejącej wymiany (wolnego, innego niż obecny)
+    const znajdzAlternDawce = (wymiana) => {
+      const t = talie.find(t => t.nazwa === wymiana.talia);
+      if (!t) return null;
+      const odbiorca = czlonkowie.find(c => c.nazwa === wymiana.do);
+      for (const o2 of czlonkowie) {
+        if (!odbiorca || o2.id === odbiorca.id) continue;
+        if (o2.nazwa === wymiana.od) continue;
+        if (wysylajacy.has(o2.id)) continue;
+        if (duplikaty[`${o2.id}_${t.id}_${wymiana.karta}`]) return o2;
+      }
+      return null;
+    };
 
     for (const s of potrzebyGrup) {
       for (const karta of s.brakT) {
@@ -897,7 +910,6 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
           w.do === s.osoba.nazwa && w.talia === s.talia.nazwa && w.karta === karta.nazwa
         )) continue;
 
-        // Przelicz aktualną fazę uwzględniając już zaplanowane
         const juzIdzie = planoweWymiany.filter(w =>
           w.do === s.osoba.nazwa && w.talia === s.talia.nazwa
         ).length;
@@ -905,10 +917,34 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         const aktFaza = obliczFaze(aktBrakT, s.brakO.length, typWymiany);
         const aktEfNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, aktBrakT);
 
+        // Szukaj wolnego dawcy
         let dawca = null;
         for (const o2 of czlonkowie) {
           if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
           if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) { dawca = o2; break; }
+        }
+
+        // Brak wolnego dawcy — próbuj podmienić zajętego który ma alternatywę
+        if (!dawca) {
+          for (const o2 of czlonkowie) {
+            if (o2.id === s.osoba.id) continue;
+            if (!wysylajacy.has(o2.id)) continue;
+            if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
+            // o2 jest zajęty ale ma duplikat naszej karty
+            // Znajdź jego aktualną wymianę i sprawdź czy ma alternatywę
+            const jegaWymiana = planoweWymiany.find(w => w.od === o2.nazwa);
+            if (!jegaWymiana) continue;
+            const alternDawca = znajdzAlternDawce(jegaWymiana);
+            if (alternDawca) {
+              // Podmień dawcę w tamtej wymianie
+              const idx = planoweWymiany.indexOf(jegaWymiana);
+              planoweWymiany[idx] = { ...jegaWymiana, od: alternDawca.nazwa };
+              wysylajacy.delete(o2.id);
+              wysylajacy.add(alternDawca.id);
+              dawca = o2; // o2 jest teraz wolny
+              break;
+            }
+          }
         }
 
         if (dawca) {
