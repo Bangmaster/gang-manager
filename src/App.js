@@ -686,7 +686,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         }
         if(dawca){
           wysylajacy.add(dawca.id);
-          planoweWymiany.push({od:dawca.nazwa,do:vip.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda,faza:20,brakTCount:1,brakOCount:0,trudna});
+          planoweWymiany.push({od:dawca.nazwa,do:vip.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda,faza:200,brakTCount:1,brakOCount:0,trudna});
         } else {
           nieobsluzone.push({osoba:vip,talia,karta,brakTCount:1});
         }
@@ -724,7 +724,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       }
       if(dawca){
         wysylajacy.add(dawca.id);
-        planoweWymiany.push({od:dawca.nazwa,do:k.osoba.nazwa,karta:k.karta.nazwa,talia:k.talia.nazwa,nagroda:k.nagroda,faza:21,brakTCount:k.brakTCount,brakOCount:k.brakOCount,trudna:k.trudna});
+        planoweWymiany.push({od:dawca.nazwa,do:k.osoba.nazwa,karta:k.karta.nazwa,talia:k.talia.nazwa,nagroda:k.nagroda,faza:210,brakTCount:k.brakTCount,brakOCount:k.brakOCount,trudna:k.trudna});
       }
     }
 
@@ -815,7 +815,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         planoweWymiany.push({
           od: dawca.nazwa, do: s.osoba.nazwa,
           karta: karta.nazwa, talia: s.talia.nazwa,
-          nagroda: s.nagroda, faza: 10,
+          nagroda: s.nagroda, faza: 100,
           brakTCount: s.brakT.length, brakOCount: s.brakO.length,
           trudna: s.trudna,
         });
@@ -847,7 +847,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
           planoweWymiany.push({
             od: dawca.nazwa, do: s.osoba.nazwa,
             karta: karta.nazwa, talia: s.talia.nazwa,
-            nagroda: s.nagroda, faza: 11,
+            nagroda: s.nagroda, faza: 110,
             brakTCount: s.brakT.length, brakOCount: s.brakO.length,
             trudna: s.trudna,
           });
@@ -873,10 +873,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     });
 
     kandidaci.sort((a, b) => {
-      // Zamień fazę 15 na 1.5 dla sortowania
-      const fa = a.faza===15 ? 1.5 : a.faza;
-      const fb = b.faza===15 ? 1.5 : b.faza;
-      if (fa !== fb) return fa - fb;
+      if (a.faza !== b.faza) return a.faza - b.faza;
       const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
       if (!ignorujTrudne && aT !== bT) return aT - bT;
       if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
@@ -935,23 +932,44 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
   return {planoweWymiany,nieobsluzone,zamknieciaInfo};
 }
 
-function obliczFaze(brakT,brakO,typWymiany){
-  const isDiament = typWymiany==="diamentowe";
+function obliczFaze(brakT, brakO, typWymiany) {
+  // Priorytet dynamiczny: im mniej brakuje łącznie tym wyższy priorytet
+  // Format: brakT * 10 + brakO → np. 1+0=10, 1+1=11, 2+0=20, 2+1=21 itd.
+  // Fazy specjalne dla diamentowych gdzie brakO=0 i brakT=2 → 2 osoby wyślą po 1 karcie
+  if (brakT === 0) return 0; // już ma wszystkie
+  return brakT * 10 + brakO;
+}
 
-  // FAZA 1: Wymiana zamknie talię natychmiast
-  if(brakT===1&&brakO===0) return 1;
-  if(brakT===2&&brakO===0) return 2;
+function opisFazy(faza, typWymiany) {
+  const isDiament = typWymiany === "diamentowe";
+  const brakT = Math.floor(faza / 10);
+  const brakO = faza % 10;
+  const typT = isDiament ? "💎" : "⭐";
+  const typO = isDiament ? "⭐" : "💎";
 
-  // FAZA 1.5 (tylko przy diamentowej wymianie):
-  // Brakuje 1 diamentowej + tylko 1 złotej → złotą wyślemy w następnej złotej wymianie
-  // To jest bardziej opłacalne niż zamknięcie innej talii za mniejszą nagrodę
-  if(isDiament&&brakT===1&&brakO===1) return 15; // 1.5 → 15 w liczbach całkowitych
+  if (brakT === 1 && brakO === 0) return {
+    t: `🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 ${typT} + komplet ${typO}`, k: "#f55"
+  };
+  if (brakT === 2 && brakO === 0) return {
+    t: isDiament
+      ? `🟠 FAZA 2 — Brakuje 2 ${typT} + komplet ${typO} → 2 osoby wyślą po 1 ${typT} = ZAMKNIE TALIĘ`
+      : `🟠 FAZA 2 — Brakuje 2 ${typT} + komplet ${typO} → 2 wymiany do zamknięcia`,
+    k: "#ff7a00"
+  };
+  if (brakT === 1 && brakO === 1) return {
+    t: isDiament
+      ? `💎 FAZA 3 — Brakuje 1 ${typT} + 1 ${typO} → wyślij ${typT} teraz, ${typO} w następnej wymianie`
+      : `🟡 FAZA 3 — Brakuje 1 ${typT} + 1 ${typO}`,
+    k: isDiament ? "#ff4488" : "#fa0"
+  };
 
-  // FAZA 3-4: Talia blisko zamknięcia
-  if(brakT===1&&brakO>=1&&brakO<=2) return 3;
-  if(brakT===2&&brakO>=1&&brakO<=2) return 4;
-
-  return 5;
+  // Generyczne etykiety dla pozostałych faz
+  const kolorFazy = brakT <= 2 ? "#fa0" : brakT <= 3 ? "#d4b800" : "#6af";
+  const nrFazy = brakT === 1 ? (brakO + 2) : brakT === 2 ? (brakO + 4) : brakT === 3 ? (brakO + 6) : (brakT * 2 + brakO);
+  return {
+    t: `FAZA ${nrFazy} — Brakuje ${brakT} ${typT} + ${brakO} ${typO}`,
+    k: kolorFazy
+  };
 }
 
 function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej}) {
@@ -1063,16 +1081,18 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   };
 
   const etykietyFaz={
-    1:{t:"🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 karty + komplet innych typów",k:"#f55"},
-    2:{t:"🟠 FAZA 2 — Brakuje 2 kart + komplet innych typów (talia blisko)",k:"#ff7a00"},
-    15:{t:"💎 FAZA 1.5 — Brakuje 1 diamentowej + 1 złotej → złotą wyślemy w następnej wymianie!",k:"#ff4488"},
-    3:{t:"🟡 FAZA 3 — Brakuje 1 karty + 1-2 innych typów do uzupełnienia",k:"#fa0"},
-    4:{t:"🟡 FAZA 4 — Brakuje 2 kart + 1-2 innych typów do uzupełnienia",k:"#d4b800"},
-    5:{t:"🔵 FAZA 5 — Talia daleka od zamknięcia (3+ braków)",k:"#6af"},
-    10:{t:"🔓 ZAMKNIE TALIĘ — pakiet kart na zamknięcie talii (komplet innych typów już ma)",k:"#bb88ff"},
-    11:{t:"🔓 Dodatkowo — brakuje też kart innego typu, ale wysyłamy bo nie ma lepszych",k:"#888bff"},
-    20:{t:"👑 VIP — karty dla wybranej osoby priorytetowej",k:"#ffd700"},
-    21:{t:"👥 Reszta gangu — pozostali dawcy po obsłudze VIP-a",k:"#aaa"},
+    10:{t:"🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 karty + komplet innych typów",k:"#f55"},
+    20:{t:"🟠 FAZA 2 — Brakuje 2 kart + komplet innych typów",k:"#ff7a00"},
+    11:{t:"🟡 FAZA 3 — Brakuje 1 karty + 1 innego typu",k:"#ff4488"},
+    12:{t:"🟡 FAZA 4 — Brakuje 1 karty + 2 innych typów",k:"#fa0"},
+    21:{t:"🟡 FAZA 5 — Brakuje 2 kart + 1 innego typu",k:"#fa0"},
+    22:{t:"🟡 FAZA 6 — Brakuje 2 kart + 2 innych typów",k:"#d4b800"},
+    31:{t:"🔵 FAZA 7 — Brakuje 3 kart + 1 innego typu",k:"#6af"},
+    32:{t:"🔵 FAZA 8 — Brakuje 3 kart + 2 innych typów",k:"#6af"},
+    100:{t:"🔓 ZAMKNIE TALIĘ — pakiet kart na zamknięcie talii",k:"#bb88ff"},
+    110:{t:"🔓 Dodatkowo — wysyłamy bo nie ma lepszych",k:"#888bff"},
+    200:{t:"👑 VIP — karty dla wybranej osoby priorytetowej",k:"#ffd700"},
+    210:{t:"👥 Reszta gangu — pozostali dawcy po obsłudze VIP-a",k:"#aaa"},
   };
 
   return (
@@ -1277,10 +1297,10 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           }}>{publikowanie?"⏳ Zapisuję...":"📤 Opublikuj dla gangu"}</button>
         </div>
 
-        {[1,15,2,3,4,5,10,11,20,21].map(faza=>{
+        {[10,20,11,12,21,22,31,32,100,110,200,210].map(faza=>{
           const w=wynik.planoweWymiany.filter(x=>x.faza===faza);
           if(!w.length) return null;
-          const e=etykietyFaz[faza]||{t:`Faza ${faza}`,k:"#aaa"};
+          const e=etykietyFaz[faza]||opisFazy(faza,typWymiany);
           return (
             <div key={faza} style={{marginBottom:12,background:"rgba(0,0,0,0.15)",border:`1px solid ${e.k}33`,borderRadius:10,overflow:"hidden"}}>
               <div style={{padding:"8px 14px",background:`${e.k}15`,color:e.k,fontWeight:"bold",fontSize:12,borderBottom:`1px solid ${e.k}25`}}>{e.t}</div>
@@ -1875,7 +1895,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
     return kandydaci.sort((a,b)=>{
       if(b.zamknieTalie!==a.zamknieTalie) return (b.zamknieTalie?1:0)-(a.zamknieTalie?1:0);
       if(b.progBonus!==a.progBonus) return b.progBonus-a.progBonus;
-      const fa=a.faza===15?1.5:a.faza, fb=b.faza===15?1.5:b.faza;
+      const fa=a.faza, fb=b.faza;
       if(fa!==fb) return fa-fb;
       if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
       return a.brakTCount-b.brakTCount;
@@ -2033,8 +2053,8 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                                 🎯 PRÓG {alt.nastepnyProg?.prog} kart — brakuje {alt.brakujeDoProg} do progu (+{alt.progBonus.toLocaleString()} ammo)
                               </span>
                             )}
-                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:alt.faza===15?"#ff4488":["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>
-                              {alt.faza===15?"F1.5":`F${alt.faza}`}
+                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:(etykietyFaz[alt.faza]||opisFazy(alt.faza,typWymiany))?.k||"#aaa"}}>
+                              F{Math.floor(alt.faza/10)}.{alt.faza%10||"0"}
                             </span>
                             <span style={{fontSize:11,flex:1,color:"#ddd"}}>
                               <strong style={{color:"#ffd700"}}>{alt.karta}</strong>
@@ -2075,6 +2095,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
   const przyciski=[
     {id:"szybkie",label:"⚡ Szybkie"},
     {id:"skaner",label:"📷 Skaner"},
+    {id:"screen",label:"🖥️ Screen Capture"},
     {id:"postep",label:"📊 Postęp"},
     {id:"kalkulator",label:"🧮 Kalkulator"},
     {id:"historia",label:"📜 Historia"},
@@ -2103,6 +2124,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
 
       {tryb==="szybkie"&&<SzybkieWprowadzanie talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsoba} setWybranaOsoba={setWybranaOsoba} wybranaTalia={wybranaTalia} setWybranaTalia={setWybranaTalia}/>}
       {tryb==="skaner"&&<SkanerNaZywo talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsobaSkaner} setWybranaOsoba={setWybranaOsobaSkaner}/>}
+      {tryb==="screen"&&<ScreenCapture talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte}/>}
       {tryb==="postep"&&<PostepSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane}/>}
       {tryb==="kalkulator"&&<KalkulatorSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} typWymiany={typWymiany}/>}
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
@@ -3055,8 +3077,9 @@ function KalendarzEventow() {
     zapiszEventy(nowe);
   };
 
-  const kolorTypu = { złote: "#ffd700", diamentowe: "#87CEEB", inne: "#0c6", walka: "#f55" };
-  const ikonTypu = { złote: "⭐", diamentowe: "💎", inne: "📌", walka: "⚔️" };
+  const kolorTypu = { złote: "#ffd700", diamentowe: "#87CEEB", "event6h_tak": "#0c6", "event6h_nie": "#f55", "karty2x": "#ff6dff", inne: "#fa0" };
+  const ikonTypu = { złote: "⭐", diamentowe: "💎", "event6h_tak": "✅", "event6h_nie": "❌", "karty2x": "🃏", inne: "📌" };
+  const labelTypu = { złote: "Złote", diamentowe: "Diamentowe", "event6h_tak": "Event 6H ✅", "event6h_nie": "Event 6H ❌", "karty2x": "Karty 2x", inne: "Inne" };
 
   const wybranyKlucz = wybranyDzien ? kluczDnia(wybranyDzien) : null;
   const eventyWybranego = wybranyKlucz ? (eventy[wybranyKlucz] || []) : [];
@@ -3132,7 +3155,7 @@ function KalendarzEventow() {
             <div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",marginBottom:4,background:"rgba(255,255,255,0.04)",border:`1px solid ${kolorTypu[e.typ]||"#333"}33`,borderRadius:6}}>
               <span style={{fontSize:14}}>{ikonTypu[e.typ]||"📌"}</span>
               <span style={{flex:1,fontSize:12,color:"#ddd"}}>{e.tekst}</span>
-              <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:`${kolorTypu[e.typ]||"#aaa"}22`,color:kolorTypu[e.typ]||"#aaa"}}>{e.typ}</span>
+              <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:`${kolorTypu[e.typ]||"#aaa"}22`,color:kolorTypu[e.typ]||"#aaa"}}>{labelTypu[e.typ]||e.typ}</span>
               <button onClick={()=>usunEvent(wybranyKlucz,e.id)} style={{background:"none",border:"none",color:"#f5544466",cursor:"pointer",fontSize:13}}>✕</button>
             </div>
           ))}
@@ -3141,13 +3164,13 @@ function KalendarzEventow() {
           <div style={{marginTop:10,borderTop:"1px solid #1a1a2e",paddingTop:10}}>
             <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>+ Dodaj event:</div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
-              {Object.entries(ikonTypu).map(([typ,ikona])=>(
+              {Object.entries(labelTypu).map(([typ,label])=>(
                 <button key={typ} onClick={()=>setTypEvent(typ)} style={{
                   padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
                   background:typEvent===typ?`${kolorTypu[typ]}22`:"rgba(255,255,255,0.05)",
                   border:typEvent===typ?`1px solid ${kolorTypu[typ]}`:"1px solid #2a2a3a",
                   color:typEvent===typ?kolorTypu[typ]:"#666",
-                }}>{ikona} {typ}</button>
+                }}>{ikonTypu[typ]} {label}</button>
               ))}
             </div>
             <div style={{display:"flex",gap:6}}>
@@ -3188,7 +3211,7 @@ function KalendarzEventow() {
                 {ev.map(e=>(
                   <div key={e.id} style={{fontSize:11,color:"#aaa",display:"flex",alignItems:"center",gap:4}}>
                     <span>{ikonTypu[e.typ]}</span>
-                    <span style={{color:kolorTypu[e.typ]||"#aaa"}}>[{e.typ}]</span>
+                    <span style={{color:kolorTypu[e.typ]||"#aaa"}}>[{labelTypu[e.typ]||e.typ}]</span>
                     <span>{e.tekst}</span>
                   </div>
                 ))}
@@ -3197,6 +3220,425 @@ function KalendarzEventow() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// ============================================================
+// SCREEN CAPTURE — auto-wykrywanie talii z ekranu gry
+// ============================================================
+function ScreenCapture({talie,czlonkowie,posiadane,duplikaty,zapiszKarte}) {
+  const videoRef=useRef(null);
+  const canvasRef=useRef(null);
+  const intervalRef=useRef(null);
+  const ostatniaTaliaRef=useRef(null);
+  const kolejkaRef=useRef([]);
+
+  const [aktywny,setAktywny]=useState(false);
+  const [stream,setStream]=useState(null);
+  const [status,setStatus]=useState("");
+  const [wybranaOsoba,setWybranaOsoba]=useState(0);
+  const [wykrytaTalia,setWykrytaTalia]=useState(null);
+  const [kolejka,setKolejka]=useState([]); // {talia, base64, thumb, wynik}
+  const [analizuje,setAnalizuje]=useState(false);
+  const [wynikiFinal,setWynikiFinal]=useState([]);
+  const [postep,setPostep]=useState(null);
+  const [licznikScreenow,setLicznikScreenow]=useState(0);
+
+  const osoba=czlonkowie[wybranaOsoba];
+
+  // Dźwięk "ding"
+  const ding=()=>{
+    try {
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      const osc=ctx.createOscillator();
+      const gain=ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value=880;
+      osc.type="sine";
+      gain.gain.setValueAtTime(0.3,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime+0.5);
+    } catch(e){}
+  };
+
+  const startCapture=async()=>{
+    try {
+      const s=await navigator.mediaDevices.getDisplayMedia({
+        video:{frameRate:5,width:{ideal:1920},height:{ideal:1080}},
+        audio:false
+      });
+      setStream(s);
+      setAktywny(true);
+      setStatus("🖥️ Ekran udostępniony — przełącz na grę i otwieraj talie!");
+      setTimeout(()=>{
+        if(videoRef.current){
+          videoRef.current.srcObject=s;
+          videoRef.current.play().catch(()=>{});
+        }
+      },200);
+      s.getVideoTracks()[0].addEventListener("ended",()=>stopCapture());
+    } catch(e){
+      setStatus("❌ Brak dostępu do ekranu: "+e.message);
+    }
+  };
+
+  const stopCapture=()=>{
+    clearInterval(intervalRef.current);
+    stream?.getTracks().forEach(t=>t.stop());
+    setStream(null);
+    setAktywny(false);
+    ostatniaTaliaRef.current=null;
+    setStatus("");
+  };
+
+  // Zrób screenshot i zwróć base64 + miniaturę
+  const zrobScreenshot=()=>{
+    const v=videoRef.current;
+    const c=canvasRef.current;
+    if(!v||!c||v.readyState<2||v.videoWidth===0) return null;
+    c.width=v.videoWidth; c.height=v.videoHeight;
+    c.getContext("2d").drawImage(v,0,0);
+    const base64=c.toDataURL("image/jpeg",0.85).split(",")[1];
+    const tc=document.createElement("canvas");
+    tc.width=160; tc.height=90;
+    tc.getContext("2d").drawImage(c,0,0,160,90);
+    const thumb=tc.toDataURL("image/jpeg",0.6);
+    return {base64,thumb};
+  };
+
+  // Szybkie zapytanie do AI tylko o nazwę talii (tanie i szybkie)
+  const wykrejNazweTalii=async(base64)=>{
+    try {
+      const resp=await fetch("/api/gemini",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          prompt:`Na tym screenshocie z gry The Gang znajdź napis "TALIA WYDARZEŃ:" i podaj nazwę talii która jest pod tym napisem.
+Jeśli nie widzisz ekranu talii (np. widać menu, mapę, inne elementy) — odpowiedz "BRAK".
+Odpowiedz WYŁĄCZNIE jednym słowem lub krótką nazwą talii, nic więcej. Przykład: "Miejskie legendy" lub "BRAK".`,
+          base64,mimeType:"image/jpeg"
+        })
+      });
+      if(!resp.ok) return null;
+      const data=await resp.json();
+      const text=(data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+      if(text==="BRAK"||text.length<2) return null;
+      // Dopasuj do znanych talii
+      const match=talie.find(t=>
+        normalizuj(t.nazwa)===normalizuj(text)||
+        normalizuj(t.nazwa).includes(normalizuj(text).substring(0,6))||
+        normalizuj(text).includes(normalizuj(t.nazwa).substring(0,6))
+      );
+      return match?.nazwa||text;
+    } catch(e){ return null; }
+  };
+
+  // Start auto-monitorowania
+  const startMonitor=()=>{
+    if(intervalRef.current) clearInterval(intervalRef.current);
+    ostatniaTaliaRef.current=null;
+    kolejkaRef.current=[];
+    setKolejka([]);
+    setLicznikScreenow(0);
+
+    let cooldown=false; // żeby nie analizować tej samej talii wielokrotnie
+
+    intervalRef.current=setInterval(async()=>{
+      if(cooldown) return;
+      const snap=zrobScreenshot();
+      if(!snap) return;
+      setLicznikScreenow(p=>p+1);
+
+      // Wykryj nazwę talii
+      const nazwaWykryta=await wykrejNazweTalii(snap.base64);
+
+      if(!nazwaWykryta){
+        if(ostatniaTaliaRef.current) setStatus(`🔍 Czekam na ekran talii... (ostatnia: ${ostatniaTaliaRef.current})`);
+        else setStatus("🔍 Szukam ekranu talii — otwórz talię w grze...");
+        return;
+      }
+
+      // Nowa talia wykryta!
+      if(nazwaWykryta!==ostatniaTaliaRef.current){
+        cooldown=true;
+        ostatniaTaliaRef.current=nazwaWykryta;
+        setWykrytaTalia(nazwaWykryta);
+        setStatus(`✅ Wykryto: "${nazwaWykryta}" — analizuję karty...`);
+
+        // Poczekaj 1s żeby ekran się ustabilizował, potem zrób właściwy screenshot
+        await new Promise(r=>setTimeout(r,1000));
+        const snapFinal=zrobScreenshot();
+        if(snapFinal){
+          const nowyWpis={talia:nazwaWykryta,base64:snapFinal.base64,thumb:snapFinal.thumb,wynik:null,status:"oczekuje"};
+          kolejkaRef.current=[...kolejkaRef.current,nowyWpis];
+          setKolejka([...kolejkaRef.current]);
+          ding();
+          setStatus(`🎵 Wykryto #${kolejkaRef.current.length}: "${nazwaWykryta}" — możesz przełączyć na następną!`);
+        }
+        // Cooldown 3s żeby nie wykryć tej samej talii ponownie
+        setTimeout(()=>{ cooldown=false; },3000);
+      }
+    },1500);
+
+    setStatus("🔍 Monitoring aktywny — otwórz pierwszą talię w grze!");
+  };
+
+  const stopMonitor=()=>{
+    clearInterval(intervalRef.current);
+    intervalRef.current=null;
+    setStatus(`⏹ Zatrzymano. Zebrano ${kolejkaRef.current.length} talii — kliknij Analizuj!`);
+  };
+
+  // Pełna analiza zebranych screenów
+  const analizujWszystkie=async()=>{
+    if(!kolejkaRef.current.length||!osoba) return;
+    setAnalizuje(true);
+    setWynikiFinal([]);
+    const wyniki=[];
+
+    for(let i=0;i<kolejkaRef.current.length;i++){
+      const wpis=kolejkaRef.current[i];
+      setPostep({current:i+1,total:kolejkaRef.current.length,talia:wpis.talia});
+      setStatus(`🤖 Analizuję ${i+1}/${kolejkaRef.current.length}: ${wpis.talia}...`);
+
+      try {
+        const resp=await fetch("/api/gemini",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            prompt:`Rozpoznaj karty z gry The Gang na tym screenshocie.
+Każda karta ma gwiazdki na górze:
+- Kolorowe gwiazdki (żółte/fioletowe) = posiadana: true
+- Szare gwiazdki = posiadana: false
+- Żółta cyfra widoczna na karcie = duplikat: true
+
+Talia na tym screenie to: "${wpis.talia}"
+Karty tej talii: ${(talie.find(t=>normalizuj(t.nazwa)===normalizuj(wpis.talia))?.karty||[]).map(k=>`"${k.nazwa}"(${k.typ[0]})`).join(",")}
+
+Zwróć WYŁĄCZNIE JSON:
+{"talia":"${wpis.talia}","karty":[{"nazwa":"...","posiadana":true|false,"duplikat":true|false}]}`,
+            base64:wpis.base64,mimeType:"image/jpeg"
+          })
+        });
+        if(!resp.ok) throw new Error(`Błąd ${resp.status}`);
+        const data=await resp.json();
+        let text=(data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+        if(text.startsWith("```json")) text=text.slice(7);
+        if(text.startsWith("```")) text=text.slice(3);
+        if(text.endsWith("```")) text=text.slice(0,-3);
+        const parsed=JSON.parse(text.trim());
+        const taliaMatch=talie.find(t=>normalizuj(t.nazwa)===normalizuj(wpis.talia));
+        wyniki.push({...parsed,taliaMatch,thumb:wpis.thumb,ok:true});
+        ding();
+      } catch(e){
+        wyniki.push({talia:wpis.talia,karty:[],taliaMatch:null,thumb:wpis.thumb,ok:false,blad:e.message});
+      }
+      if(i<kolejkaRef.current.length-1) await new Promise(r=>setTimeout(r,2000));
+    }
+
+    setWynikiFinal(wyniki);
+    setPostep(null);
+    setAnalizuje(false);
+    const ok=wyniki.filter(w=>w.ok).length;
+    setStatus(`🎉 Gotowe! ${ok}/${wyniki.length} talii przeanalizowanych — sprawdź i zatwierdź`);
+  };
+
+  const zatwierdz=async()=>{
+    if(!wynikiFinal.length||!osoba) return;
+    let zmiany=0;
+    for(const w of wynikiFinal){
+      if(!w.ok||!w.taliaMatch) continue;
+      for(const k of w.karty){
+        const kartaMatch=w.taliaMatch.karty.find(kk=>
+          normalizuj(kk.nazwa)===normalizuj(k.nazwa)||
+          kk.nazwa.toLowerCase().includes((k.nazwa||"").toLowerCase().substring(0,5))
+        );
+        if(!kartaMatch) continue;
+        const key=`${osoba.id}_${w.taliaMatch.id}_${kartaMatch.nazwa}`;
+        if(k.posiadana&&!posiadane[key]){ await zapiszKarte("posiadane",key,true); zmiany++; }
+        else if(!k.posiadana&&posiadane[key]){ await zapiszKarte("posiadane",key,null); zmiany++; }
+        if(k.posiadana&&k.duplikat&&!duplikaty?.[key]){ await zapiszKarte("duplikaty",key,true); zmiany++; }
+      }
+    }
+    setStatus(`🎉 Zapisano ${zmiany} zmian dla ${osoba.nazwa}!`);
+    setWynikiFinal([]);
+    setKolejka([]);
+    kolejkaRef.current=[];
+  };
+
+  useEffect(()=>{
+    if(stream&&videoRef.current){
+      videoRef.current.srcObject=stream;
+      videoRef.current.play().catch(()=>{});
+    }
+  },[stream]);
+  useEffect(()=>()=>{
+    clearInterval(intervalRef.current);
+    stream?.getTracks().forEach(t=>t.stop());
+  },[]);// eslint-disable-line
+
+  return (
+    <div>
+      <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#6496ff",marginBottom:4}}>🖥️ Screen Capture — auto-wykrywanie talii</div>
+        <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
+          1. Wybierz osobę → kliknij <strong style={{color:"#6496ff"}}>Udostępnij ekran</strong><br/>
+          2. Wybierz okno/ekran z grą → kliknij <strong style={{color:"#0c6"}}>Start monitorowania</strong><br/>
+          3. Przełącz na grę — otwieraj talie jedna po drugiej<br/>
+          4. Usłyszysz <strong style={{color:"#ffd700"}}>ding 🎵</strong> gdy talia zostanie wykryta → przełącz na następną<br/>
+          5. Po wszystkich taliach → <strong style={{color:"#0c6"}}>Analizuj → Zatwierdź</strong>
+        </div>
+      </div>
+
+      {/* Wybór osoby */}
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>👤 Czyje karty analizujesz:</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {czlonkowie.map((c,i)=>(
+            <button key={c.id} onClick={()=>setWybranaOsoba(i)} style={{
+              padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
+              background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.06)",
+              border:wybranaOsoba===i?"none":"1px solid #2a2a3a",
+              color:wybranaOsoba===i?"#000":"#888",
+            }}>{c.nazwa}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Przyciski */}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        {!aktywny?(
+          <button onClick={startCapture} style={{padding:"10px 20px",background:"linear-gradient(135deg,#4169E1,#6496ff)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+            🖥️ Udostępnij ekran
+          </button>
+        ):(
+          <>
+            {!intervalRef.current?(
+              <button onClick={startMonitor} style={{padding:"10px 20px",background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+                🔍 Start monitorowania
+              </button>
+            ):(
+              <button onClick={stopMonitor} style={{padding:"10px 20px",background:"linear-gradient(135deg,#f55,#fa0)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+                ⏹ Stop
+              </button>
+            )}
+            <button onClick={stopCapture} style={{padding:"10px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544455",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:12}}>
+              ✕ Rozłącz ekran
+            </button>
+          </>
+        )}
+        {kolejka.length>0&&!analizuje&&(
+          <button onClick={analizujWszystkie} style={{padding:"10px 20px",background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+            🤖 Analizuj ({kolejka.length})
+          </button>
+        )}
+        {kolejka.length>0&&!analizuje&&(
+          <button onClick={()=>{setKolejka([]);kolejkaRef.current=[];}} style={{padding:"10px 10px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:12}}>
+            🗑
+          </button>
+        )}
+      </div>
+
+      {/* Status */}
+      {status&&(
+        <div style={{fontSize:12,padding:"8px 12px",borderRadius:6,marginBottom:10,
+          background:status.includes("❌")?"rgba(255,50,50,0.1)":status.includes("🎉")||status.includes("✅")?"rgba(0,200,100,0.1)":"rgba(0,0,0,0.2)",
+          color:status.includes("❌")?"#f55":status.includes("🎉")||status.includes("✅")?"#0c6":status.includes("🎵")?"#ffd700":"#87CEEB",
+          border:status.includes("🎵")?"1px solid #ffd70044":"none",
+        }}>{status}</div>
+      )}
+
+      {/* Aktualna wykryta talia */}
+      {wykrytaTalia&&intervalRef.current&&(
+        <div style={{textAlign:"center",padding:"8px",background:"rgba(255,215,0,0.08)",border:"1px solid #ffd70033",borderRadius:8,marginBottom:10,fontSize:12,color:"#ffd700"}}>
+          🃏 Aktualnie: <strong>{wykrytaTalia}</strong>
+          <span style={{color:"#555",marginLeft:8,fontSize:10}}>screeny: {licznikScreenow}</span>
+        </div>
+      )}
+
+      {/* Pasek postępu analizy */}
+      {postep&&(
+        <div style={{marginBottom:12,background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"10px 12px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#aaa",marginBottom:6}}>
+            <span>🤖 Analizuję: {postep.talia}</span>
+            <span>{postep.current}/{postep.total}</span>
+          </div>
+          <div style={{height:8,background:"#12122a",borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${(postep.current/postep.total)*100}%`,background:"linear-gradient(90deg,#b8860b,#ffd700)",transition:"width 0.3s",borderRadius:4}}/>
+          </div>
+        </div>
+      )}
+
+      {/* Podgląd ekranu (mały) */}
+      {aktywny&&(
+        <div style={{marginBottom:12,borderRadius:8,overflow:"hidden",border:"1px solid #6496ff55",position:"relative"}}>
+          <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",display:"block",maxHeight:180,objectFit:"contain",background:"#000"}}/>
+          <div style={{position:"absolute",top:4,left:4,background:"rgba(0,0,0,0.8)",padding:"2px 6px",borderRadius:4,fontSize:9,color:intervalRef.current?"#0c6":"#6496ff"}}>
+            {intervalRef.current?"🔍 LIVE":"● EKRAN"}
+          </div>
+          {kolejka.length>0&&<div style={{position:"absolute",top:4,right:4,background:"rgba(0,0,0,0.8)",padding:"2px 8px",borderRadius:4,fontSize:10,color:"#ffd700",fontWeight:"bold"}}>
+            📋 {kolejka.length}
+          </div>}
+        </div>
+      )}
+      <canvas ref={canvasRef} style={{display:"none"}}/>
+
+      {/* Miniaturki zebranych talii */}
+      {kolejka.length>0&&!wynikiFinal.length&&(
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>📋 Zebrane talie ({kolejka.length}):</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {kolejka.map((z,i)=>(
+              <div key={i} style={{position:"relative",textAlign:"center"}}>
+                <img src={z.thumb} alt={z.talia} style={{width:100,height:56,borderRadius:4,border:"1px solid #2a2a3a",objectFit:"cover",display:"block"}}/>
+                <div style={{fontSize:9,color:"#ffd700",marginTop:2,maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{z.talia}</div>
+                <button onClick={()=>{
+                  const n=kolejka.filter((_,j)=>j!==i);
+                  setKolejka(n); kolejkaRef.current=n;
+                }} style={{position:"absolute",top:2,right:2,background:"rgba(255,50,50,0.8)",border:"none",borderRadius:3,color:"#fff",fontSize:9,cursor:"pointer",padding:"0 3px"}}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Wyniki */}
+      {wynikiFinal.length>0&&(
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+            🔍 Wyniki dla <span style={{color:"#0c6"}}>{osoba?.nazwa}</span>
+          </div>
+          {wynikiFinal.map((w,i)=>(
+            <div key={i} style={{marginBottom:6,padding:"8px 10px",background:w.ok?"rgba(0,200,100,0.05)":"rgba(255,50,50,0.05)",border:`1px solid ${w.ok?"#0c633":"#f5544433"}`,borderRadius:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:w.ok?4:0}}>
+                {w.thumb&&<img src={w.thumb} alt="" style={{width:60,height:34,borderRadius:3,objectFit:"cover"}}/>}
+                <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"#ffd700":"#f55"}}>
+                  {w.ok?`✓ ${w.taliaMatch?.nazwa||w.talia}`:`❌ ${w.talia}`}
+                  {w.blad&&<span style={{fontSize:10,color:"#f55",marginLeft:4}}>{w.blad}</span>}
+                </div>
+              </div>
+              {w.ok&&w.karty&&(
+                <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                  {w.karty.map((k,j)=>(
+                    <span key={j} style={{
+                      padding:"2px 7px",borderRadius:4,fontSize:10,
+                      background:k.posiadana?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.03)",
+                      border:k.posiadana?"1px solid #0c633":"1px solid #2a2a3a",
+                      color:k.posiadana?"#0c6":"#444",
+                    }}>{k.posiadana?"✓ ":""}{k.nazwa}{k.duplikat?" +dup":""}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          <button onClick={zatwierdz} style={{width:"100%",marginTop:8,padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14}}>
+            ✅ Zatwierdź i zapisz wszystko dla {osoba?.nazwa}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
