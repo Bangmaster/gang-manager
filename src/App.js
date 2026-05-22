@@ -2061,7 +2061,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                                 🎯 PRÓG {alt.nastepnyProg?.prog} kart — brakuje {alt.brakujeDoProg} do progu (+{alt.progBonus.toLocaleString()} ammo)
                               </span>
                             )}
-                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:(etykietyFaz[alt.faza]||opisFazy(alt.faza,typWymiany))?.k||"#aaa"}}>
+                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:opisFazy(alt.faza,typWymiany)?.k||"#aaa"}}>
                               F{Math.floor(alt.faza/10)}.{alt.faza%10||"0"}
                             </span>
                             <span style={{fontSize:11,flex:1,color:"#ddd"}}>
