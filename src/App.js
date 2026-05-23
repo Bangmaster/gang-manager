@@ -895,7 +895,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     });
 
     // Przydziel dawców — ta sama logika rekurencyjna
-    const znajdzAlternDawceProgi = (wymiana) => {
+    const _znajdzAlternDawceProgi = (wymiana) => { // eslint-disable-line no-unused-vars
       const t = talie.find(t => t.nazwa === wymiana.talia);
       if (!t) return null;
       const odbiorca = czlonkowie.find(c => c.nazwa === wymiana.do);
