@@ -3158,6 +3158,13 @@ function KalendarzEventow({zapiszStrukture, dane}) {
     }
   });
 
+  const nazwyMiesiecy = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
+  const nazwyDni = ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"];
+  const pierwszyDzien = new Date(rok, miesiac, 1).getDay();
+  const offsetPn = (pierwszyDzien === 0 ? 6 : pierwszyDzien - 1);
+  const liczbaDni = new Date(rok, miesiac + 1, 0).getDate();
+  const kluczDnia = (d) => `${rok}_${String(miesiac+1).padStart(2,"0")}_${String(d).padStart(2,"0")}`;
+
   const dodajEvent = () => {
     if (!nowyEvent.trim() || !wybranyDzien) return;
     const klucz = kluczDnia(wybranyDzien);
