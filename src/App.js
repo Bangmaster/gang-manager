@@ -1372,12 +1372,6 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         <div style={{fontSize:12,color:"#888",marginBottom:10}}>
           Zaplanowane wymiany: <strong style={{color:"#ffd700"}}>{wynik.planoweWymiany.length}</strong>
           {wynik.nieobsluzone.length>0&&<span style={{color:"#fa0",marginLeft:12}}>⚠️ {wynik.nieobsluzone.length} bez dawcy</span>}
-          {wynik.zamknieciaInfo.length>0&&<span style={{color:"#0c6",background:"rgba(0,200,100,0.1)",border:"1px solid #0c633",borderRadius:6,padding:"2px 8px",fontWeight:"bold",marginLeft:12}}>
-            🏆 Gang zgarnie: +{(
-              wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0) +
-              wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>s+z.nowyProg.ammo,0)
-            ).toLocaleString()} 💰
-          </span>}
           <button onClick={async()=>{
             setPublikowanie(true);
             const aktywna={
