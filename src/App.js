@@ -877,13 +877,10 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         };
       })
       .sort((a, b) => {
-        const aZamknie = (a.faza===10||a.faza===20) ? 1 : 0;
-        const bZamknie = (b.faza===10||b.faza===20) ? 1 : 0;
-        if (aZamknie !== bZamknie) return bZamknie - aZamknie;
-        if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
-        if (b.brakT.length !== a.brakT.length) return b.brakT.length - a.brakT.length;
         const pa = priorytetFazy(a.faza), pb = priorytetFazy(b.faza);
         if (pa !== pb) return pa - pb;
+        if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
+        if (b.brakT.length !== a.brakT.length) return b.brakT.length - a.brakT.length;
         if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
         return 0;
       });
