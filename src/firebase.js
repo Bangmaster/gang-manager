@@ -57,7 +57,7 @@ export async function setCardField(typ, key, value) {
 // Zapis strukturalny (talie, członkowie) — całe pole naraz
 export async function setStructure(pole, wartosc) {
   try {
-    await updateDoc(GANG_DOC, { [pole]: wartosc });
+    await setDoc(GANG_DOC, { [pole]: wartosc }, { merge: true });
     return true;
   } catch (e) {
     console.error("Błąd zapisu struktury:", e);
