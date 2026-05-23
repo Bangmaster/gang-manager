@@ -2939,7 +2939,6 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
   };
 
   const kartyCount=talie.reduce((s,t)=>s+t.karty.length,0);
-  const rekordowCount=czlonkowie.length*kartyCount;
 
   if(krok===2) return (
     <div style={{textAlign:"center",padding:30}}>
