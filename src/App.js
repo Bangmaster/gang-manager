@@ -3132,10 +3132,15 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const [wybranyDzien, setWybranyDzien] = useState(null);
   const [nowyEvent, setNowyEvent] = useState("");
   const [typEvent, setTypEvent] = useState("złote");
-  const [eventy, setEventy] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gang_kalendarz_v2") || "{}"); }
-    catch { return {}; }
-  });
+
+  // Eventy z Firebase — przechowywane jako JSON string żeby uniknąć problemów z zagnieżdżonymi obiektami
+  const eventy = (() => {
+    try {
+      const raw = dane?.kalendarzJson;
+      if (raw) return JSON.parse(raw);
+      return {};
+    } catch { return {}; }
+  })();
 
   const nazwyMiesiecy = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
   const nazwyDni = ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"];
@@ -3145,8 +3150,7 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const kluczDnia = (d) => `${rok}-${String(miesiac+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 
   const zapiszEventy = (nowe) => {
-    setEventy(nowe);
-    localStorage.setItem("gang_kalendarz_v2", JSON.stringify(nowe));
+    zapiszStrukture("kalendarzJson", JSON.stringify(nowe));
   };
 
   const dodajEvent = () => {
