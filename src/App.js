@@ -861,7 +861,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     // i jeśli tak, podmień go tam gdzie jest mniej ważny
 
     const priorytetFazy = (faza) => {
-      const kolejnosc = [20,10,21,11,22,12,31,32,41,42,51,52];
+      const kolejnosc = [10,20,11,21,12,22,30,31,32,41,42,51,52];
       const idx = kolejnosc.indexOf(faza);
       return idx === -1 ? 99 : idx;
     };
@@ -930,20 +930,53 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
             if (o2.id === s.osoba.id) continue;
             if (!wysylajacy.has(o2.id)) continue;
             if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
-            // o2 jest zajęty ale ma duplikat naszej karty
-            // Znajdź jego aktualną wymianę i sprawdź czy ma alternatywę
             const jegaWymiana = planoweWymiany.find(w => w.od === o2.nazwa);
             if (!jegaWymiana) continue;
             const alternDawca = znajdzAlternDawce(jegaWymiana);
             if (alternDawca) {
-              // Podmień dawcę w tamtej wymianie
+              // Podmień dawcę w tamtej wymianie na alternatywnego
               const idx = planoweWymiany.indexOf(jegaWymiana);
               planoweWymiany[idx] = { ...jegaWymiana, od: alternDawca.nazwa };
               wysylajacy.delete(o2.id);
               wysylajacy.add(alternDawca.id);
-              dawca = o2; // o2 jest teraz wolny
+              dawca = o2;
               break;
             }
+          }
+        }
+
+        // Nadal brak dawcy — sprawdź czy "kradzież" dawcy się opłaca
+        // Jeśli nasza nagroda > nagroda tamtej wymiany → kradniemy dawcę
+        if (!dawca) {
+          let najlepszyKandydat = null;
+          let najlepszyZysk = 0;
+          for (const o2 of czlonkowie) {
+            if (o2.id === s.osoba.id) continue;
+            if (!wysylajacy.has(o2.id)) continue;
+            if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
+            const jegaWymiana = planoweWymiany.find(w => w.od === o2.nazwa);
+            if (!jegaWymiana) continue;
+            // Zysk = nagroda którą zyskujemy minus nagroda którą tracimy
+            const zysk = aktEfNagroda - (jegaWymiana.nagroda || 0);
+            if (zysk > 0 && zysk > najlepszyZysk) {
+              najlepszyZysk = zysk;
+              najlepszyKandydat = { o2, jegaWymiana };
+            }
+          }
+          if (najlepszyKandydat) {
+            // Usuń tamtą wymianę i zwolnij dawcę
+            const idx = planoweWymiany.indexOf(najlepszyKandydat.jegaWymiana);
+            planoweWymiany.splice(idx, 1);
+            wysylajacy.delete(najlepszyKandydat.o2.id);
+            // Dodaj tamtą wymianę do nieobsłużonych żeby admin wiedział
+            nieobsluzone.push({
+              osoba: czlonkowie.find(c=>c.nazwa===najlepszyKandydat.jegaWymiana.do),
+              talia: talie.find(t=>t.nazwa===najlepszyKandydat.jegaWymiana.talia),
+              karta: {nazwa:najlepszyKandydat.jegaWymiana.karta},
+              brakTCount: najlepszyKandydat.jegaWymiana.brakTCount||1,
+              zastapiona: true,
+            });
+            dawca = najlepszyKandydat.o2;
           }
         }
 
@@ -1148,6 +1181,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     21:{t:"🟡 FAZA 5 — Brakuje 2 kart + 1 innego typu",k:"#fa0"},
     22:{t:"🟡 FAZA 6 — Brakuje 2 kart + 2 innych typów",k:"#d4b800"},
     31:{t:"🔵 FAZA 7 — Brakuje 3 kart + 1 innego typu",k:"#6af"},
+    30:{t:"🔵 FAZA 6.5 — Brakuje 3 kart + komplet innych typów",k:"#6af"},
     32:{t:"🔵 FAZA 8 — Brakuje 3 kart + 2 innych typów",k:"#6af"},
     100:{t:"🔓 ZAMKNIE TALIĘ — pakiet kart na zamknięcie talii",k:"#bb88ff"},
     110:{t:"🔓 Dodatkowo — wysyłamy bo nie ma lepszych",k:"#888bff"},
@@ -1357,7 +1391,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           }}>{publikowanie?"⏳ Zapisuję...":"📤 Opublikuj dla gangu"}</button>
         </div>
 
-        {[10,20,11,12,21,22,31,32,100,110,200,210].map(faza=>{
+        {[10,20,11,21,12,22,30,31,32,100,110,200,210].map(faza=>{
           const w=wynik.planoweWymiany.filter(x=>x.faza===faza);
           if(!w.length) return null;
           const e=etykietyFaz[faza]||opisFazy(faza,typWymiany);
@@ -2896,10 +2930,10 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
 
   const wykonajReset=async()=>{
     setResetujace(true);
-    // Wyczyść posiadane i duplikaty — zachowaj talie i członków
     await zapiszStrukture("posiadane",{});
     await zapiszStrukture("duplikaty",{});
     await zapiszStrukture("aktywnaWymiana",null);
+    await zapiszStrukture("talie",[]);
     setResetujace(false);
     setKrok(2);
   };
@@ -2911,7 +2945,7 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
     <div style={{textAlign:"center",padding:30}}>
       <div style={{fontSize:40,marginBottom:10}}>🎉</div>
       <div style={{fontSize:16,fontWeight:"bold",color:"#0c6",marginBottom:8}}>Reset sezonu zakończony!</div>
-      <div style={{fontSize:12,color:"#888",marginBottom:16}}>Wszystkie karty i duplikaty wyczyszczone. Talie i członkowie zachowani.</div>
+      <div style={{fontSize:12,color:"#888",marginBottom:16}}>Karty, duplikaty i talie wyczyszczone. Wgraj nowe talie przez OCR w zakładce ⚙️ Talie.</div>
       <button onClick={()=>setKrok(0)} style={{padding:"8px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:6,color:"#ffd700",cursor:"pointer",fontSize:12}}>
         ← Wróć
       </button>
@@ -2922,8 +2956,11 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
     <div style={{background:"rgba(255,50,50,0.08)",border:"2px solid #f55",borderRadius:10,padding:20}}>
       <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:10}}>⚠️ Ostatnia szansa — jesteś pewny?</div>
       <div style={{fontSize:12,color:"#aaa",marginBottom:16,lineHeight:1.6}}>
-        Zostanie wymazanych <strong style={{color:"#f55"}}>{rekordowCount} rekordów</strong> kart dla {czlonkowie.length} osób.<br/>
-        Talie ({talie.length}), członkowie i historia walk pozostają.<br/>
+        Zostaną wymazane:<br/>
+        • <strong style={{color:"#f55"}}>Wszystkie posiadane karty i duplikaty</strong><br/>
+        • <strong style={{color:"#f55"}}>Wszystkie talie ({talie.length} talii, {kartyCount} kart)</strong><br/>
+        • Aktywna wymiana<br/><br/>
+        Zostaną zachowani członkowie i historia walk.<br/>
         <strong>Tej operacji nie można cofnąć!</strong>
       </div>
       <div style={{display:"flex",gap:8}}>
@@ -2944,14 +2981,14 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
         <div style={{fontSize:11,color:"#888",lineHeight:1.7}}>
           Używasz gdy zaczyna się nowy sezon i chcesz wyczyścić dane kart.<br/>
           <strong style={{color:"#aaa"}}>Co zostanie wyczyszczone:</strong><br/>
-          • Wszystkie posiadane karty ({rekordowCount} rekordów)<br/>
+          • Wszystkie posiadane karty<br/>
           • Wszystkie duplikaty<br/>
-          • Aktywna wymiana (jeśli istnieje)<br/><br/>
+          • Wszystkie talie i karty (nowy sezon = nowe talie)<br/>
+          • Aktywna wymiana<br/><br/>
           <strong style={{color:"#aaa"}}>Co zostanie zachowane:</strong><br/>
-          • Talie i karty ({talie.length} talii, {kartyCount} kart)<br/>
           • Członkowie gangu ({czlonkowie.length} osób)<br/>
           • Historia walk<br/>
-          • Ustawienia
+          • Kalendarz eventów
         </div>
       </div>
       <button onClick={()=>setKrok(1)} style={{width:"100%",padding:14,background:"rgba(255,50,50,0.15)",border:"2px solid #f5544455",borderRadius:10,color:"#f55",cursor:"pointer",fontSize:14,fontWeight:"bold"}}>
@@ -3116,7 +3153,7 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const offsetPn = (pierwszyDzien === 0 ? 6 : pierwszyDzien - 1); // offset od poniedziałku
   const liczbaDni = new Date(rok, miesiac + 1, 0).getDate();
 
-  const kluczDnia = (d) => `${rok}-${String(miesiac+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  const kluczDnia = (d) => `${rok}_${String(miesiac+1).padStart(2,"0")}_${String(d).padStart(2,"0")}`;
 
   const dodajEvent = () => {
     if (!nowyEvent.trim() || !wybranyDzien) return;
@@ -3141,7 +3178,7 @@ function KalendarzEventow({zapiszStrukture, dane}) {
 
   const wybranyKlucz = wybranyDzien ? kluczDnia(wybranyDzien) : null;
   const eventyWybranego = wybranyKlucz ? (eventy[wybranyKlucz] || []) : [];
-  const dzisiajKlucz = `${dzis.getFullYear()}-${String(dzis.getMonth()+1).padStart(2,"0")}-${String(dzis.getDate()).padStart(2,"0")}`;
+  const dzisiajKlucz = `${dzis.getFullYear()}_${String(dzis.getMonth()+1).padStart(2,"0")}_${String(dzis.getDate()).padStart(2,"0")}`;
 
   return (
     <div>
@@ -3252,7 +3289,7 @@ function KalendarzEventow({zapiszStrukture, dane}) {
         for(let d=0;d<30;d++){
           const dt=new Date(dzis);
           dt.setDate(dt.getDate()+d);
-          const k=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+          const k=`${dt.getFullYear()}_${String(dt.getMonth()+1).padStart(2,"0")}_${String(dt.getDate()).padStart(2,"0")}`;
           if(eventy[k]?.length){
             nadchodzace.push({data:dt,klucz:k,eventy:eventy[k],dzisiaj:k===dzisiajKlucz});
           }
