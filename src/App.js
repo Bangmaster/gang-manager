@@ -1372,13 +1372,15 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         <div style={{fontSize:12,color:"#888",marginBottom:10,display:"flex",flexWrap:"wrap",alignItems:"center",gap:10}}>
           <span>Zaplanowane wymiany: <strong style={{color:"#ffd700"}}>{wynik.planoweWymiany.length}</strong></span>
           {wynik.nieobsluzone.length>0&&<span style={{color:"#fa0"}}>⚠️ {wynik.nieobsluzone.length} bez dawcy</span>}
-          {wynik.zamknieciaInfo.length>0&&(
+          {wynik.zamknieciaInfo.length>0?(
             <span style={{color:"#0c6",background:"rgba(0,200,100,0.1)",border:"1px solid #0c633",borderRadius:6,padding:"2px 8px",fontWeight:"bold"}}>
               🏆 Gang zgarnie: +{(
                 wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0) +
                 wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>s+z.nowyProg.ammo,0)
               ).toLocaleString()} 💰
             </span>
+          ):(
+            <span style={{color:"#666",fontSize:11}}>brak zamknięć talii w tej wymianie</span>
           )}
           <button onClick={async()=>{
             setPublikowanie(true);
