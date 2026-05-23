@@ -885,20 +885,32 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         return 0;
       });
 
+    // Znajdź wolnego dawcę który ma duplikat danej karty
+    const znajdzWolnegoDawce = (taliaId, kartaNazwa, wykluczonaOsobaId) => {
+      for (const o2 of czlonkowie) {
+        if (o2.id === wykluczonaOsobaId || wysylajacy.has(o2.id)) continue;
+        if (duplikaty[`${o2.id}_${taliaId}_${kartaNazwa}`]) return o2;
+      }
+      return null;
+    };
+
     // Znajdź alternatywnego dawcę dla istniejącej wymiany
-    const znajdzAlternDawce = (wymiana) => {
+    const znajdzAlternDawce = (wymiana, wykluczonaOsobaId) => {
       const t = talie.find(t => t.nazwa === wymiana.talia);
       if (!t) return null;
       const odbiorca = czlonkowie.find(c => c.nazwa === wymiana.do);
       for (const o2 of czlonkowie) {
         if (!odbiorca || o2.id === odbiorca.id) continue;
         if (o2.nazwa === wymiana.od) continue;
+        if (o2.id === wykluczonaOsobaId) continue;
         if (wysylajacy.has(o2.id)) continue;
         if (duplikaty[`${o2.id}_${t.id}_${wymiana.karta}`]) return o2;
       }
       return null;
     };
 
+    // Główna pętla — dla każdej potrzeby próbuj znaleźć dawcę
+    // używając dwupoziomowej logiki z przepisywaniem łańcuchów
     for (const s of potrzebyGrup) {
       for (const karta of s.brakT) {
         const key = `${s.osoba.id}_${s.talia.id}_${karta.nazwa}`;
@@ -914,27 +926,29 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         const aktFaza = obliczFaze(aktBrakT, s.brakO.length, typWymiany);
         const aktEfNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, aktBrakT);
 
-        // Poziom 1: szukaj wolnego dawcy
-        let dawca = null;
-        for (const o2 of czlonkowie) {
-          if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
-          if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) { dawca = o2; break; }
-        }
+        // Poziom 1: wolny dawca
+        let dawca = znajdzWolnegoDawce(s.talia.id, karta.nazwa, s.osoba.id);
 
-        // Poziom 2: zajęty dawca ma alternatywę — podmień go
+        // Poziom 2: zajęty dawca → szukaj łańcucha podmian
+        // Dla każdego zajętego dawcy który ma naszą kartę:
+        // sprawdź czy jego aktualna wymiana może dostać innego dawcę
         if (!dawca) {
           for (const o2 of czlonkowie) {
-            if (o2.id === s.osoba.id) continue;
-            if (!wysylajacy.has(o2.id)) continue;
+            if (o2.id === s.osoba.id || !wysylajacy.has(o2.id)) continue;
             if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
+
+            // o2 jest zajęty — znajdź jego wymianę
             const jegaWymiana = planoweWymiany.find(w => w.od === o2.nazwa);
             if (!jegaWymiana) continue;
-            const alternDawca = znajdzAlternDawce(jegaWymiana);
-            if (alternDawca) {
+
+            // Szukaj alternatywy dla jego wymiany (innej niż o2 i innej niż nasz odbiorca)
+            const altern = znajdzAlternDawce(jegaWymiana, s.osoba.id);
+            if (altern) {
+              // Podmień: altern wysyła zamiast o2, o2 idzie do nas
               const idx = planoweWymiany.indexOf(jegaWymiana);
-              planoweWymiany[idx] = { ...jegaWymiana, od: alternDawca.nazwa };
+              planoweWymiany[idx] = { ...jegaWymiana, od: altern.nazwa };
               wysylajacy.delete(o2.id);
-              wysylajacy.add(alternDawca.id);
+              wysylajacy.add(altern.id);
               dawca = o2;
               break;
             }
