@@ -3133,9 +3133,6 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const [nowyEvent, setNowyEvent] = useState("");
   const [typEvent, setTypEvent] = useState("złote");
 
-  // Eventy z Firebase (realtime przez dane.kalendarz)
-  const eventy = dane?.kalendarz || {};
-
   const zapiszEventy = async (nowe) => {
     // Zapisz cały kalendarz jako jeden obiekt
     // Konwertuj tablice eventów na obiekty (Firebase nie lubi tablic w merge)
