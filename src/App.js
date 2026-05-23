@@ -3132,30 +3132,9 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const [wybranyDzien, setWybranyDzien] = useState(null);
   const [nowyEvent, setNowyEvent] = useState("");
   const [typEvent, setTypEvent] = useState("złote");
-
-  const zapiszEventy = async (nowe) => {
-    // Zapisz cały kalendarz jako jeden obiekt
-    // Konwertuj tablice eventów na obiekty (Firebase nie lubi tablic w merge)
-    const doZapisu = {};
-    Object.entries(nowe).forEach(([dzien, evArr]) => {
-      if (Array.isArray(evArr) && evArr.length > 0) {
-        const obj = {};
-        evArr.forEach((e, i) => { obj[`e${i}`] = e; });
-        doZapisu[dzien] = obj;
-      }
-    });
-    zapiszStrukture("kalendarz", doZapisu);
-  };
-
-  // Pobierz eventy z Firebase (konwertuj z powrotem na tablice)
-  const eventyRaw = dane?.kalendarz || {};
-  const eventy = {};
-  Object.entries(eventyRaw).forEach(([dzien, val]) => {
-    if (val && typeof val === 'object' && !Array.isArray(val)) {
-      eventy[dzien] = Object.values(val).sort((a,b) => (a.id||0)-(b.id||0));
-    } else if (Array.isArray(val)) {
-      eventy[dzien] = val;
-    }
+  const [eventy, setEventy] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gang_kalendarz_v2") || "{}"); }
+    catch { return {}; }
   });
 
   const nazwyMiesiecy = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
@@ -3163,14 +3142,18 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const pierwszyDzien = new Date(rok, miesiac, 1).getDay();
   const offsetPn = (pierwszyDzien === 0 ? 6 : pierwszyDzien - 1);
   const liczbaDni = new Date(rok, miesiac + 1, 0).getDate();
-  const kluczDnia = (d) => `d${rok}_${String(miesiac+1).padStart(2,"0")}_${String(d).padStart(2,"0")}`;
+  const kluczDnia = (d) => `${rok}-${String(miesiac+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+
+  const zapiszEventy = (nowe) => {
+    setEventy(nowe);
+    localStorage.setItem("gang_kalendarz_v2", JSON.stringify(nowe));
+  };
 
   const dodajEvent = () => {
     if (!nowyEvent.trim() || !wybranyDzien) return;
     const klucz = kluczDnia(wybranyDzien);
     const aktualne = eventy[klucz] || [];
-    const nowyWpis = { tekst: nowyEvent.trim(), typ: typEvent, id: Date.now() };
-    const nowe = { ...eventy, [klucz]: [...aktualne, nowyWpis] };
+    const nowe = { ...eventy, [klucz]: [...aktualne, { tekst: nowyEvent.trim(), typ: typEvent, id: Date.now() }] };
     zapiszEventy(nowe);
     setNowyEvent("");
   };
@@ -3181,13 +3164,14 @@ function KalendarzEventow({zapiszStrukture, dane}) {
     if (!nowe[klucz].length) delete nowe[klucz];
     zapiszEventy(nowe);
   };
+
   const kolorTypu = { złote: "#ffd700", diamentowe: "#87CEEB", "event6h_tak": "#0c6", "event6h_nie": "#f55", "karty2x": "#ff6dff", inne: "#fa0" };
   const ikonTypu = { złote: "⭐", diamentowe: "💎", "event6h_tak": "✅", "event6h_nie": "❌", "karty2x": "🃏", inne: "📌" };
   const labelTypu = { złote: "Złote", diamentowe: "Diamentowe", "event6h_tak": "Event 6H ✅", "event6h_nie": "Event 6H ❌", "karty2x": "Karty 2x", inne: "Inne" };
 
   const wybranyKlucz = wybranyDzien ? kluczDnia(wybranyDzien) : null;
   const eventyWybranego = wybranyKlucz ? (eventy[wybranyKlucz] || []) : [];
-  const dzisiajKlucz = `d${dzis.getFullYear()}_${String(dzis.getMonth()+1).padStart(2,"0")}_${String(dzis.getDate()).padStart(2,"0")}`;
+  const dzisiajKlucz = `${dzis.getFullYear()}-${String(dzis.getMonth()+1).padStart(2,"0")}-${String(dzis.getDate()).padStart(2,"0")}`;
 
   return (
     <div>
