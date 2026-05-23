@@ -855,8 +855,147 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         }
       }
     }
+  } else if (tryb === "progi") {
+    // TRYB "DOBIJ PROGI"
+    // Priorytet: osoby najbliższe progu (1-5 kart)
+    // Sortuj po: brakujeDoProg ASC (najmniej brakuje = najwyższy priorytet)
+    // Potem po ammoProg DESC (większa nagroda za próg = wyższy priorytet)
+    // Wysyłaj DOWOLNĄ kartę której brakuje — niekoniecznie zamykającą talię
+
+    const progiKandydaci = [];
+
+    czlonkowie.forEach(osoba => {
+      const progInfo = progiOsob[osoba.id];
+      if (!progInfo?.nastepnyProg) return; // już ma wszystkie progi
+
+      talie.forEach(talia => {
+        const kartyT = talia.karty.filter(k => k.typ === typ);
+        kartyT.forEach(karta => {
+          const key = `${osoba.id}_${talia.id}_${karta.nazwa}`;
+          if (posiadane[key]) return; // już ma
+          progiKandydaci.push({
+            osoba, talia, karta,
+            brakujeDoProg: progInfo.brakujeDoProg,
+            ammoProg: progInfo.ammoProg,
+            nastepnyProg: progInfo.nastepnyProg,
+            nagroda: talia.nagroda_amunicja || 0,
+            trudna: TRUDNE_NUMERY.includes(talia.numer),
+          });
+        });
+      });
+    });
+
+    // Sortuj: najmniej brakuje do progu → największa nagroda za próg → nagroda talii
+    progiKandydaci.sort((a, b) => {
+      if (a.brakujeDoProg !== b.brakujeDoProg) return a.brakujeDoProg - b.brakujeDoProg;
+      if (b.ammoProg !== a.ammoProg) return b.ammoProg - a.ammoProg;
+      if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
+      if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
+      return 0;
+    });
+
+    // Przydziel dawców — ta sama logika rekurencyjna
+    const znajdzAlternDawceProgi = (wymiana) => {
+      const t = talie.find(t => t.nazwa === wymiana.talia);
+      if (!t) return null;
+      const odbiorca = czlonkowie.find(c => c.nazwa === wymiana.do);
+      for (const o2 of czlonkowie) {
+        if (!odbiorca || o2.id === odbiorca.id) continue;
+        if (o2.nazwa === wymiana.od) continue;
+        if (wysylajacy.has(o2.id)) continue;
+        if (duplikaty[`${o2.id}_${t.id}_${wymiana.karta}`]) return o2;
+      }
+      return null;
+    };
+
+    const probujUwolnicProgi = (potrzebnyDawca, wykluczonaOsobaId, odwiedzone = new Set()) => {
+      if (odwiedzone.has(potrzebnyDawca.nazwa)) return false;
+      odwiedzone.add(potrzebnyDawca.nazwa);
+      const jegaWymiana = planoweWymiany.find(w => w.od === potrzebnyDawca.nazwa);
+      if (!jegaWymiana) return false;
+      const t = talie.find(t => t.nazwa === jegaWymiana.talia);
+      if (!t) return false;
+      const odbiorca = czlonkowie.find(c => c.nazwa === jegaWymiana.do);
+      for (const o2 of czlonkowie) {
+        if (!odbiorca || o2.id === odbiorca.id) continue;
+        if (o2.nazwa === jegaWymiana.od) continue;
+        if (o2.id === wykluczonaOsobaId) continue;
+        if (odwiedzone.has(o2.nazwa)) continue;
+        if (!duplikaty[`${o2.id}_${t.id}_${jegaWymiana.karta}`]) continue;
+        if (!wysylajacy.has(o2.id)) {
+          const idx = planoweWymiany.indexOf(jegaWymiana);
+          planoweWymiany[idx] = { ...jegaWymiana, od: o2.nazwa };
+          wysylajacy.delete(potrzebnyDawca.id);
+          wysylajacy.add(o2.id);
+          return true;
+        }
+      }
+      for (const o2 of czlonkowie) {
+        if (!odbiorca || o2.id === odbiorca.id) continue;
+        if (o2.nazwa === jegaWymiana.od) continue;
+        if (o2.id === wykluczonaOsobaId) continue;
+        if (odwiedzone.has(o2.nazwa)) continue;
+        if (!duplikaty[`${o2.id}_${t.id}_${jegaWymiana.karta}`]) continue;
+        if (!wysylajacy.has(o2.id)) continue;
+        if (probujUwolnicProgi(o2, wykluczonaOsobaId, odwiedzone)) {
+          const idx = planoweWymiany.indexOf(jegaWymiana);
+          planoweWymiany[idx] = { ...jegaWymiana, od: o2.nazwa };
+          wysylajacy.delete(potrzebnyDawca.id);
+          wysylajacy.add(o2.id);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Śledź ile kart już idzie do każdej osoby (żeby wiedzieć kiedy próg przekroczony)
+    const kartIdaceDo = {}; // osobaId -> count
+
+    for (const k of progiKandydaci) {
+      const key = `${k.osoba.id}_${k.talia.id}_${k.karta.nazwa}`;
+      if (posiadane[key]) continue;
+      if (planoweWymiany.some(w => w.do === k.osoba.nazwa && w.talia === k.talia.nazwa && w.karta === k.karta.nazwa)) continue;
+
+      // Sprawdź czy ta osoba już osiągnie próg dzięki kartom już zaplanowanym
+      const juzIdzie = kartIdaceDo[k.osoba.id] || 0;
+      const progInfo = progiOsob[k.osoba.id];
+      if (juzIdzie >= progInfo.brakujeDoProg) continue; // próg już osiągnięty przez inne karty
+
+      let dawca = null;
+      for (const o2 of czlonkowie) {
+        if (o2.id === k.osoba.id || wysylajacy.has(o2.id)) continue;
+        if (duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) { dawca = o2; break; }
+      }
+
+      if (!dawca) {
+        for (const o2 of czlonkowie) {
+          if (o2.id === k.osoba.id || !wysylajacy.has(o2.id)) continue;
+          if (!duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) continue;
+          if (probujUwolnicProgi(o2, k.osoba.id, new Set())) { dawca = o2; break; }
+        }
+      }
+
+      if (dawca) {
+        wysylajacy.add(dawca.id);
+        kartIdaceDo[k.osoba.id] = (kartIdaceDo[k.osoba.id] || 0) + 1;
+        const faza = obliczFaze(
+          k.talia.karty.filter(c=>c.typ===typ&&!posiadane[`${k.osoba.id}_${k.talia.id}_${c.nazwa}`]).length,
+          k.talia.karty.filter(c=>c.typ!==typ&&!posiadane[`${k.osoba.id}_${k.talia.id}_${c.nazwa}`]).length,
+          typWymiany
+        );
+        planoweWymiany.push({
+          od: dawca.nazwa, do: k.osoba.nazwa,
+          karta: k.karta.nazwa, talia: k.talia.nazwa,
+          nagroda: k.nagroda, faza,
+          brakTCount: 1, brakOCount: 0,
+          trudna: k.trudna,
+          progBonus: k.ammoProg,
+          bliskoProg: true,
+          doProgu: k.brakujeDoProg,
+        });
+      }
+    }
   } else {
-    // TRYB "PRIORYTET" — Greedy optimizer z podmianą dawców
     // Gdy brak wolnego dawcy — sprawdź czy zajęty dawca ma alternatywę
     // i jeśli tak, podmień go tam gdzie jest mniej ważny
 
@@ -878,9 +1017,23 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       })
       .sort((a, b) => {
         const pa = priorytetFazy(a.faza), pb = priorytetFazy(b.faza);
+        // Dla faz zamykających talię (10 i 20) — sortuj po ammo per dawca
+        const aZamknie = a.faza === 10 || a.faza === 20;
+        const bZamknie = b.faza === 10 || b.faza === 20;
+        if (aZamknie && bZamknie) {
+          // Ammo per dawca = efNagroda / liczba brakujących kart
+          const aPerDawca = a.efNagroda / Math.max(1, a.brakT.length);
+          const bPerDawca = b.efNagroda / Math.max(1, b.brakT.length);
+          if (Math.round(bPerDawca) !== Math.round(aPerDawca)) return bPerDawca - aPerDawca;
+          // Przy równym ammo per dawca — faza 10 pierwsza (mniej dawców potrzebnych)
+          if (pa !== pb) return pa - pb;
+          return 0;
+        }
+        // Zamykające przed niezamykającymi
+        if (aZamknie !== bZamknie) return aZamknie ? -1 : 1;
+        // Reszta faz — po priorytecie fazy
         if (pa !== pb) return pa - pb;
         if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
-        if (b.brakT.length !== a.brakT.length) return b.brakT.length - a.brakT.length;
         if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
         return 0;
       });
@@ -1191,6 +1344,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         {[
           {id:"priorytet",label:"🎯 Priorytet (1-2 brakujące)"},
           {id:"zamknij",label:"🔓 Zamknij cokolwiek"},
+          {id:"progi",label:"📈 Dobij progi"},
           {id:"vip",label:"👑 VIP — dobij jedną osobę"},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTrybWymiany(t.id)} style={{
