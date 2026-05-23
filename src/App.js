@@ -885,7 +885,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         return 0;
       });
 
-    // Znajdź alternatywnego dawcę dla istniejącej wymiany (wolnego, innego niż obecny)
+    // Znajdź alternatywnego dawcę dla istniejącej wymiany
     const znajdzAlternDawce = (wymiana) => {
       const t = talie.find(t => t.nazwa === wymiana.talia);
       if (!t) return null;
@@ -914,14 +914,14 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         const aktFaza = obliczFaze(aktBrakT, s.brakO.length, typWymiany);
         const aktEfNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, aktBrakT);
 
-        // Szukaj wolnego dawcy
+        // Poziom 1: szukaj wolnego dawcy
         let dawca = null;
         for (const o2 of czlonkowie) {
           if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
           if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) { dawca = o2; break; }
         }
 
-        // Brak wolnego dawcy — próbuj podmienić zajętego który ma alternatywę
+        // Poziom 2: zajęty dawca ma alternatywę — podmień go
         if (!dawca) {
           for (const o2 of czlonkowie) {
             if (o2.id === s.osoba.id) continue;
@@ -931,7 +931,6 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
             if (!jegaWymiana) continue;
             const alternDawca = znajdzAlternDawce(jegaWymiana);
             if (alternDawca) {
-              // Podmień dawcę w tamtej wymianie na alternatywnego
               const idx = planoweWymiany.indexOf(jegaWymiana);
               planoweWymiany[idx] = { ...jegaWymiana, od: alternDawca.nazwa };
               wysylajacy.delete(o2.id);
@@ -939,44 +938,6 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
               dawca = o2;
               break;
             }
-          }
-        }
-
-        // Nadal brak dawcy — sprawdź czy "kradzież" dawcy się opłaca
-        if (!dawca) {
-          const potencjalNagrody = s.nagroda + (s.bliskoProg ? s.progBonus : 0);
-          let najlepszyKandydat = null;
-          let najlepszyZysk = -Infinity;
-          for (const o2 of czlonkowie) {
-            if (o2.id === s.osoba.id) continue;
-            if (!wysylajacy.has(o2.id)) continue;
-            if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
-            const jegaWymiana = planoweWymiany.find(w => w.od === o2.nazwa);
-            if (!jegaWymiana) continue;
-            // Zysk = nasz potencjał minus nagroda którą tracimy
-            // Przy równych nagrodach — preferuj kradzież gdy tamta wymiana jest niższej fazy
-            const zysk = potencjalNagrody - (jegaWymiana.nagroda || 0);
-            const priorytetNaszy = priorytetFazy(aktFaza);
-            const priorytetTamten = priorytetFazy(jegaWymiana.faza || 99);
-            // Kradniemy jeśli: zysk > 0 LUB (zysk == 0 i jesteśmy wyżej w priorytecie faz)
-            const opłaca = zysk > 0 || (zysk >= 0 && priorytetNaszy < priorytetTamten);
-            if (opłaca && zysk > najlepszyZysk) {
-              najlepszyZysk = zysk;
-              najlepszyKandydat = { o2, jegaWymiana };
-            }
-          }
-          if (najlepszyKandydat) {
-            const idx = planoweWymiany.indexOf(najlepszyKandydat.jegaWymiana);
-            planoweWymiany.splice(idx, 1);
-            wysylajacy.delete(najlepszyKandydat.o2.id);
-            nieobsluzone.push({
-              osoba: czlonkowie.find(c=>c.nazwa===najlepszyKandydat.jegaWymiana.do),
-              talia: talie.find(t=>t.nazwa===najlepszyKandydat.jegaWymiana.talia),
-              karta: {nazwa:najlepszyKandydat.jegaWymiana.karta},
-              brakTCount: najlepszyKandydat.jegaWymiana.brakTCount||1,
-              zastapiona: true,
-            });
-            dawca = najlepszyKandydat.o2;
           }
         }
 
