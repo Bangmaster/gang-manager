@@ -1323,6 +1323,31 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         )}
       </div>
 
+      {wynik&&wynik.zamknieciaInfo.length>0&&(
+        <div style={{background:"rgba(0,200,100,0.1)",border:"2px solid #0c6",borderRadius:10,padding:"12px 16px",marginBottom:12}}>
+          <div style={{fontWeight:"bold",color:"#0c6",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
+          {wynik.zamknieciaInfo.map((z,i)=>(
+            <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #12122a"}}>
+              🎉 <strong style={{color:"#ffd700"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
+              <span style={{color:"#0c6",marginLeft:6}}>+{z.nagroda?.toLocaleString()} 💰</span>
+              {z.nowyProg&&(
+                <span style={{marginLeft:8,background:"rgba(255,165,0,0.2)",border:"1px solid #fa0",borderRadius:6,padding:"1px 6px",fontSize:11,color:"#fa0"}}>
+                  🎯 PRÓG {z.nowyProg.prog} kart! +{z.nowyProg.ammo.toLocaleString()} 💰
+                </span>
+              )}
+            </div>
+          ))}
+          <div style={{marginTop:8,fontWeight:"bold",color:"#0c6",fontSize:13}}>
+            Łącznie z talii: +{wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0).toLocaleString()} 💰
+            {wynik.zamknieciaInfo.some(z=>z.nowyProg)&&(
+              <span style={{color:"#fa0",marginLeft:8}}>
+                + progi: +{wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>s+z.nowyProg.ammo,0).toLocaleString()} 💰
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <button onClick={generuj} style={{
         width:"100%",padding:14,background:"linear-gradient(135deg,#b8860b,#ffd700,#b8860b)",
         border:"none",borderRadius:10,color:"#000",fontSize:15,fontWeight:"bold",
