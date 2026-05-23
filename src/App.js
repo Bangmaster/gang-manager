@@ -943,29 +943,32 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         }
 
         // Nadal brak dawcy — sprawdź czy "kradzież" dawcy się opłaca
-        // Jeśli nasza nagroda > nagroda tamtej wymiany → kradniemy dawcę
         if (!dawca) {
+          const potencjalNagrody = s.nagroda + (s.bliskoProg ? s.progBonus : 0);
           let najlepszyKandydat = null;
-          let najlepszyZysk = 0;
+          let najlepszyZysk = -Infinity;
           for (const o2 of czlonkowie) {
             if (o2.id === s.osoba.id) continue;
             if (!wysylajacy.has(o2.id)) continue;
             if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
             const jegaWymiana = planoweWymiany.find(w => w.od === o2.nazwa);
             if (!jegaWymiana) continue;
-            // Zysk = nagroda którą zyskujemy minus nagroda którą tracimy
-            const zysk = aktEfNagroda - (jegaWymiana.nagroda || 0);
-            if (zysk > 0 && zysk > najlepszyZysk) {
+            // Zysk = nasz potencjał minus nagroda którą tracimy
+            // Przy równych nagrodach — preferuj kradzież gdy tamta wymiana jest niższej fazy
+            const zysk = potencjalNagrody - (jegaWymiana.nagroda || 0);
+            const priorytetNaszy = priorytetFazy(aktFaza);
+            const priorytetTamten = priorytetFazy(jegaWymiana.faza || 99);
+            // Kradniemy jeśli: zysk > 0 LUB (zysk == 0 i jesteśmy wyżej w priorytecie faz)
+            const opłaca = zysk > 0 || (zysk >= 0 && priorytetNaszy < priorytetTamten);
+            if (opłaca && zysk > najlepszyZysk) {
               najlepszyZysk = zysk;
               najlepszyKandydat = { o2, jegaWymiana };
             }
           }
           if (najlepszyKandydat) {
-            // Usuń tamtą wymianę i zwolnij dawcę
             const idx = planoweWymiany.indexOf(najlepszyKandydat.jegaWymiana);
             planoweWymiany.splice(idx, 1);
             wysylajacy.delete(najlepszyKandydat.o2.id);
-            // Dodaj tamtą wymianę do nieobsłużonych żeby admin wiedział
             nieobsluzone.push({
               osoba: czlonkowie.find(c=>c.nazwa===najlepszyKandydat.jegaWymiana.do),
               talia: talie.find(t=>t.nazwa===najlepszyKandydat.jegaWymiana.talia),
