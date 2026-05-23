@@ -885,32 +885,62 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         return 0;
       });
 
-    // Znajdź wolnego dawcę który ma duplikat danej karty
-    const znajdzWolnegoDawce = (taliaId, kartaNazwa, wykluczonaOsobaId) => {
-      for (const o2 of czlonkowie) {
-        if (o2.id === wykluczonaOsobaId || wysylajacy.has(o2.id)) continue;
-        if (duplikaty[`${o2.id}_${taliaId}_${kartaNazwa}`]) return o2;
-      }
-      return null;
-    };
+    // Rekurencyjny solver łańcucha podmian
+    // Próbuje uwolnić dawcę poprzez podmianę łańcucha przydziałów
+    // odwiedzone = Set nazw dawców których już sprawdzaliśmy (zapobiega nieskończonej pętli)
+    const probujUwolnicDawce = (potrzebnyDawca, wykluczonaOsobaId, odwiedzone = new Set()) => {
+      if (odwiedzone.has(potrzebnyDawca.nazwa)) return false;
+      odwiedzone.add(potrzebnyDawca.nazwa);
 
-    // Znajdź alternatywnego dawcę dla istniejącej wymiany
-    const znajdzAlternDawce = (wymiana, wykluczonaOsobaId) => {
-      const t = talie.find(t => t.nazwa === wymiana.talia);
-      if (!t) return null;
-      const odbiorca = czlonkowie.find(c => c.nazwa === wymiana.do);
+      const jegaWymiana = planoweWymiany.find(w => w.od === potrzebnyDawca.nazwa);
+      if (!jegaWymiana) return false;
+
+      const t = talie.find(t => t.nazwa === jegaWymiana.talia);
+      if (!t) return false;
+
+      const odbiorca = czlonkowie.find(c => c.nazwa === jegaWymiana.do);
+
+      // Szukaj wolnego zastępcy dla jego wymiany
       for (const o2 of czlonkowie) {
         if (!odbiorca || o2.id === odbiorca.id) continue;
-        if (o2.nazwa === wymiana.od) continue;
+        if (o2.nazwa === jegaWymiana.od) continue;
         if (o2.id === wykluczonaOsobaId) continue;
-        if (wysylajacy.has(o2.id)) continue;
-        if (duplikaty[`${o2.id}_${t.id}_${wymiana.karta}`]) return o2;
+        if (odwiedzone.has(o2.nazwa)) continue;
+        if (!duplikaty[`${o2.id}_${t.id}_${jegaWymiana.karta}`]) continue;
+
+        if (!wysylajacy.has(o2.id)) {
+          // Znaleziono wolnego zastępcę — podmień
+          const idx = planoweWymiany.indexOf(jegaWymiana);
+          planoweWymiany[idx] = { ...jegaWymiana, od: o2.nazwa };
+          wysylajacy.delete(potrzebnyDawca.id);
+          wysylajacy.add(o2.id);
+          return true;
+        }
       }
-      return null;
+
+      // Brak wolnego zastępcy — spróbuj rekurencyjnie uwolnić kogoś zajętego
+      for (const o2 of czlonkowie) {
+        if (!odbiorca || o2.id === odbiorca.id) continue;
+        if (o2.nazwa === jegaWymiana.od) continue;
+        if (o2.id === wykluczonaOsobaId) continue;
+        if (odwiedzone.has(o2.nazwa)) continue;
+        if (!duplikaty[`${o2.id}_${t.id}_${jegaWymiana.karta}`]) continue;
+        if (!wysylajacy.has(o2.id)) continue;
+
+        // o2 jest zajęty — próbuj go uwolnić rekurencyjnie
+        if (probujUwolnicDawce(o2, wykluczonaOsobaId, odwiedzone)) {
+          // Udało się uwolnić o2 — teraz podmień
+          const idx = planoweWymiany.indexOf(jegaWymiana);
+          planoweWymiany[idx] = { ...jegaWymiana, od: o2.nazwa };
+          wysylajacy.delete(potrzebnyDawca.id);
+          wysylajacy.add(o2.id);
+          return true;
+        }
+      }
+
+      return false;
     };
 
-    // Główna pętla — dla każdej potrzeby próbuj znaleźć dawcę
-    // używając dwupoziomowej logiki z przepisywaniem łańcuchów
     for (const s of potrzebyGrup) {
       for (const karta of s.brakT) {
         const key = `${s.osoba.id}_${s.talia.id}_${karta.nazwa}`;
@@ -927,28 +957,19 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         const aktEfNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, aktBrakT);
 
         // Poziom 1: wolny dawca
-        let dawca = znajdzWolnegoDawce(s.talia.id, karta.nazwa, s.osoba.id);
+        let dawca = null;
+        for (const o2 of czlonkowie) {
+          if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
+          if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) { dawca = o2; break; }
+        }
 
-        // Poziom 2: zajęty dawca → szukaj łańcucha podmian
-        // Dla każdego zajętego dawcy który ma naszą kartę:
-        // sprawdź czy jego aktualna wymiana może dostać innego dawcę
+        // Poziom 2: zajęty dawca → próbuj uwolnić przez łańcuch podmian
         if (!dawca) {
           for (const o2 of czlonkowie) {
             if (o2.id === s.osoba.id || !wysylajacy.has(o2.id)) continue;
             if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
 
-            // o2 jest zajęty — znajdź jego wymianę
-            const jegaWymiana = planoweWymiany.find(w => w.od === o2.nazwa);
-            if (!jegaWymiana) continue;
-
-            // Szukaj alternatywy dla jego wymiany (innej niż o2 i innej niż nasz odbiorca)
-            const altern = znajdzAlternDawce(jegaWymiana, s.osoba.id);
-            if (altern) {
-              // Podmień: altern wysyła zamiast o2, o2 idzie do nas
-              const idx = planoweWymiany.indexOf(jegaWymiana);
-              planoweWymiany[idx] = { ...jegaWymiana, od: altern.nazwa };
-              wysylajacy.delete(o2.id);
-              wysylajacy.add(altern.id);
+            if (probujUwolnicDawce(o2, s.osoba.id, new Set())) {
               dawca = o2;
               break;
             }
