@@ -3163,7 +3163,7 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const pierwszyDzien = new Date(rok, miesiac, 1).getDay();
   const offsetPn = (pierwszyDzien === 0 ? 6 : pierwszyDzien - 1);
   const liczbaDni = new Date(rok, miesiac + 1, 0).getDate();
-  const kluczDnia = (d) => `${rok}_${String(miesiac+1).padStart(2,"0")}_${String(d).padStart(2,"0")}`;
+  const kluczDnia = (d) => `d${rok}_${String(miesiac+1).padStart(2,"0")}_${String(d).padStart(2,"0")}`;
 
   const dodajEvent = () => {
     if (!nowyEvent.trim() || !wybranyDzien) return;
@@ -3187,13 +3187,13 @@ function KalendarzEventow({zapiszStrukture, dane}) {
 
   const wybranyKlucz = wybranyDzien ? kluczDnia(wybranyDzien) : null;
   const eventyWybranego = wybranyKlucz ? (eventy[wybranyKlucz] || []) : [];
-  const dzisiajKlucz = `${dzis.getFullYear()}_${String(dzis.getMonth()+1).padStart(2,"0")}_${String(dzis.getDate()).padStart(2,"0")}`;
+  const dzisiajKlucz = `d${dzis.getFullYear()}_${String(dzis.getMonth()+1).padStart(2,"0")}_${String(dzis.getDate()).padStart(2,"0")}`;
 
   return (
     <div>
       <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#6496ff",marginBottom:4}}>📅 Kalendarz eventów gangu</div>
-        <div style={{fontSize:11,color:"#888"}}>Zapisuj złote/diamentowe dni wymiany, walki i inne eventy. Dane zapisywane lokalnie w przeglądarce.</div>
+        <div style={{fontSize:11,color:"#888"}}>Zapisuj złote/diamentowe dni wymiany i inne eventy. Widoczne dla wszystkich adminów w czasie rzeczywistym.</div>
       </div>
 
       {/* Nawigacja miesiąca */}
@@ -3298,7 +3298,7 @@ function KalendarzEventow({zapiszStrukture, dane}) {
         for(let d=0;d<30;d++){
           const dt=new Date(dzis);
           dt.setDate(dt.getDate()+d);
-          const k=`${dt.getFullYear()}_${String(dt.getMonth()+1).padStart(2,"0")}_${String(dt.getDate()).padStart(2,"0")}`;
+          const k=`d${dt.getFullYear()}_${String(dt.getMonth()+1).padStart(2,"0")}_${String(dt.getDate()).padStart(2,"0")}`;
           if(eventy[k]?.length){
             nadchodzace.push({data:dt,klucz:k,eventy:eventy[k],dzisiaj:k===dzisiajKlucz});
           }
