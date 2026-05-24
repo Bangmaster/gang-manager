@@ -14,7 +14,32 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 const GANG_DOC = doc(db, "gang", "main");
-const ONLINE_DOC = doc(db, "gang", "online"); // osobny doc dla obecności
+const ONLINE_DOC = doc(db, "gang", "online");
+const KALENDARZ_DOC = doc(db, "gang", "kalendarz"); // osobny dokument dla kalendarza
+
+// === KALENDARZ ===
+export async function zapiszKalendarz(eventy) {
+  try {
+    await setDoc(KALENDARZ_DOC, { eventy: JSON.stringify(eventy) });
+    return true;
+  } catch (e) {
+    console.error("Błąd zapisu kalendarza:", e);
+    return false;
+  }
+}
+
+export function subscribeKalendarz(callback) {
+  return onSnapshot(KALENDARZ_DOC, (snap) => {
+    if (snap.exists()) {
+      try {
+        const eventy = JSON.parse(snap.data().eventy || "{}");
+        callback(eventy);
+      } catch { callback({}); }
+    } else {
+      callback({});
+    }
+  }, (err) => console.error("Błąd subskrypcji kalendarza:", err));
+}
 
 export async function loadGangData() {
   try {
