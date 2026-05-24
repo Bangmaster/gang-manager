@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
@@ -1828,33 +1828,70 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
     zapisz(czlonkowie.map(c=>c.id===id?{...c,nazwa:tempNazwa}:c));
     setEdytujId(null);
   };
+  const przesun=(idx,kierunek)=>{
+    const nowe=[...czlonkowie];
+    const doIdx=idx+kierunek;
+    if(doIdx<0||doIdx>=nowe.length) return;
+    [nowe[idx],nowe[doIdx]]=[nowe[doIdx],nowe[idx]];
+    zapisz(nowe);
+  };
+
+  const RANGI=[
+    {min:1,max:1,ikona:"👑",nazwa:"Lider"},
+    {min:2,max:3,ikona:"⚔️",nazwa:"Zastępca"},
+    {min:4,max:6,ikona:"🔥",nazwa:"Kapitan"},
+    {min:7,max:10,ikona:"💪",nazwa:"Weteran"},
+    {min:11,max:15,ikona:"🛡️",nazwa:"Żołnierz"},
+    {min:16,max:99,ikona:"🥾",nazwa:"Rekrut"},
+  ];
+  const rangaDla=(idx)=>RANGI.find(r=>idx+1>=r.min&&idx+1<=r.max)||RANGI[RANGI.length-1];
 
   return (
     <div>
-      <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:12}}>👥 Członkowie ({czlonkowie.length})</div>
-      {czlonkowie.map((c,i)=>(
-        <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #12122a"}}>
-          <span style={{fontSize:12,color:"#555",width:22}}>{i+1}.</span>
-          {edytujId===c.id?(
-            <>
-              <input value={tempNazwa} onChange={e=>setTempNazwa(e.target.value)} onKeyDown={e=>e.key==="Enter"&&zapiszN(c.id)}
-                style={{flex:1,padding:"5px 8px",background:"#12122a",border:"1px solid #ffd700",borderRadius:5,color:"#fff",fontSize:13}}/>
-              <button onClick={()=>zapiszN(c.id)} style={{padding:"5px 10px",background:"#ffd700",border:"none",borderRadius:5,cursor:"pointer",fontSize:12,color:"#000",fontWeight:"bold"}}>OK</button>
-            </>
-          ):(
-            <>
-              <span style={{flex:1,fontSize:13,color:"#ddd"}}>{c.nazwa}</span>
-              <button onClick={()=>{setEdytujId(c.id);setTempNazwa(c.nazwa);}} style={{padding:"3px 8px",background:"rgba(255,215,0,0.08)",border:"1px solid #b8860b33",borderRadius:5,color:"#b8860b",cursor:"pointer",fontSize:11}}>✏️</button>
-              <button onClick={()=>usun(c.id)} style={{padding:"3px 8px",background:"rgba(255,50,50,0.08)",border:"1px solid #f5544433",borderRadius:5,color:"#f5544488",cursor:"pointer",fontSize:11}}>🗑</button>
-            </>
-          )}
-        </div>
-      ))}
+      <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>👥 Członkowie ({czlonkowie.length})</div>
+      <div style={{fontSize:11,color:"#666",marginBottom:12}}>Użyj ▲▼ żeby ustawić kolejność według poziomu w grze. Kolejność wpływa na rangi.</div>
+      {czlonkowie.map((c,i)=>{
+        const ranga=rangaDla(i);
+        return (
+          <div key={c.id} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 0",borderBottom:"1px solid #12122a"}}>
+            {/* Przyciski góra/dół */}
+            <div style={{display:"flex",flexDirection:"column",gap:1}}>
+              <button onClick={()=>przesun(i,-1)} disabled={i===0} style={{padding:"0 5px",background:"none",border:"none",color:i===0?"#222":"#666",cursor:i===0?"default":"pointer",fontSize:10,lineHeight:1.2}}>▲</button>
+              <button onClick={()=>przesun(i,1)} disabled={i===czlonkowie.length-1} style={{padding:"0 5px",background:"none",border:"none",color:i===czlonkowie.length-1?"#222":"#666",cursor:i===czlonkowie.length-1?"default":"pointer",fontSize:10,lineHeight:1.2}}>▼</button>
+            </div>
+            {/* Ranga */}
+            <span title={ranga.nazwa} style={{fontSize:14,width:20,textAlign:"center"}}>{ranga.ikona}</span>
+            <span style={{fontSize:11,color:"#555",width:20}}>{i+1}.</span>
+            {edytujId===c.id?(
+              <>
+                <input value={tempNazwa} onChange={e=>setTempNazwa(e.target.value)} onKeyDown={e=>e.key==="Enter"&&zapiszN(c.id)}
+                  style={{flex:1,padding:"5px 8px",background:"#12122a",border:"1px solid #ffd700",borderRadius:5,color:"#fff",fontSize:13}}/>
+                <button onClick={()=>zapiszN(c.id)} style={{padding:"5px 10px",background:"#ffd700",border:"none",borderRadius:5,cursor:"pointer",fontSize:12,color:"#000",fontWeight:"bold"}}>OK</button>
+              </>
+            ):(
+              <>
+                <span style={{flex:1,fontSize:13,color:"#ddd"}}>{c.nazwa}</span>
+                <span style={{fontSize:10,color:"#555"}}>{ranga.nazwa}</span>
+                <button onClick={()=>{setEdytujId(c.id);setTempNazwa(c.nazwa);}} style={{padding:"3px 8px",background:"rgba(255,215,0,0.08)",border:"1px solid #b8860b33",borderRadius:5,color:"#b8860b",cursor:"pointer",fontSize:11}}>✏️</button>
+                <button onClick={()=>usun(c.id)} style={{padding:"3px 8px",background:"rgba(255,50,50,0.08)",border:"1px solid #f5544433",borderRadius:5,color:"#f5544488",cursor:"pointer",fontSize:11}}>🗑</button>
+              </>
+            )}
+          </div>
+        );
+      })}
       <div style={{display:"flex",gap:8,marginTop:14}}>
         <input value={nowyNick} onChange={e=>setNowyNick(e.target.value)} placeholder="Nick nowego członka"
           onKeyDown={e=>e.key==="Enter"&&dodaj()}
           style={{flex:1,padding:"8px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
         <button onClick={dodaj} style={{padding:"8px 16px",background:"rgba(0,200,100,0.12)",border:"1px solid #0c655",borderRadius:6,color:"#0c6",cursor:"pointer",fontWeight:"bold",fontSize:13}}>+ Dodaj</button>
+      </div>
+      <div style={{marginTop:14,padding:10,background:"rgba(0,0,0,0.2)",borderRadius:8}}>
+        <div style={{fontSize:11,color:"#666",marginBottom:6}}>Rangi według pozycji:</div>
+        {RANGI.map((r,i)=>(
+          <div key={i} style={{fontSize:11,color:"#555",padding:"1px 0"}}>
+            {r.ikona} <span style={{color:"#888"}}>{r.nazwa}</span> — pozycja {r.min}{r.max<99?`-${r.max}`:`+`}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -3286,15 +3323,16 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const [wybranyDzien, setWybranyDzien] = useState(null);
   const [nowyEvent, setNowyEvent] = useState("");
   const [typEvent, setTypEvent] = useState("złote");
+  const [lokalneEventy, setLokalneEventy] = useState(null);
 
-  // Eventy z Firebase — przechowywane jako JSON string żeby uniknąć problemów z zagnieżdżonymi obiektami
-  const eventy = (() => {
-    try {
-      const raw = dane?.kalendarzJson;
-      if (raw) return JSON.parse(raw);
-      return {};
-    } catch { return {}; }
-  })();
+  // Użyj lokalnych eventów jeśli są (natychmiastowa aktualizacja UI)
+  // Gdy dane z Firebase przyjdą — synchronizuj
+  const eventyZFirebase = useMemo(() => {
+    try { const raw = dane?.kalendarzJson; if (raw) return JSON.parse(raw); return {}; }
+    catch { return {}; }
+  }, [dane?.kalendarzJson]);// eslint-disable-line
+
+  const eventy = lokalneEventy !== null ? lokalneEventy : eventyZFirebase;
 
   const nazwyMiesiecy = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
   const nazwyDni = ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"];
@@ -3304,7 +3342,8 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const kluczDnia = (d) => `${rok}-${String(miesiac+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 
   const zapiszEventy = (nowe) => {
-    zapiszStrukture("kalendarzJson", JSON.stringify(nowe));
+    setLokalneEventy(nowe); // natychmiastowa aktualizacja UI
+    zapiszStrukture("kalendarzJson", JSON.stringify(nowe)); // zapis do Firebase
   };
 
   const dodajEvent = () => {
