@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -2411,7 +2411,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
-      {tryb==="kalendarz"&&<KalendarzEventow zapiszStrukture={zapiszStrukture} dane={dane}/>}
+      {tryb==="kalendarz"&&<KalendarzEventow/>}
     </div>
   );
 }
@@ -3316,23 +3316,20 @@ function OsiagnieciaWidget({talie,czlonkowie,posiadane,duplikaty,zalogowany}) {
 // ============================================================
 // KALENDARZ EVENTÓW
 // ============================================================
-function KalendarzEventow({zapiszStrukture, dane}) {
+function KalendarzEventow() {
   const dzis = new Date();
   const [rok, setRok] = useState(dzis.getFullYear());
   const [miesiac, setMiesiac] = useState(dzis.getMonth());
   const [wybranyDzien, setWybranyDzien] = useState(null);
   const [nowyEvent, setNowyEvent] = useState("");
   const [typEvent, setTypEvent] = useState("złote");
-  const [lokalneEventy, setLokalneEventy] = useState(null);
+  const [eventy, setEventy] = useState({});
 
-  // Użyj lokalnych eventów jeśli są (natychmiastowa aktualizacja UI)
-  // Gdy dane z Firebase przyjdą — synchronizuj
-  const eventyZFirebase = useMemo(() => {
-    try { const raw = dane?.kalendarzJson; if (raw) return JSON.parse(raw); return {}; }
-    catch { return {}; }
-  }, [dane?.kalendarzJson]);// eslint-disable-line
-
-  const eventy = lokalneEventy !== null ? lokalneEventy : eventyZFirebase;
+  // Subskrypcja osobnego dokumentu kalendarza
+  useEffect(() => {
+    const unsub = subscribeKalendarz(setEventy);
+    return () => unsub();
+  }, []);
 
   const nazwyMiesiecy = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
   const nazwyDni = ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"];
@@ -3342,8 +3339,8 @@ function KalendarzEventow({zapiszStrukture, dane}) {
   const kluczDnia = (d) => `${rok}-${String(miesiac+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
 
   const zapiszEventy = (nowe) => {
-    setLokalneEventy(nowe); // natychmiastowa aktualizacja UI
-    zapiszStrukture("kalendarzJson", JSON.stringify(nowe)); // zapis do Firebase
+    setEventy(nowe); // natychmiastowa aktualizacja UI
+    zapiszKalendarz(nowe);
   };
 
   const dodajEvent = () => {
