@@ -711,10 +711,78 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     }
   }
 
+  // Ktoś zrobił dokładnie tyle samo obrażeń w każdej walce (konsekwentny)
+  if (lacznaWalka >= 3) {
+    const konsekwentny = wszyscy.filter(g => {
+      if (g.uczestnictwa < 3) return false;
+      const obr = g.historiaObr.map(h => h.obr);
+      const srednia = obr.reduce((s,o)=>s+o,0)/obr.length;
+      const odchylenie = Math.sqrt(obr.reduce((s,o)=>s+Math.pow(o-srednia,2),0)/obr.length);
+      return odchylenie < srednia * 0.1 && srednia > 5000;
+    });
+    if (konsekwentny.length > 0) {
+      ciekawostki.push({ ikona: "🤖", tytul: "Robot sezonu", opis: `${konsekwentny[0].nazwa} robi prawie identyczne obrażenia w każdej walce. Bot? Autokliker? A może po prostu masz to perfekcyjnie opanowane 🤔` });
+    }
+  }
+
+  // Ktoś poprawił się najbardziej w ciągu sezonu
+  if (lacznaWalka >= 4) {
+    const poprawil = wszyscy.filter(g => {
+      if (g.historiaObr.length < 4) return false;
+      const polowa = Math.floor(g.historiaObr.length / 2);
+      const pierwszaPolowa = g.historiaObr.slice(0, polowa).reduce((s,h)=>s+h.obr,0)/polowa;
+      const drugaPolowa = g.historiaObr.slice(polowa).reduce((s,h)=>s+h.obr,0)/(g.historiaObr.length-polowa);
+      return drugaPolowa > pierwszaPolowa * 1.5;
+    });
+    if (poprawil.length > 0) {
+      ciekawostki.push({ ikona: "📈", tytul: "Glow up sezonu", opis: `${poprawil[0].nazwa} zaczął sezon słabo ale teraz miażdży. Może w końcu przeczytał tutorial? 😄` });
+    }
+  }
+
+  // Ktoś zrobił więcej tarcz niż obrażeń
+  const tarczo_maniacy = wszyscy.filter(g => g.tarczeLacznie > 0 && g.obrazeniaLacznie > 0 && g.tarczeLacznie * 50000 > g.obrazeniaLacznie);
+  if (tarczo_maniacy.length > 0) {
+    ciekawostki.push({ ikona: "🛡️", tytul: "Pacyfista gangu", opis: `${tarczo_maniacy[0].nazwa} zdejmuje tarcze zamiast zadawać obrażenia. Może zmień grę na Candy Crush? 🍬` });
+  }
+
+  // Najbardziej nieregularny gracz
+  if (lacznaWalka >= 5) {
+    const nieregularny = wszyscy.find(g => {
+      if (g.uczestnictwa < 2) return false;
+      const max = Math.max(...g.historiaObr.map(h=>h.obr));
+      const min = Math.min(...g.historiaObr.map(h=>h.obr));
+      return max > min * 10;
+    });
+    if (nieregularny) {
+      ciekawostki.push({ ikona: "🎲", tytul: "Chaos wcielony", opis: `${nieregularny.nazwa} raz jest bogiem walki, raz robi 0 obrażeń. Losuje wyniki kością? Może zależy od pogody? ⛈️` });
+    }
+  }
+
+  // Ktoś zawsze ostatni potwierdza wymiany (jeśli mamy dane)
+  const srednieObr = wszyscy.length > 0 ? wszyscy.reduce((s,g)=>s+g.obrazeniaLacznie,0)/wszyscy.length : 0;
+  const ponizejSredniej = wszyscy.filter(g => g.uczestnictwa >= 3 && g.obrazeniaLacznie < srednieObr * 0.5);
+  if (ponizejSredniej.length > 0) {
+    ciekawostki.push({ ikona: "💤", tytul: "Drużyna B", opis: `${ponizejSredniej.map(g=>g.nazwa).join(", ")} ${ponizejSredniej.length===1?"robi":"robią"} mniej niż połowę średniej gangu. Wiemy że grasz, ale czy TY wiesz że grasz? 🤷` });
+  }
+
+  // Ktoś bił rekordy
+  if (lacznaWalka >= 2) {
+    const rekordzista = wszyscy[0];
+    const maxWalka = rekordzista?.historiaObr.reduce((max,h)=>h.obr>max?h.obr:max, 0);
+    if (maxWalka > 200000) {
+      ciekawostki.push({ ikona: "💥", tytul: "Absolutny władca", opis: `${rekordzista.nazwa} zadał aż ${formatLiczby(maxWalka)} obrażeń w jednej walce. Czy to w ogóle legalne? 😱` });
+    }
+  }
+
   // Suchy żart o całym gangu
   const lacznie = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0);
   const srWalka = lacznaWalka > 0 ? Math.round(lacznie / lacznaWalka) : 0;
-  ciekawostki.push({ ikona: "📊", tytul: "Statystyka sezonu", opis: `Gang zadał łącznie ${formatLiczby(lacznie)} obrażeń w ${lacznaWalka} walkach (${formatLiczby(srWalka)}/walkę). To jak ${Math.round(lacznie/1000000)} razy uderzyć mokrą gazetą 🗞️` });
+  const zartySezonu = [
+    `Gang zadał łącznie ${formatLiczby(lacznie)} obrażeń w ${lacznaWalka} walkach. To jak ${Math.round(lacznie/1000000)} razy uderzyć mokrą gazetą 🗞️`,
+    `${formatLiczby(lacznie)} obrażeń łącznie. Dla porównania: mały palec u nogi wytrzymuje ~${Math.round(lacznie/200)} razy tyle siły. Wnioski: nieznane 🦶`,
+    `Średnio ${formatLiczby(srWalka)} obrażeń na walkę. Statystycznie co najmniej 1 osoba w gangu nie wie jak się gra. Statystyki nie kłamią 📊`,
+  ];
+  ciekawostki.push({ ikona: "📊", tytul: "Statystyka sezonu", opis: zartySezonu[lacznaWalka % zartySezonu.length] });
 
   return { wszyscy, ciekawostki, lacznaWalka };
 }
@@ -846,4 +914,5 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki }) {
     </div>
   );
 }
+
 
