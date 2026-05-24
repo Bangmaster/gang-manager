@@ -3933,7 +3933,6 @@ Zwróć WYŁĄCZNIE JSON:
 function OgloszenieGenerator({czlonkowie, posiadane, talie}) {
   const canvasRef = useRef(null);
   const [ileMiejsc, setIleMiejsc] = useState(2);
-  const [screen, setScreen] = useState(null); // screen z poziomami
   const [poziomy, setPoziomy] = useState({}); // {nazwa: lvl}
   const [analizuje, setAnalizuje] = useState(false);
   const [wygenerowano, setWygenerowano] = useState(false);
