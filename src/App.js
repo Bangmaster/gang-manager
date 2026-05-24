@@ -2382,6 +2382,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"historia",label:"📜 Historia"},
     {id:"reset",label:"🔄 Reset"},
     {id:"push",label:"🔔 Powiadomienia"},
+    {id:"ogloszenie",label:"📢 Ogłoszenie"},
     {id:"kalendarz",label:"📅 Kalendarz"},
   ];
 
@@ -2411,6 +2412,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
+      {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
     </div>
   );
@@ -3921,6 +3923,298 @@ Zwróć WYŁĄCZNIE JSON:
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// GENERATOR OGŁOSZENIA REKRUTACYJNEGO
+// ============================================================
+function OgloszenieGenerator({czlonkowie, posiadane, talie}) {
+  const canvasRef = useRef(null);
+  const [ileMiejsc, setIleMiejsc] = useState(2);
+  const [screen, setScreen] = useState(null); // screen z poziomami
+  const [poziomy, setPoziomy] = useState({}); // {nazwa: lvl}
+  const [analizuje, setAnalizuje] = useState(false);
+  const [wygenerowano, setWygenerowano] = useState(false);
+
+  // Top 5 graczy wg posiadanych kart
+  const top5 = [...czlonkowie]
+    .map(c => ({
+      nazwa: c.nazwa,
+      karty: talie.reduce((s,t) => s + t.karty.filter(k => posiadane[`${c.id}_${t.id}_${k.nazwa}`]).length, 0),
+      lvl: poziomy[c.nazwa] || 0,
+    }))
+    .sort((a,b) => (b.lvl||b.karty) - (a.lvl||a.karty))
+    .slice(0, 5);
+
+  const laczonaLvl = Object.values(poziomy).reduce((s,l)=>s+(parseInt(l)||0),0);
+
+  // OCR screena z poziomami
+  const analizujScreen = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAnalizuje(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(",")[1];
+        const resp = await fetch("/api/gemini", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            prompt: `Na tym screenie z gry The Gang widać listę członków gangu z ich poziomami (lvl).
+Rozpoznaj każdego gracza i jego poziom.
+Zwróć WYŁĄCZNIE JSON: {"gracze":[{"nazwa":"...","lvl":123}]}
+Jeśli nie widać poziomu przy graczu, wpisz 0.`,
+            base64, mimeType: "image/jpeg"
+          })
+        });
+        const data = await resp.json();
+        let text = (data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+        if(text.startsWith("```json")) text=text.slice(7);
+        if(text.startsWith("```")) text=text.slice(3);
+        if(text.endsWith("```")) text=text.slice(0,-3);
+        const parsed = JSON.parse(text.trim());
+        const nowe = {};
+        parsed.gracze?.forEach(g => { nowe[g.nazwa] = g.lvl; });
+        setPoziomy(nowe);
+      };
+      reader.readAsDataURL(file);
+    } catch(e) {
+      alert("Błąd OCR: " + e.message);
+    }
+    setAnalizuje(false);
+  };
+
+  // Generuj ogłoszenie na Canvas
+  const generuj = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const W = 1080, H = 1920;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+
+    // Tło — gradient jak w grze
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, "#0a0a1a");
+    grad.addColorStop(0.5, "#1a0a2e");
+    grad.addColorStop(1, "#0a1a0a");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Ramka złota
+    ctx.strokeStyle = "#b8860b";
+    ctx.lineWidth = 8;
+    ctx.strokeRect(20, 20, W-40, H-40);
+    ctx.strokeStyle = "#ffd700";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(30, 30, W-60, H-60);
+
+    // Ozdobne rogi
+    const rogi = [[40,40],[W-40,40],[40,H-40],[W-40,H-40]];
+    rogi.forEach(([x,y]) => {
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      const dx = x < W/2 ? 1 : -1;
+      const dy = y < H/2 ? 1 : -1;
+      ctx.moveTo(x, y + dy*60);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + dx*60, y);
+      ctx.stroke();
+    });
+
+    // Logo/tytuł gangu
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "bold 90px Georgia, serif";
+    ctx.shadowColor = "#b8860b";
+    ctx.shadowBlur = 20;
+    ctx.fillText("⚔️ FAMILY ⚔️", W/2, 160);
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#aaa";
+    ctx.font = "36px Georgia, serif";
+    ctx.fillText("GANG — The Gang Mobile", W/2, 220);
+
+    // Separator
+    ctx.fillStyle = "#ffd700";
+    ctx.fillRect(100, 250, W-200, 3);
+
+    // REKRUTACJA
+    ctx.fillStyle = "#ff4444";
+    ctx.font = "bold 72px Georgia, serif";
+    ctx.shadowColor = "#ff0000";
+    ctx.shadowBlur = 15;
+    ctx.fillText("🔥 REKRUTACJA 🔥", W/2, 360);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "bold 100px Georgia, serif";
+    ctx.fillText(`${ileMiejsc} WOLNE MIEJSCE${ileMiejsc>1?"A":""}`, W/2, 480);
+
+    // Separator
+    ctx.fillStyle = "#b8860b";
+    ctx.fillRect(100, 510, W-200, 2);
+
+    // Moc gangu
+    if (laczonaLvl > 0) {
+      ctx.fillStyle = "#87CEEB";
+      ctx.font = "bold 44px Georgia, serif";
+      ctx.fillText("💎 MOC GANGU", W/2, 590);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 66px Georgia, serif";
+      ctx.fillText(`${laczonaLvl.toLocaleString()} LVL`, W/2, 670);
+      ctx.fillStyle = "#b8860b";
+      ctx.fillRect(100, 695, W-200, 2);
+    }
+
+    // Top 5
+    const top5Y = laczonaLvl > 0 ? 750 : 580;
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "bold 48px Georgia, serif";
+    ctx.fillText("🏆 TOP 5 GRACZY", W/2, top5Y);
+
+    const medale = ["🥇","🥈","🥉","4️⃣","5️⃣"];
+    top5.forEach((g, i) => {
+      const y = top5Y + 70 + i * 80;
+      ctx.fillStyle = i===0?"#ffd700":i===1?"#c0c0c0":i===2?"#cd7f32":"#aaa";
+      ctx.font = `bold ${i<3?46:40}px Georgia, serif`;
+      ctx.textAlign = "left";
+      ctx.fillText(`${medale[i]} ${g.nazwa}`, 120, y);
+      if (g.lvl > 0) {
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#87CEEB";
+        ctx.font = `${i<3?40:36}px Georgia, serif`;
+        ctx.fillText(`LVL ${g.lvl}`, W-120, y);
+      }
+      ctx.textAlign = "center";
+    });
+
+    // Separator
+    const sepY = top5Y + 80 + top5.length * 80;
+    ctx.fillStyle = "#b8860b";
+    ctx.fillRect(100, sepY, W-200, 2);
+
+    // Co oferujemy
+    const ofertaY = sepY + 60;
+    ctx.fillStyle = "#0c6";
+    ctx.font = "bold 48px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.fillText("✨ CO OFERUJEMY?", W/2, ofertaY);
+
+    const oferty = [
+      "📋 Profesjonalna rozpiska wymian kart",
+      "📈 Nowy schemat gry — szybki wzrost",
+      "💰 Maksymalizacja ammo gangu",
+      "🤝 Wyjątkowa, przyjazna atmosfera",
+      "⚡ Aktywny gang — wymiany co 1-2 dni",
+    ];
+    oferty.forEach((o, i) => {
+      ctx.fillStyle = "#ddd";
+      ctx.font = `38px Georgia, serif`;
+      ctx.fillText(o, W/2, ofertaY + 70 + i * 65);
+    });
+
+    // Wymagania
+    const wymY = ofertaY + 70 + oferty.length * 65 + 30;
+    ctx.fillStyle = "#b8860b";
+    ctx.fillRect(100, wymY, W-200, 2);
+
+    ctx.fillStyle = "#ff6400";
+    ctx.font = "bold 46px Georgia, serif";
+    ctx.fillText("📌 SZUKAMY", W/2, wymY + 60);
+
+    const wymagania = [
+      "✅ Zaangażowanych i aktywnych graczy",
+      "✅ Regularny udział w wymianach",
+      "✅ Udział w walkach gangu",
+    ];
+    wymagania.forEach((w, i) => {
+      ctx.fillStyle = "#ccc";
+      ctx.font = "38px Georgia, serif";
+      ctx.fillText(w, W/2, wymY + 130 + i * 65);
+    });
+
+    // Stopka
+    ctx.fillStyle = "#b8860b";
+    ctx.fillRect(100, H-180, W-200, 2);
+    ctx.fillStyle = "#ffd700";
+    ctx.font = "bold 44px Georgia, serif";
+    ctx.fillText("📩 NAPISZ DO LIDERA GANGU!", W/2, H-120);
+    ctx.fillStyle = "#888";
+    ctx.font = "32px Georgia, serif";
+    ctx.fillText("The Gang — FAMILY", W/2, H-65);
+
+    setWygenerowano(true);
+  };
+
+  const pobierz = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = "FAMILY_rekrutacja.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa055",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:4}}>📢 Generator ogłoszenia rekrutacyjnego</div>
+        <div style={{fontSize:11,color:"#888"}}>Tworzy gotowy obrazek do wklejenia na Messenger/grupę gangu.</div>
+      </div>
+
+      {/* Ile miejsc */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:12,color:"#aaa",marginBottom:6}}>🎯 Ile miejsc szukamy:</div>
+        <div style={{display:"flex",gap:8}}>
+          {[1,2,3,4,5].map(n=>(
+            <button key={n} onClick={()=>setIleMiejsc(n)} style={{
+              padding:"8px 16px",borderRadius:8,fontSize:14,fontWeight:"bold",cursor:"pointer",
+              background:ileMiejsc===n?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.07)",
+              border:ileMiejsc===n?"none":"1px solid #2a2a3a",
+              color:ileMiejsc===n?"#000":"#888",
+            }}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Screen z poziomami */}
+      <div style={{marginBottom:14,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:12}}>
+        <div style={{fontSize:12,color:"#87CEEB",fontWeight:"bold",marginBottom:6}}>💎 Wgraj screen z poziomami graczy (opcjonalnie)</div>
+        <div style={{fontSize:11,color:"#666",marginBottom:8}}>Screen z ekranu gangu gdzie widać nicki i poziomy</div>
+        <input type="file" accept="image/*" onChange={analizujScreen} disabled={analizuje}
+          style={{width:"100%",padding:8,background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,boxSizing:"border-box"}}/>
+        {analizuje&&<div style={{fontSize:12,color:"#87CEEB",marginTop:6}}>🤖 Analizuję poziomy...</div>}
+        {Object.keys(poziomy).length>0&&(
+          <div style={{marginTop:8}}>
+            <div style={{fontSize:11,color:"#0c6",marginBottom:4}}>✅ Rozpoznano {Object.keys(poziomy).length} graczy — łączny lvl: {laczonaLvl.toLocaleString()}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+              {Object.entries(poziomy).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,l])=>(
+                <span key={n} style={{fontSize:10,padding:"2px 6px",background:"rgba(135,206,235,0.1)",border:"1px solid #87CEEB33",borderRadius:4,color:"#87CEEB"}}>{n}: {l}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Generuj */}
+      <button onClick={generuj} style={{width:"100%",padding:14,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:10,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:15,marginBottom:12}}>
+        ⚡ Generuj ogłoszenie
+      </button>
+
+      {/* Podgląd */}
+      {wygenerowano&&(
+        <div style={{marginBottom:12}}>
+          <canvas ref={canvasRef} style={{width:"100%",borderRadius:8,border:"2px solid #b8860b",display:"block"}}/>
+          <button onClick={pobierz} style={{width:"100%",marginTop:8,padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14}}>
+            📥 Pobierz obrazek PNG
+          </button>
+        </div>
+      )}
+      {!wygenerowano&&<canvas ref={canvasRef} style={{display:"none"}}/>}
     </div>
   );
 }
