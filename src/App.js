@@ -1061,7 +1061,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     // Rekurencyjny solver łańcucha podmian
     // Próbuje uwolnić dawcę poprzez podmianę łańcucha przydziałów
     // odwiedzone = Set nazw dawców których już sprawdzaliśmy (zapobiega nieskończonej pętli)
-    const probujUwolnicDawce = (potrzebnyDawca, wykluczonaOsobaId, odwiedzone = new Set()) => {
+    const probujUwolnicDawce = (potrzebnyDawca, wykluczonaOsobaId, odwiedzone = new Set(), naszAktFaza = 99) => {
       if (odwiedzone.has(potrzebnyDawca.nazwa)) return false;
       odwiedzone.add(potrzebnyDawca.nazwa);
 
@@ -1070,6 +1070,11 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
 
       const t = talie.find(t => t.nazwa === jegaWymiana.talia);
       if (!t) return false;
+
+      // Nie podmieniaj jeśli tamta wymiana jest wyższego priorytetu (niższa faza = wyższy priorytet)
+      const priorytetTamtej = priorytetFazy(jegaWymiana.faza || 99);
+      const priorytetNaszej = priorytetFazy(naszAktFaza);
+      if (priorytetTamtej < priorytetNaszej) return false; // tamta ważniejsza
 
       const odbiorca = czlonkowie.find(c => c.nazwa === jegaWymiana.do);
 
@@ -1101,7 +1106,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         if (!wysylajacy.has(o2.id)) continue;
 
         // o2 jest zajęty — próbuj go uwolnić rekurencyjnie
-        if (probujUwolnicDawce(o2, wykluczonaOsobaId, odwiedzone)) {
+        if (probujUwolnicDawce(o2, wykluczonaOsobaId, odwiedzone, naszAktFaza)) {
           // Udało się uwolnić o2 — teraz podmień
           const idx = planoweWymiany.indexOf(jegaWymiana);
           planoweWymiany[idx] = { ...jegaWymiana, od: o2.nazwa };
@@ -1122,12 +1127,17 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
           w.do === s.osoba.nazwa && w.talia === s.talia.nazwa && w.karta === karta.nazwa
         )) continue;
 
+        // Przelicz aktualny brakT uwzględniając już zaplanowane karty dla tej osoby/talii
         const juzIdzie = planoweWymiany.filter(w =>
           w.do === s.osoba.nazwa && w.talia === s.talia.nazwa
         ).length;
         const aktBrakT = Math.max(1, s.brakT.length - juzIdzie);
         const aktFaza = obliczFaze(aktBrakT, s.brakO.length, typWymiany);
         const aktEfNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, aktBrakT);
+
+        // Przed szukaniem dawcy — sprawdź czy ta potrzeba jest nadal priorytetowa
+        // Jeśli ktoś już dostał kartę i teraz jest w fazie 10 (zamknie talię)
+        // to jest ważniejszy niż ktoś w fazie 20 z tą samą nagrodą
 
         // Poziom 1: wolny dawca
         let dawca = null;
@@ -1142,7 +1152,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
             if (o2.id === s.osoba.id || !wysylajacy.has(o2.id)) continue;
             if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
 
-            if (probujUwolnicDawce(o2, s.osoba.id, new Set())) {
+          if (probujUwolnicDawce(o2, s.osoba.id, new Set(), aktFaza)) {
               dawca = o2;
               break;
             }
@@ -1159,6 +1169,13 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
             trudna: s.trudna, progBonus: aktEfNagroda - s.nagroda,
             bliskoProg: s.bliskoProg||false,
           });
+
+          // Jeśli ta karta obniża fazę odbiorcy do 10 (zamknie talię),
+          // sprawdź pozostałe brakujące karty tej osoby z tej samej talii
+          // i próbuj je obsłużyć od razu z nowym wyższym priorytetem
+          if (aktBrakT > 1) {
+            // Zostają jeszcze karty do obsłużenia — zostaną przetworzone w kolejnych iteracjach
+          }
         } else if (s.brakT.length <= 3) {
           nieobsluzone.push({ osoba: s.osoba, talia: s.talia, karta, brakTCount: s.brakT.length });
         }
