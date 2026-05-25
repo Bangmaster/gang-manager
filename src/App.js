@@ -3928,10 +3928,355 @@ Zwróć WYŁĄCZNIE JSON:
 }
 
 // ============================================================
-// GENERATOR OGŁOSZENIA REKRUTACYJNEGO
+// GENERATOR OGŁOSZENIA REKRUTACYJNEGO — HTML
 // ============================================================
 function OgloszenieGenerator({czlonkowie, posiadane, talie}) {
-  const canvasRef = useRef(null);
+  const [ileMiejsc, setIleMiejsc] = useState(2);
+  const [poziomy, setPoziomy] = useState({});
+  const [analizuje, setAnalizuje] = useState(false);
+  const [pokazPodglad, setPokazPodglad] = useState(false);
+  const podgladRef = useRef(null);
+
+  const top5 = [...czlonkowie]
+    .map(c => ({
+      nazwa: c.nazwa,
+      karty: talie.reduce((s,t) => s + t.karty.filter(k => posiadane[`${c.id}_${t.id}_${k.nazwa}`]).length, 0),
+      lvl: poziomy[normalizuj(c.nazwa)] || 0,
+    }))
+    .sort((a,b) => (b.lvl||b.karty) - (a.lvl||a.karty))
+    .slice(0, 5);
+
+  const laczonaLvl = Object.values(poziomy).reduce((s,l)=>s+(parseInt(l)||0),0);
+
+  const analizujScreen = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAnalizuje(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(",")[1];
+        const resp = await fetch("/api/gemini", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            prompt: `Na tym screenie z gry The Gang widać listę członków gangu z ich poziomami.
+Rozpoznaj każdego gracza i jego poziom liczbowy.
+Zwróć WYŁĄCZNIE JSON: {"gracze":[{"nazwa":"...","lvl":123}]}`,
+            base64, mimeType: file.type || "image/jpeg"
+          })
+        });
+        const data = await resp.json();
+        let text = (data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+        if(text.startsWith("```json")) text=text.slice(7);
+        if(text.startsWith("```")) text=text.slice(3);
+        if(text.endsWith("```")) text=text.slice(0,-3);
+        const parsed = JSON.parse(text.trim());
+        const nowe = {};
+        parsed.gracze?.forEach(g => { nowe[normalizuj(g.nazwa)] = g.lvl; });
+        setPoziomy(nowe);
+      };
+      reader.readAsDataURL(file);
+    } catch(err) { alert("Błąd: "+err.message); }
+    setAnalizuje(false);
+  };
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  width: 540px;
+  background: #000;
+  font-family: 'Cinzel', serif;
+  color: #f0e6d3;
+  overflow: hidden;
+}
+.card {
+  width: 540px;
+  min-height: 960px;
+  background: linear-gradient(160deg, #0a0518 0%, #150a2e 30%, #0a1a0f 70%, #0a0518 100%);
+  position: relative;
+  padding: 32px 28px;
+  border: 1px solid #b8860b;
+}
+.card::before {
+  content:'';
+  position:absolute;
+  inset:6px;
+  border:1px solid #ffd70044;
+  pointer-events:none;
+}
+.corner {
+  position:absolute;
+  width:50px; height:50px;
+  border-color:#ffd700;
+  border-style:solid;
+}
+.corner.tl { top:14px; left:14px; border-width:2px 0 0 2px; }
+.corner.tr { top:14px; right:14px; border-width:2px 2px 0 0; }
+.corner.bl { bottom:14px; left:14px; border-width:0 0 2px 2px; }
+.corner.br { bottom:14px; right:14px; border-width:0 2px 2px 0; }
+
+.gang-name {
+  text-align:center;
+  font-family:'Cinzel Decorative', serif;
+  font-size:42px;
+  font-weight:700;
+  background: linear-gradient(180deg, #fff8dc, #ffd700, #b8860b);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 12px #ffd70088);
+  letter-spacing:4px;
+  margin-bottom:4px;
+}
+.gang-sub {
+  text-align:center;
+  font-size:13px;
+  color:#b8860b;
+  letter-spacing:6px;
+  margin-bottom:16px;
+}
+.divider {
+  height:1px;
+  background:linear-gradient(90deg, transparent, #ffd700, #b8860b, #ffd700, transparent);
+  margin:12px 0;
+}
+.rekrutacja {
+  text-align:center;
+  font-size:15px;
+  color:#ff6633;
+  letter-spacing:8px;
+  margin:14px 0 6px;
+  font-weight:700;
+}
+.miejsca {
+  text-align:center;
+  font-family:'Cinzel Decorative', serif;
+  font-size:38px;
+  font-weight:700;
+  background:linear-gradient(180deg,#ff8844,#ff4422);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 10px #ff442266);
+  margin-bottom:4px;
+}
+.section-title {
+  text-align:center;
+  font-size:14px;
+  letter-spacing:5px;
+  color:#87CEEB;
+  margin:14px 0 10px;
+}
+.moc {
+  text-align:center;
+  background:linear-gradient(135deg,#0a1a3a,#1a2a4a);
+  border:1px solid #4169E144;
+  border-radius:8px;
+  padding:10px;
+  margin-bottom:10px;
+}
+.moc-val {
+  font-size:32px;
+  font-weight:900;
+  background:linear-gradient(180deg,#87CEEB,#4169E1);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.top5 {
+  background:linear-gradient(135deg,#1a1020,#0f0a1a);
+  border:1px solid #ffd70022;
+  border-radius:8px;
+  padding:12px 16px;
+  margin-bottom:10px;
+}
+.top5-row {
+  display:flex;
+  align-items:center;
+  padding:5px 0;
+  border-bottom:1px solid #ffffff0a;
+  gap:10px;
+}
+.top5-row:last-child { border-bottom:none; }
+.medal { font-size:20px; width:28px; }
+.top5-name { flex:1; font-size:16px; color:#f0e6d3; }
+.top5-lvl { font-size:14px; color:#87CEEB; }
+.oferty {
+  background:linear-gradient(135deg,#0a1a0a,#0f1a10);
+  border:1px solid #0c644422;
+  border-radius:8px;
+  padding:12px 16px;
+  margin-bottom:10px;
+}
+.oferta-row {
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  padding:5px 0;
+  font-size:15px;
+  color:#d0e8d0;
+  border-bottom:1px solid #ffffff08;
+}
+.oferta-row:last-child { border-bottom:none; }
+.wymagania {
+  background:linear-gradient(135deg,#1a0a0a,#1a0f0a);
+  border:1px solid #ff640022;
+  border-radius:8px;
+  padding:12px 16px;
+  margin-bottom:14px;
+}
+.wym-row {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:5px 0;
+  font-size:15px;
+  color:#e8d8c0;
+  border-bottom:1px solid #ffffff08;
+}
+.wym-row:last-child { border-bottom:none; }
+.footer {
+  text-align:center;
+  padding-top:12px;
+}
+.footer-cta {
+  font-size:16px;
+  font-weight:700;
+  background:linear-gradient(90deg,#ffd700,#ffaa00,#ffd700);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  letter-spacing:2px;
+  margin-bottom:6px;
+}
+.footer-sub { font-size:11px; color:#555; letter-spacing:3px; }
+.stars { color:#ffd700; font-size:10px; letter-spacing:3px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <div class="stars" style="text-align:center;margin-bottom:8px">★ ★ ★ ★ ★</div>
+  <div class="gang-name">⚔ FAMILY ⚔</div>
+  <div class="gang-sub">THE GANG MOBILE</div>
+  <div class="divider"></div>
+
+  <div class="rekrutacja">— REKRUTACJA —</div>
+  <div class="miejsca">🔥 ${ileMiejsc} WOLNE${ileMiejsc>1?" MIEJSCA":" MIEJSCE"} 🔥</div>
+
+  ${laczonaLvl>0?`
+  <div class="divider"></div>
+  <div class="section-title">💎 MOC GANGU</div>
+  <div class="moc">
+    <div class="moc-val">${laczonaLvl.toLocaleString()} LVL</div>
+    <div style="font-size:11px;color:#4169E1;letter-spacing:3px">ŁĄCZNY POZIOM GANGU</div>
+  </div>`:''}
+
+  <div class="divider"></div>
+  <div class="section-title">🏆 TOP 5 GRACZY</div>
+  <div class="top5">
+    ${top5.map((g,i)=>{
+      const medale=["🥇","🥈","🥉","④","⑤"];
+      return `<div class="top5-row">
+        <span class="medal">${medale[i]}</span>
+        <span class="top5-name">${g.nazwa}</span>
+        ${g.lvl>0?`<span class="top5-lvl">LVL ${g.lvl}</span>`:''}
+      </div>`;
+    }).join('')}
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-title">✨ CO OFERUJEMY</div>
+  <div class="oferty">
+    <div class="oferta-row"><span>📋</span><span>Profesjonalna rozpiska wymian kart</span></div>
+    <div class="oferta-row"><span>📈</span><span>Nowy schemat gry — szybki wzrost ammo</span></div>
+    <div class="oferta-row"><span>💰</span><span>Maksymalizacja nagród gangu</span></div>
+    <div class="oferta-row"><span>🤝</span><span>Wyjątkowa, przyjazna atmosfera</span></div>
+    <div class="oferta-row"><span>⚡</span><span>Wymiany kart co 1-2 dni</span></div>
+  </div>
+
+  <div class="section-title" style="color:#ff8844">📌 SZUKAMY</div>
+  <div class="wymagania">
+    <div class="wym-row"><span>✅</span><span>Zaangażowanych i aktywnych graczy</span></div>
+    <div class="wym-row"><span>✅</span><span>Regularny udział w wymianach kart</span></div>
+    <div class="wym-row"><span>✅</span><span>Aktywny udział w walkach gangu</span></div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="footer">
+    <div class="footer-cta">📩 NAPISZ DO LIDERA GANGU!</div>
+    <div class="footer-sub">THE GANG — FAMILY</div>
+    <div class="stars" style="margin-top:6px">★ ★ ★ ★ ★</div>
+  </div>
+</div>
+</body>
+</html>`;
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa055",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:4}}>📢 Generator ogłoszenia</div>
+        <div style={{fontSize:11,color:"#888"}}>Generuje piękne ogłoszenie w stylu The Gang. Zrób zrzut ekranu i wklej na Messenger!</div>
+      </div>
+
+      {/* Ile miejsc */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:12,color:"#aaa",marginBottom:6}}>🎯 Ile miejsc szukamy:</div>
+        <div style={{display:"flex",gap:8}}>
+          {[1,2,3,4,5].map(n=>(
+            <button key={n} onClick={()=>setIleMiejsc(n)} style={{
+              padding:"8px 18px",borderRadius:8,fontSize:15,fontWeight:"bold",cursor:"pointer",
+              background:ileMiejsc===n?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.07)",
+              border:ileMiejsc===n?"none":"1px solid #2a2a3a",
+              color:ileMiejsc===n?"#000":"#888",
+            }}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Screen z poziomami */}
+      <div style={{marginBottom:14,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:12}}>
+        <div style={{fontSize:12,color:"#87CEEB",fontWeight:"bold",marginBottom:6}}>💎 Wgraj screen z poziomami (opcjonalnie)</div>
+        <input type="file" accept="image/*" onChange={analizujScreen} disabled={analizuje}
+          style={{width:"100%",padding:8,background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,boxSizing:"border-box"}}/>
+        {analizuje&&<div style={{fontSize:12,color:"#87CEEB",marginTop:6}}>🤖 Analizuję poziomy...</div>}
+        {Object.keys(poziomy).length>0&&(
+          <div style={{marginTop:6,fontSize:11,color:"#0c6"}}>
+            ✅ {Object.keys(poziomy).length} graczy • łączny lvl: {laczonaLvl.toLocaleString()}
+          </div>
+        )}
+      </div>
+
+      {/* Generuj */}
+      <button onClick={()=>setPokazPodglad(true)} style={{width:"100%",padding:14,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:10,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:15,marginBottom:12}}>
+        ⚡ Generuj ogłoszenie
+      </button>
+
+      {/* Podgląd HTML */}
+      {pokazPodglad&&(
+        <div>
+          <div style={{fontSize:11,color:"#888",marginBottom:8,textAlign:"center"}}>
+            👆 Zrób zrzut ekranu tego ogłoszenia i wklej na Messenger
+          </div>
+          <div ref={podgladRef} style={{border:"2px solid #b8860b",borderRadius:8,overflow:"hidden"}}>
+            <iframe
+              srcDoc={html}
+              style={{width:"100%",height:960,border:"none",display:"block"}}
+              title="ogloszenie"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
   const [ileMiejsc, setIleMiejsc] = useState(2);
   const [poziomy, setPoziomy] = useState({}); // {nazwa: lvl}
   const [analizuje, setAnalizuje] = useState(false);
@@ -3950,270 +4295,3 @@ function OgloszenieGenerator({czlonkowie, posiadane, talie}) {
   const laczonaLvl = Object.values(poziomy).reduce((s,l)=>s+(parseInt(l)||0),0);
 
   // OCR screena z poziomami
-  const analizujScreen = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAnalizuje(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result.split(",")[1];
-        const resp = await fetch("/api/gemini", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({
-            prompt: `Na tym screenie z gry The Gang widać listę członków gangu z ich poziomami (lvl).
-Rozpoznaj każdego gracza i jego poziom.
-Zwróć WYŁĄCZNIE JSON: {"gracze":[{"nazwa":"...","lvl":123}]}
-Jeśli nie widać poziomu przy graczu, wpisz 0.`,
-            base64, mimeType: "image/jpeg"
-          })
-        });
-        const data = await resp.json();
-        let text = (data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
-        if(text.startsWith("```json")) text=text.slice(7);
-        if(text.startsWith("```")) text=text.slice(3);
-        if(text.endsWith("```")) text=text.slice(0,-3);
-        const parsed = JSON.parse(text.trim());
-        const nowe = {};
-        parsed.gracze?.forEach(g => { nowe[g.nazwa] = g.lvl; });
-        setPoziomy(nowe);
-      };
-      reader.readAsDataURL(file);
-    } catch(e) {
-      alert("Błąd OCR: " + e.message);
-    }
-    setAnalizuje(false);
-  };
-
-  // Generuj ogłoszenie na Canvas
-  const generuj = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const W = 1080, H = 1920;
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext("2d");
-
-    // Tło — gradient jak w grze
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, "#0a0a1a");
-    grad.addColorStop(0.5, "#1a0a2e");
-    grad.addColorStop(1, "#0a1a0a");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-
-    // Ramka złota
-    ctx.strokeStyle = "#b8860b";
-    ctx.lineWidth = 8;
-    ctx.strokeRect(20, 20, W-40, H-40);
-    ctx.strokeStyle = "#ffd700";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, W-60, H-60);
-
-    // Ozdobne rogi
-    const rogi = [[40,40],[W-40,40],[40,H-40],[W-40,H-40]];
-    rogi.forEach(([x,y]) => {
-      ctx.strokeStyle = "#ffd700";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      const dx = x < W/2 ? 1 : -1;
-      const dy = y < H/2 ? 1 : -1;
-      ctx.moveTo(x, y + dy*60);
-      ctx.lineTo(x, y);
-      ctx.lineTo(x + dx*60, y);
-      ctx.stroke();
-    });
-
-    // Logo/tytuł gangu
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ffd700";
-    ctx.font = "bold 90px Georgia, serif";
-    ctx.shadowColor = "#b8860b";
-    ctx.shadowBlur = 20;
-    ctx.fillText("⚔️ FAMILY ⚔️", W/2, 160);
-
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#aaa";
-    ctx.font = "36px Georgia, serif";
-    ctx.fillText("GANG — The Gang Mobile", W/2, 220);
-
-    // Separator
-    ctx.fillStyle = "#ffd700";
-    ctx.fillRect(100, 250, W-200, 3);
-
-    // REKRUTACJA
-    ctx.fillStyle = "#ff4444";
-    ctx.font = "bold 72px Georgia, serif";
-    ctx.shadowColor = "#ff0000";
-    ctx.shadowBlur = 15;
-    ctx.fillText("🔥 REKRUTACJA 🔥", W/2, 360);
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = "#ffd700";
-    ctx.font = "bold 100px Georgia, serif";
-    ctx.fillText(`${ileMiejsc} WOLNE MIEJSCE${ileMiejsc>1?"A":""}`, W/2, 480);
-
-    // Separator
-    ctx.fillStyle = "#b8860b";
-    ctx.fillRect(100, 510, W-200, 2);
-
-    // Moc gangu
-    if (laczonaLvl > 0) {
-      ctx.fillStyle = "#87CEEB";
-      ctx.font = "bold 44px Georgia, serif";
-      ctx.fillText("💎 MOC GANGU", W/2, 590);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 66px Georgia, serif";
-      ctx.fillText(`${laczonaLvl.toLocaleString()} LVL`, W/2, 670);
-      ctx.fillStyle = "#b8860b";
-      ctx.fillRect(100, 695, W-200, 2);
-    }
-
-    // Top 5
-    const top5Y = laczonaLvl > 0 ? 750 : 580;
-    ctx.fillStyle = "#ffd700";
-    ctx.font = "bold 48px Georgia, serif";
-    ctx.fillText("🏆 TOP 5 GRACZY", W/2, top5Y);
-
-    const medale = ["🥇","🥈","🥉","4️⃣","5️⃣"];
-    top5.forEach((g, i) => {
-      const y = top5Y + 70 + i * 80;
-      ctx.fillStyle = i===0?"#ffd700":i===1?"#c0c0c0":i===2?"#cd7f32":"#aaa";
-      ctx.font = `bold ${i<3?46:40}px Georgia, serif`;
-      ctx.textAlign = "left";
-      ctx.fillText(`${medale[i]} ${g.nazwa}`, 120, y);
-      if (g.lvl > 0) {
-        ctx.textAlign = "right";
-        ctx.fillStyle = "#87CEEB";
-        ctx.font = `${i<3?40:36}px Georgia, serif`;
-        ctx.fillText(`LVL ${g.lvl}`, W-120, y);
-      }
-      ctx.textAlign = "center";
-    });
-
-    // Separator
-    const sepY = top5Y + 80 + top5.length * 80;
-    ctx.fillStyle = "#b8860b";
-    ctx.fillRect(100, sepY, W-200, 2);
-
-    // Co oferujemy
-    const ofertaY = sepY + 60;
-    ctx.fillStyle = "#0c6";
-    ctx.font = "bold 48px Georgia, serif";
-    ctx.textAlign = "center";
-    ctx.fillText("✨ CO OFERUJEMY?", W/2, ofertaY);
-
-    const oferty = [
-      "📋 Profesjonalna rozpiska wymian kart",
-      "📈 Nowy schemat gry — szybki wzrost",
-      "💰 Maksymalizacja ammo gangu",
-      "🤝 Wyjątkowa, przyjazna atmosfera",
-      "⚡ Aktywny gang — wymiany co 1-2 dni",
-    ];
-    oferty.forEach((o, i) => {
-      ctx.fillStyle = "#ddd";
-      ctx.font = `38px Georgia, serif`;
-      ctx.fillText(o, W/2, ofertaY + 70 + i * 65);
-    });
-
-    // Wymagania
-    const wymY = ofertaY + 70 + oferty.length * 65 + 30;
-    ctx.fillStyle = "#b8860b";
-    ctx.fillRect(100, wymY, W-200, 2);
-
-    ctx.fillStyle = "#ff6400";
-    ctx.font = "bold 46px Georgia, serif";
-    ctx.fillText("📌 SZUKAMY", W/2, wymY + 60);
-
-    const wymagania = [
-      "✅ Zaangażowanych i aktywnych graczy",
-      "✅ Regularny udział w wymianach",
-      "✅ Udział w walkach gangu",
-    ];
-    wymagania.forEach((w, i) => {
-      ctx.fillStyle = "#ccc";
-      ctx.font = "38px Georgia, serif";
-      ctx.fillText(w, W/2, wymY + 130 + i * 65);
-    });
-
-    // Stopka
-    ctx.fillStyle = "#b8860b";
-    ctx.fillRect(100, H-180, W-200, 2);
-    ctx.fillStyle = "#ffd700";
-    ctx.font = "bold 44px Georgia, serif";
-    ctx.fillText("📩 NAPISZ DO LIDERA GANGU!", W/2, H-120);
-    ctx.fillStyle = "#888";
-    ctx.font = "32px Georgia, serif";
-    ctx.fillText("The Gang — FAMILY", W/2, H-65);
-
-    setWygenerowano(true);
-  };
-
-  const pobierz = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const link = document.createElement("a");
-    link.download = "FAMILY_rekrutacja.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  };
-
-  return (
-    <div>
-      <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa055",borderRadius:10,padding:14,marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:4}}>📢 Generator ogłoszenia rekrutacyjnego</div>
-        <div style={{fontSize:11,color:"#888"}}>Tworzy gotowy obrazek do wklejenia na Messenger/grupę gangu.</div>
-      </div>
-
-      {/* Ile miejsc */}
-      <div style={{marginBottom:12}}>
-        <div style={{fontSize:12,color:"#aaa",marginBottom:6}}>🎯 Ile miejsc szukamy:</div>
-        <div style={{display:"flex",gap:8}}>
-          {[1,2,3,4,5].map(n=>(
-            <button key={n} onClick={()=>setIleMiejsc(n)} style={{
-              padding:"8px 16px",borderRadius:8,fontSize:14,fontWeight:"bold",cursor:"pointer",
-              background:ileMiejsc===n?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.07)",
-              border:ileMiejsc===n?"none":"1px solid #2a2a3a",
-              color:ileMiejsc===n?"#000":"#888",
-            }}>{n}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Screen z poziomami */}
-      <div style={{marginBottom:14,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:12}}>
-        <div style={{fontSize:12,color:"#87CEEB",fontWeight:"bold",marginBottom:6}}>💎 Wgraj screen z poziomami graczy (opcjonalnie)</div>
-        <div style={{fontSize:11,color:"#666",marginBottom:8}}>Screen z ekranu gangu gdzie widać nicki i poziomy</div>
-        <input type="file" accept="image/*" onChange={analizujScreen} disabled={analizuje}
-          style={{width:"100%",padding:8,background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,boxSizing:"border-box"}}/>
-        {analizuje&&<div style={{fontSize:12,color:"#87CEEB",marginTop:6}}>🤖 Analizuję poziomy...</div>}
-        {Object.keys(poziomy).length>0&&(
-          <div style={{marginTop:8}}>
-            <div style={{fontSize:11,color:"#0c6",marginBottom:4}}>✅ Rozpoznano {Object.keys(poziomy).length} graczy — łączny lvl: {laczonaLvl.toLocaleString()}</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-              {Object.entries(poziomy).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,l])=>(
-                <span key={n} style={{fontSize:10,padding:"2px 6px",background:"rgba(135,206,235,0.1)",border:"1px solid #87CEEB33",borderRadius:4,color:"#87CEEB"}}>{n}: {l}</span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Generuj */}
-      <button onClick={generuj} style={{width:"100%",padding:14,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:10,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:15,marginBottom:12}}>
-        ⚡ Generuj ogłoszenie
-      </button>
-
-      {/* Podgląd */}
-      {wygenerowano&&(
-        <div style={{marginBottom:12}}>
-          <canvas ref={canvasRef} style={{width:"100%",borderRadius:8,border:"2px solid #b8860b",display:"block"}}/>
-          <button onClick={pobierz} style={{width:"100%",marginTop:8,padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14}}>
-            📥 Pobierz obrazek PNG
-          </button>
-        </div>
-      )}
-      {!wygenerowano&&<canvas ref={canvasRef} style={{display:"none"}}/>}
-    </div>
-  );
-}
