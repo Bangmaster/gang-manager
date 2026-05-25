@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -426,16 +426,36 @@ function LoginScreen({onLogin, czlonkowie}) {
   const cytat=CYTATY[Math.floor(Date.now()/86400000)%CYTATY.length];
   const tip=TIPY[Math.floor(Date.now()/43200000)%TIPY.length];
 
-  const zaloguj=()=>{
+  const zaloguj=async()=>{
+    const fp = getFingerprint();
+    const teraz = new Date().toISOString();
+
     const u=ADMIN_CREDENTIALS.find(c=>c.login===login&&c.haslo===haslo);
-    if(u){onLogin(u);return;}
+    if(u){
+      // Zapisz log admina
+      zapiszLog({ nick: u.login, rola: u.rola, czas: teraz, fp, typ: "login" });
+      zapiszFingerprint(u.login, fp);
+      onLogin(u);
+      return;
+    }
     if(login.trim().length>=2&&haslo===""){
       const oryginalny=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(login.trim()));
       if(!oryginalny){
         setBlad(`Nick "${login.trim()}" nie istnieje w gangu. Sprawdź pisownię.`);
         return;
       }
-      onLogin({login: oryginalny.nazwa, rola:"czlonek"});
+      // Sprawdź czy to nowe urządzenie
+      const znane = await pobierzFingerprinty();
+      const znaneNicka = znane[oryginalny.nazwa] || [];
+      const noweUrzadzenie = znaneNicka.length > 0 && !znaneNicka.includes(fp);
+      // Zapisz log
+      zapiszLog({
+        nick: oryginalny.nazwa, rola: "czlonek", czas: teraz, fp,
+        typ: noweUrzadzenie ? "login_nowe_urzadzenie" : "login",
+        noweUrzadzenie,
+      });
+      zapiszFingerprint(oryginalny.nazwa, fp);
+      onLogin({login: oryginalny.nazwa, rola:"czlonek", noweUrzadzenie});
       return;
     }
     setBlad("Błędne dane. Członek: tylko nick (bez hasła). Admin: login + hasło.");
@@ -2383,6 +2403,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"reset",label:"🔄 Reset"},
     {id:"push",label:"🔔 Powiadomienia"},
     {id:"ogloszenie",label:"📢 Ogłoszenie"},
+    {id:"logi",label:"🔒 Logi logowań"},
     {id:"kalendarz",label:"📅 Kalendarz"},
   ];
 
@@ -2413,6 +2434,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
+      {tryb==="logi"&&<LogiLogowan/>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
     </div>
   );
@@ -4274,6 +4296,108 @@ body {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// LOGI LOGOWAŃ
+// ============================================================
+function LogiLogowan() {
+  const [logi, setLogi] = useState([]);
+  const [filtrNick, setFiltrNick] = useState("");
+  const [pokazTylkoNowe, setPokazTylkoNowe] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeLogi(setLogi);
+    return () => unsub();
+  }, []);
+
+  const filtered = logi
+    .filter(l => !filtrNick || normalizuj(l.nick||"").includes(normalizuj(filtrNick)))
+    .filter(l => !pokazTylkoNowe || l.noweUrzadzenie);
+
+  const formatCzas = (iso) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString("pl-PL");
+    } catch { return iso; }
+  };
+
+  // Statystyki
+  const noweUrzadzenia = logi.filter(l => l.noweUrzadzenie);
+  const unikalne = [...new Set(logi.map(l=>l.nick))];
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:8}}>🔒 Logi logowań</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"8px 14px",flex:1}}>
+            <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700"}}>{logi.length}</div>
+            <div style={{fontSize:11,color:"#888"}}>logowań łącznie</div>
+          </div>
+          <div style={{background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:8,padding:"8px 14px",flex:1}}>
+            <div style={{fontSize:22,fontWeight:"bold",color:"#f55"}}>{noweUrzadzenia.length}</div>
+            <div style={{fontSize:11,color:"#888"}}>nowych urządzeń</div>
+          </div>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"8px 14px",flex:1}}>
+            <div style={{fontSize:22,fontWeight:"bold",color:"#0c6"}}>{unikalne.length}</div>
+            <div style={{fontSize:11,color:"#888"}}>unikalnych nicków</div>
+          </div>
+        </div>
+      </div>
+
+      {noweUrzadzenia.length>0&&(
+        <div style={{background:"rgba(255,50,50,0.1)",border:"2px solid #f55",borderRadius:10,padding:12,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#f55",marginBottom:8}}>⚠️ Wykryto logowania z nowych urządzeń!</div>
+          {noweUrzadzenia.slice(0,5).map((l,i)=>(
+            <div key={i} style={{fontSize:12,color:"#fa0",padding:"3px 0",borderBottom:"1px solid #f5544422"}}>
+              🔴 <strong>{l.nick}</strong> — nowe urządzenie [{l.fp}] — {formatCzas(l.czas)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filtry */}
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <input value={filtrNick} onChange={e=>setFiltrNick(e.target.value)}
+          placeholder="Szukaj nicku..."
+          style={{flex:1,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+        <button onClick={()=>setPokazTylkoNowe(p=>!p)} style={{
+          padding:"7px 12px",borderRadius:6,fontSize:12,cursor:"pointer",
+          background:pokazTylkoNowe?"rgba(255,50,50,0.2)":"rgba(255,255,255,0.05)",
+          border:pokazTylkoNowe?"1px solid #f55":"1px solid #333",
+          color:pokazTylkoNowe?"#f55":"#666",
+        }}>⚠️ Tylko nowe urządzenia</button>
+      </div>
+
+      {/* Lista logów */}
+      <div style={{maxHeight:400,overflowY:"auto"}}>
+        {filtered.length===0?(
+          <div style={{textAlign:"center",padding:20,color:"#555",fontSize:12}}>Brak logów</div>
+        ):filtered.map((l,i)=>(
+          <div key={i} style={{
+            display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:3,
+            background:l.noweUrzadzenie?"rgba(255,50,50,0.08)":"rgba(255,255,255,0.03)",
+            border:`1px solid ${l.noweUrzadzenie?"#f5544433":"#1a1a2e"}`,
+            borderRadius:6,
+          }}>
+            <span style={{fontSize:14}}>{l.noweUrzadzenie?"🔴":l.rola==="admin"?"👑":l.rola==="zastepca"?"⚔️":"👤"}</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:"bold",color:l.noweUrzadzenie?"#f55":"#ddd"}}>
+                {l.nick}
+                {l.noweUrzadzenie&&<span style={{fontSize:10,color:"#f55",marginLeft:6,background:"rgba(255,50,50,0.15)",padding:"1px 5px",borderRadius:4}}>NOWE URZĄDZENIE!</span>}
+                <span style={{fontSize:10,color:"#555",marginLeft:6}}>{l.rola}</span>
+              </div>
+              <div style={{fontSize:10,color:"#555",display:"flex",gap:8}}>
+                <span>🕐 {formatCzas(l.czas)}</span>
+                <span>🔑 {l.fp}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
