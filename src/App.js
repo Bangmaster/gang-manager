@@ -4277,21 +4277,3 @@ body {
     </div>
   );
 }
-  const [ileMiejsc, setIleMiejsc] = useState(2);
-  const [poziomy, setPoziomy] = useState({}); // {nazwa: lvl}
-  const [analizuje, setAnalizuje] = useState(false);
-  const [wygenerowano, setWygenerowano] = useState(false);
-
-  // Top 5 graczy wg posiadanych kart
-  const top5 = [...czlonkowie]
-    .map(c => ({
-      nazwa: c.nazwa,
-      karty: talie.reduce((s,t) => s + t.karty.filter(k => posiadane[`${c.id}_${t.id}_${k.nazwa}`]).length, 0),
-      lvl: poziomy[c.nazwa] || 0,
-    }))
-    .sort((a,b) => (b.lvl||b.karty) - (a.lvl||a.karty))
-    .slice(0, 5);
-
-  const laczonaLvl = Object.values(poziomy).reduce((s,l)=>s+(parseInt(l)||0),0);
-
-  // OCR screena z poziomami
