@@ -125,3 +125,62 @@ export function subscribeOnline(callback) {
     callback(snap.exists() ? snap.data() : {});
   }, (err) => console.error("Błąd subskrypcji online:", err));
 }
+
+// === LOGI LOGOWAŃ ===
+const LOGI_DOC = doc(db, "gang", "logi");
+
+export async function zapiszLog(wpis) {
+  try {
+    const snap = await getDoc(LOGI_DOC);
+    const stare = snap.exists() ? (snap.data().logi || []) : [];
+    // Max 200 wpisów
+    const nowe = [wpis, ...stare].slice(0, 200);
+    await setDoc(LOGI_DOC, { logi: nowe });
+    return true;
+  } catch(e) { console.error("Błąd zapisu logu:", e); return false; }
+}
+
+export function subscribeLogi(callback) {
+  return onSnapshot(LOGI_DOC, (snap) => {
+    if (snap.exists()) callback(snap.data().logi || []);
+    else callback([]);
+  });
+}
+
+// Fingerprint urządzenia — unikalny identyfikator bez IP
+export function getFingerprint() {
+  const parts = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + "x" + screen.height,
+    screen.colorDepth,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || 0,
+    navigator.platform || "",
+  ];
+  // Prosty hash
+  let hash = 0;
+  const str = parts.join("|");
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).padStart(8, "0");
+}
+
+// Pobierz znane fingerprinty dla każdego nicka
+export async function pobierzFingerprinty() {
+  try {
+    const snap = await getDoc(LOGI_DOC);
+    return snap.exists() ? (snap.data().fingerprinty || {}) : {};
+  } catch { return {}; }
+}
+
+export async function zapiszFingerprint(nick, fp) {
+  try {
+    const snap = await getDoc(LOGI_DOC);
+    const stare = snap.exists() ? (snap.data().fingerprinty || {}) : {};
+    const nowe = { ...stare, [nick]: [...new Set([...(stare[nick]||[]), fp])].slice(0,5) };
+    await setDoc(LOGI_DOC, { fingerprinty: nowe }, { merge: true });
+  } catch(e) { console.error(e); }
+}
