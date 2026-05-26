@@ -152,8 +152,8 @@ export function getFingerprint() {
   const parts = [
     navigator.userAgent,
     navigator.language,
-    window.screen.width + "x" + window.screen.height,
-    window.screen.colorDepth,
+    screen.width + "x" + screen.height,
+    screen.colorDepth,
     new Date().getTimezoneOffset(),
     navigator.hardwareConcurrency || 0,
     navigator.platform || "",
@@ -183,4 +183,42 @@ export async function zapiszFingerprint(nick, fp) {
     const nowe = { ...stare, [nick]: [...new Set([...(stare[nick]||[]), fp])].slice(0,5) };
     await setDoc(LOGI_DOC, { fingerprinty: nowe }, { merge: true });
   } catch(e) { console.error(e); }
+}
+
+// === HISTORIA WYMIAN ===
+const HISTORIA_DOC = doc(db, "gang", "historia");
+
+export async function zapiszHistorieWymian(historia) {
+  try {
+    await setDoc(HISTORIA_DOC, { historia: JSON.stringify(historia) });
+    return true;
+  } catch(e) { console.error("Błąd zapisu historii:", e); return false; }
+}
+
+export async function pobierzHistorieWymian() {
+  try {
+    const snap = await getDoc(HISTORIA_DOC);
+    if (!snap.exists()) return [];
+    return JSON.parse(snap.data().historia || "[]");
+  } catch { return []; }
+}
+
+export function subscribeHistoria(callback) {
+  return onSnapshot(HISTORIA_DOC, (snap) => {
+    if (snap.exists()) {
+      try { callback(JSON.parse(snap.data().historia || "[]")); }
+      catch { callback([]); }
+    } else { callback([]); }
+  });
+}
+
+// Oblicz ile razy każda osoba dostała kartę w historii
+export function obliczLicznikOtrzymanych(historia) {
+  const licznik = {}; // {nazwa: count}
+  historia.forEach(wymiana => {
+    (wymiana.wymiany || []).forEach(w => {
+      if (w.do) licznik[w.do] = (licznik[w.do] || 0) + 1;
+    });
+  });
+  return licznik;
 }
