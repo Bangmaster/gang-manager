@@ -1025,33 +1025,47 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       return idx === -1 ? 99 : idx;
     };
 
+    // Sprawdź czy talia może być faktycznie zamknięta — czy wszystkie brakujące karty mają potencjalnych dawców
+    const czyMoznaZamknac = (s) => {
+      return s.brakT.every(karta => {
+        const juzWPlanie = planoweWymiany.some(w =>
+          w.do === s.osoba.nazwa && w.talia === s.talia.nazwa && w.karta === karta.nazwa
+        );
+        if (juzWPlanie) return true;
+        return czlonkowie.some(o2 =>
+          o2.id !== s.osoba.id && duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]
+        );
+      });
+    };
+
     const potrzebyGrup = staneTalii
       .map(s => {
         const efNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, s.brakT.length);
         const faza = obliczFaze(s.brakT.length, s.brakO.length, typWymiany);
         const progInfo = progiOsob[s.osoba.id];
-        return { ...s, faza, efNagroda,
+        const moznaZamknac = s.brakT.every(karta =>
+          czlonkowie.some(o2 => o2.id !== s.osoba.id && duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`])
+        );
+        return { ...s, faza, efNagroda, moznaZamknac,
           bliskoProg: !!(progInfo?.nastepnyProg && progInfo.brakujeDoProg <= 2),
           progBonus: efNagroda - s.nagroda
         };
       })
       .sort((a, b) => {
         const pa = priorytetFazy(a.faza), pb = priorytetFazy(b.faza);
-        // Dla faz zamykających talię (10 i 20) — sortuj po ammo per dawca
         const aZamknie = a.faza === 10 || a.faza === 20;
         const bZamknie = b.faza === 10 || b.faza === 20;
         if (aZamknie && bZamknie) {
-          // Ammo per dawca = efNagroda / liczba brakujących kart
+          // Najpierw te które MOGĄ być faktycznie zamknięte (wszyscy dawcy dostępni)
+          if (a.moznaZamknac !== b.moznaZamknac) return b.moznaZamknac ? 1 : -1;
+          // Ammo per dawca
           const aPerDawca = a.efNagroda / Math.max(1, a.brakT.length);
           const bPerDawca = b.efNagroda / Math.max(1, b.brakT.length);
           if (Math.round(bPerDawca) !== Math.round(aPerDawca)) return bPerDawca - aPerDawca;
-          // Przy równym ammo per dawca — faza 10 pierwsza (mniej dawców potrzebnych)
           if (pa !== pb) return pa - pb;
           return 0;
         }
-        // Zamykające przed niezamykającymi
         if (aZamknie !== bZamknie) return aZamknie ? -1 : 1;
-        // Reszta faz — po priorytecie fazy
         if (pa !== pb) return pa - pb;
         if (b.efNagroda !== a.efNagroda) return b.efNagroda - a.efNagroda;
         if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
