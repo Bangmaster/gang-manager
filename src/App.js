@@ -3218,13 +3218,22 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana}) {
   const [historia,setHistoria]=useState([]);
 
   useEffect(()=>{
-    // Migruj z localStorage do Firebase jeśli jest stara historia
+    // Migruj z localStorage do Firebase — SCALAJ z istniejącą historią
     const stara = localStorage.getItem("gang_historia_wymian");
     if (stara) {
       try {
         const parsed = JSON.parse(stara);
         if (parsed.length > 0) {
-          zapiszHistorieWymian(parsed);
+          pobierzHistorieWymian().then(istniejaca => {
+            // Scal — stare z localStorage + istniejące w Firebase, bez duplikatów
+            const istniejaceIds = new Set(istniejaca.map(w=>w.id));
+            const doMigracji = parsed.filter(w=>!istniejaceIds.has(w.id));
+            if (doMigracji.length > 0) {
+              const scalona = [...istniejaca, ...doMigracji]
+                .sort((a,b)=>b.id-a.id).slice(0,50);
+              zapiszHistorieWymian(scalona);
+            }
+          });
           localStorage.removeItem("gang_historia_wymian");
         }
       } catch {}
@@ -3258,7 +3267,7 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana}) {
     <div>
       <div style={{background:"rgba(135,206,235,0.06)",border:"1px solid #87CEEB33",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#87CEEB",marginBottom:6}}>📜 Historia wymian</div>
-        <div style={{fontSize:11,color:"#888",marginBottom:10}}>Archiwum poprzednich wymian. Przechowyane lokalnie w przeglądarce.</div>
+        <div style={{fontSize:11,color:"#888",marginBottom:10}}>Archiwum poprzednich wymian. Synchronizowane przez Firebase — widoczne na wszystkich urządzeniach.</div>
         {aktywnaWymiana?(
           <button onClick={archiwizuj} style={{padding:"8px 16px",background:"linear-gradient(135deg,#87CEEB,#4169E1)",border:"none",borderRadius:6,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:"bold"}}>
             📥 Archiwizuj aktywną wymianę
