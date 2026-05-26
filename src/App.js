@@ -1032,9 +1032,22 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         const efNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, s.brakT.length);
         const faza = obliczFaze(s.brakT.length, s.brakO.length, typWymiany);
         const progInfo = progiOsob[s.osoba.id];
-        const moznaZamknac = s.brakT.every(karta =>
-          czlonkowie.some(o2 => o2.id !== s.osoba.id && duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`])
-        );
+        // Sprawdź czy talia może być faktycznie zamknięta
+        // Każda brakująca karta musi mieć WOLNEGO i INNEGO dawcę
+        const moznaZamknac = (() => {
+          const uzyteDawcy = new Set();
+          return s.brakT.every(karta => {
+            // Wolny dawca = nie jest w wysylajacy i nie jest już użyty dla innej karty tej samej osoby
+            const dawca = czlonkowie.find(o2 =>
+              o2.id !== s.osoba.id &&
+              !uzyteDawcy.has(o2.id) &&
+              !wysylajacy.has(o2.id) &&
+              duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]
+            );
+            if (dawca) { uzyteDawcy.add(dawca.id); return true; }
+            return false;
+          });
+        })();
         return { ...s, faza, efNagroda, moznaZamknac,
           bliskoProg: !!(progInfo?.nastepnyProg && progInfo.brakujeDoProg <= 2),
           progBonus: efNagroda - s.nagroda
@@ -1122,25 +1135,74 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       return false;
     };
 
-    for (const s of potrzebyGrup) {
-      for (const karta of s.brakT) {
-        const key = `${s.osoba.id}_${s.talia.id}_${karta.nazwa}`;
-        if (posiadane[key]) continue;
-        if (planoweWymiany.some(w =>
-          w.do === s.osoba.nazwa && w.talia === s.talia.nazwa && w.karta === karta.nazwa
-        )) continue;
+    // Iterujemy dynamicznie — po każdym przydziale re-sortujemy żeby uwzględnić
+    // aktualny stan wysylajacy (kto jest wolny) przy obliczaniu moznaZamknac
+    let pozostale = [...potrzebyGrup.flatMap(s => s.brakT.map(karta => ({...s, kartaDoObs: karta})))];
 
-        // Przelicz aktualny brakT uwzględniając już zaplanowane karty dla tej osoby/talii
-        const juzIdzie = planoweWymiany.filter(w =>
-          w.do === s.osoba.nazwa && w.talia === s.talia.nazwa
-        ).length;
-        const aktBrakT = Math.max(1, s.brakT.length - juzIdzie);
-        const aktFaza = obliczFaze(aktBrakT, s.brakO.length, typWymiany);
-        const aktEfNagroda = obliczEfektywnaНagrode(s.osoba.id, s.talia.id, aktBrakT);
+    while (pozostale.length > 0) {
+      // Re-oblicz moznaZamknac dla każdego kandydata z aktualnym stanem wysylajacy
+      pozostale = pozostale
+        .filter(k => {
+          const key = `${k.osoba.id}_${k.talia.id}_${k.kartaDoObs.nazwa}`;
+          if (posiadane[key]) return false;
+          if (planoweWymiany.some(w => w.do===k.osoba.nazwa && w.talia===k.talia.nazwa && w.karta===k.kartaDoObs.nazwa)) return false;
+          return true;
+        })
+        .map(k => {
+          const juzIdzie = planoweWymiany.filter(w => w.do===k.osoba.nazwa && w.talia===k.talia.nazwa).length;
+          const aktBrakT = Math.max(1, k.brakT.length - juzIdzie);
+          const aktFaza = obliczFaze(aktBrakT, k.brakO.length, typWymiany);
+          const aktEfNagroda = obliczEfektywnaНagrode(k.osoba.id, k.talia.id, aktBrakT);
+          // Ile wolnych dawców dla tej karty
+          const maWolnegoDawce = czlonkowie.some(o2 =>
+            o2.id !== k.osoba.id && !wysylajacy.has(o2.id) &&
+            duplikaty[`${o2.id}_${k.talia.id}_${k.kartaDoObs.nazwa}`]
+          );
+          // Czy cała talia mozna zamknac (wszystkie brakujące karty mają wolnych dawców)
+          const pozostaleBrakT = k.brakT.filter(kk => {
+            const key = `${k.osoba.id}_${k.talia.id}_${kk.nazwa}`;
+            return !posiadane[key] && !planoweWymiany.some(w => w.do===k.osoba.nazwa && w.talia===k.talia.nazwa && w.karta===kk.nazwa);
+          });
+          const uzyteDawcy = new Set();
+          const moznaZamknac = pozostaleBrakT.every(kk => {
+            const d = czlonkowie.find(o2 =>
+              o2.id !== k.osoba.id && !uzyteDawcy.has(o2.id) && !wysylajacy.has(o2.id) &&
+              duplikaty[`${o2.id}_${k.talia.id}_${kk.nazwa}`]
+            );
+            if (d) { uzyteDawcy.add(d.id); return true; }
+            return false;
+          });
+          return {...k, aktBrakT, aktFaza, aktEfNagroda, moznaZamknac, maWolnegoDawce};
+        })
+        .sort((a, b) => {
+          const pa = priorytetFazy(a.aktFaza), pb = priorytetFazy(b.aktFaza);
+          const aZamknie = a.aktFaza===10||a.aktFaza===20;
+          const bZamknie = b.aktFaza===10||b.aktFaza===20;
+          if (aZamknie && bZamknie) {
+            // Najpierw te które MOGĄ być zamknięte (wolni dawcy dla wszystkich kart)
+            if (a.moznaZamknac !== b.moznaZamknac) return b.moznaZamknac ? 1 : -1;
+            const aPerDawca = a.aktEfNagroda / Math.max(1, a.aktBrakT);
+            const bPerDawca = b.aktEfNagroda / Math.max(1, b.aktBrakT);
+            if (Math.round(bPerDawca) !== Math.round(aPerDawca)) return bPerDawca - aPerDawca;
+            if (pa !== pb) return pa - pb;
+            return 0;
+          }
+          if (aZamknie !== bZamknie) return aZamknie ? -1 : 1;
+          if (pa !== pb) return pa - pb;
+          if (b.aktEfNagroda !== a.aktEfNagroda) return b.aktEfNagroda - a.aktEfNagroda;
+          if (!ignorujTrudne) { const aT=a.trudna?1:0,bT=b.trudna?1:0; if(aT!==bT) return aT-bT; }
+          return 0;
+        });
 
-        // Przed szukaniem dawcy — sprawdź czy ta potrzeba jest nadal priorytetowa
-        // Jeśli ktoś już dostał kartę i teraz jest w fazie 10 (zamknie talię)
-        // to jest ważniejszy niż ktoś w fazie 20 z tą samą nagrodą
+      if (pozostale.length === 0) break;
+      const k = pozostale[0];
+      pozostale = pozostale.slice(1);
+
+      const s = k;
+      const karta = k.kartaDoObs;
+      const aktBrakT = k.aktBrakT;
+      const aktFaza = k.aktFaza;
+      const aktEfNagroda = k.aktEfNagroda;
 
         // Poziom 1: wolny dawca
         let dawca = null;
@@ -1172,18 +1234,10 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
             trudna: s.trudna, progBonus: aktEfNagroda - s.nagroda,
             bliskoProg: s.bliskoProg||false,
           });
-
-          // Jeśli ta karta obniża fazę odbiorcy do 10 (zamknie talię),
-          // sprawdź pozostałe brakujące karty tej osoby z tej samej talii
-          // i próbuj je obsłużyć od razu z nowym wyższym priorytetem
-          if (aktBrakT > 1) {
-            // Zostają jeszcze karty do obsłużenia — zostaną przetworzone w kolejnych iteracjach
-          }
         } else if (s.brakT.length <= 3) {
           nieobsluzone.push({ osoba: s.osoba, talia: s.talia, karta, brakTCount: s.brakT.length });
         }
-      }
-    }
+    } // end while
   }
 
   const symPos={...posiadane};
