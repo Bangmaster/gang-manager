@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -152,6 +152,12 @@ export default function App() {
   const [dane, setDane] = useState(null); // null = loading
   const [zakładka, setZakładka] = useState("dane");
   const [typWymiany, setTypWymiany] = useState("złote");
+  const [historiaWymian, setHistoriaWymian] = useState([]);
+
+  useEffect(() => {
+    const unsub = subscribeHistoria(setHistoriaWymian);
+    return () => unsub();
+  }, []);
   const [wynik, setWynik] = useState(null);
   const [trybWymiany, setTrybWymiany] = useState("priorytet");
   const [statusZapisu, setStatusZapisu] = useState("");
@@ -655,7 +661,9 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],ignorujTrudne=false}) {
+function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false}) {
+  // Licznik ile razy każda osoba dostała kartę w historii
+  const licznikOtrzymanych = sprawiedliwe ? obliczLicznikOtrzymanych(historiaWymian) : {};
   const typ=typWymiany==="złote"?"złota":"diamentowa";
   const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
 
@@ -768,7 +776,9 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
   }
 
   // Zbierz stan każdej talii dla każdej osoby
-  const staneTalii = []; // {osoba, talia, brakT, brakO, nagroda, trudna, kompletOpp}
+  // Dla faz 20+ (brakuje 2+ kart) — rozbij na osobne wpisy per karta
+  // żeby każda karta konkurowała o dawcę równorzędnie z innymi fazami 10
+  const staneTalii = [];
   czlonkowie.forEach(osoba => {
     talie.forEach(talia => {
       const kartyT = talia.karty.filter(k => k.typ === typ);
@@ -777,13 +787,9 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       const brakT = kartyT.filter(k => !posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
       const brakO = kartyO.filter(k => !posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
       if (!brakT.length) return;
-      staneTalii.push({
-        osoba, talia,
-        brakT, brakO,
-        nagroda: talia.nagroda_amunicja || 0,
-        trudna: TRUDNE_NUMERY.includes(talia.numer),
-        kompletOpp: kartyO.length === 0 || brakO.length === 0,
-      });
+      const nagroda = talia.nagroda_amunicja || 0;
+      const trudna = TRUDNE_NUMERY.includes(talia.numer);
+      staneTalii.push({ osoba, talia, brakT, brakO, nagroda, trudna });
     });
   });
 
@@ -1152,7 +1158,9 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
           const juzIdzie = planoweWymiany.filter(w => w.do===k.osoba.nazwa && w.talia===k.talia.nazwa).length;
           const aktBrakT = Math.max(1, k.brakT.length - juzIdzie);
           const aktFaza = obliczFaze(aktBrakT, k.brakO.length, typWymiany);
-          const aktEfNagroda = obliczEfektywnaНagrode(k.osoba.id, k.talia.id, aktBrakT);
+          // Dla ammo per dawca: liczymy jakby ta karta była ostatnią brakującą
+          // żeby każda karta z fazy 20 konkurowała równorzędnie z fazą 10
+          const aktEfNagroda = obliczEfektywnaНagrode(k.osoba.id, k.talia.id, 1);
           // Ile wolnych dawców dla tej karty
           const maWolnegoDawce = czlonkowie.some(o2 =>
             o2.id !== k.osoba.id && !wysylajacy.has(o2.id) &&
@@ -1184,6 +1192,10 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
             const aPerDawca = a.aktEfNagroda / Math.max(1, a.aktBrakT);
             const bPerDawca = b.aktEfNagroda / Math.max(1, b.aktBrakT);
             if (Math.round(bPerDawca) !== Math.round(aPerDawca)) return bPerDawca - aPerDawca;
+            // TIEBREAKER: kto rzadziej dostawał karty w historii → wyższy priorytet
+            const aOtrzymal = licznikOtrzymanych[a.osoba.nazwa] || 0;
+            const bOtrzymal = licznikOtrzymanych[b.osoba.nazwa] || 0;
+            if (aOtrzymal !== bOtrzymal) return aOtrzymal - bOtrzymal;
             if (pa !== pb) return pa - pb;
             return 0;
           }
@@ -1312,16 +1324,15 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [skopiowano,setSkopiowano]=useState(false);
   const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
+  const [wylaczoneOsoby,setWylaczoneOsoby]=useState(new Set());
+
+  const toggleTalia=id=>setWylaczoneTalie(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const toggleOsoba=id=>setWylaczoneOsoby(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const [ignorujTrudne,setIgnorujTrudne]=useState(false);
+  const [sprawiedliwe,setSprawiedliwe]=useState(false);
   const [vipKolejka,setVipKolejka]=useState([]); // lista id osób w kolejności priorytetu
 
-  const toggleTalia=(id)=>{
-    setWylaczoneTalie(prev=>{
-      const n=new Set(prev);
-      n.has(id)?n.delete(id):n.add(id);
-      return n;
-    });
-  };
+
 
   const toggleVip=(id)=>{
     setVipKolejka(prev=>{
@@ -1407,7 +1418,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
 
   const generuj=()=>{
     const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],ignorujTrudne}));
+    const aktywniCzlonkowie=czlonkowie.filter(c=>!wylaczoneOsoby.has(c.id));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],ignorujTrudne,historiaWymian,sprawiedliwe}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -1450,18 +1462,30 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         ))}
       </div>
 
-      {/* Opcja ignoruj trudne */}
-      <div style={{marginBottom:12}}>
+      {/* Opcje dodatkowe */}
+      <div style={{marginBottom:12,display:"flex",gap:8,flexWrap:"wrap"}}>
         <button onClick={()=>setIgnorujTrudne(p=>!p)} style={{
           padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
           background:ignorujTrudne?"rgba(255,100,0,0.2)":"rgba(255,255,255,0.05)",
           border:ignorujTrudne?"1px solid #ff6400":"1px solid #2a2a3a",
           color:ignorujTrudne?"#ff6400":"#555",
         }}>
-          {ignorujTrudne?"🔥 Trudne traktowane jak zwykłe (włączone)":"⚠️ Ignoruj oznaczenie trudnych talii"}
+          {ignorujTrudne?"🔥 Trudne = zwykłe (wł.)":"⚠️ Ignoruj trudne talie"}
         </button>
-        {ignorujTrudne&&<span style={{fontSize:11,color:"#888",marginLeft:8}}>talie nr {[10,11,12,14,15].join(",")} będą traktowane normalnie</span>}
+        <button onClick={()=>setSprawiedliwe(p=>!p)} style={{
+          padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
+          background:sprawiedliwe?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.05)",
+          border:sprawiedliwe?"1px solid #0c6":"1px solid #2a2a3a",
+          color:sprawiedliwe?"#0c6":"#555",
+        }}>
+          {sprawiedliwe?"⚖️ Sprawiedliwe wymiany (wł.)":"⚖️ Sprawiedliwe wymiany"}
+        </button>
       </div>
+      {sprawiedliwe&&(
+        <div style={{fontSize:11,color:"#888",marginBottom:10,padding:"6px 10px",background:"rgba(0,200,100,0.05)",border:"1px solid #0c633",borderRadius:6}}>
+          ⚖️ Przy remisie (ta sama faza i nagroda) — pierwszeństwo dostaje osoba która rzadziej dostawała karty w poprzednich wymianach. Wymaga zarchiwizowanej historii.
+        </div>
+      )}
       {trybWymiany==="vip"&&(
         <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70044",borderRadius:10,padding:12,marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
@@ -1563,6 +1587,42 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         {wylaczoneTalie.size>0&&(
           <div style={{fontSize:10,color:"#666",marginTop:6}}>
             Wyłączone talie są ignorowane przy generowaniu wymian.
+          </div>
+        )}
+      </div>
+
+      {/* Wyłącz osoby */}
+      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",borderRadius:8,padding:12,marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700"}}>
+            🚫 Wyłącz osoby z generowania (jako odbiorcy)
+            {wylaczoneOsoby.size>0&&<span style={{marginLeft:8,fontSize:11,color:"#fa0"}}>({wylaczoneOsoby.size} wyłączone)</span>}
+          </div>
+          {wylaczoneOsoby.size>0&&(
+            <button onClick={()=>setWylaczoneOsoby(new Set())} style={{fontSize:10,padding:"2px 8px",background:"rgba(255,165,0,0.1)",border:"1px solid #fa055",borderRadius:4,color:"#fa0",cursor:"pointer"}}>
+              Włącz wszystkich
+            </button>
+          )}
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {czlonkowie.map(c=>{
+            const wylaczona=wylaczoneOsoby.has(c.id);
+            return (
+              <button key={c.id} onClick={()=>toggleOsoba(c.id)} style={{
+                padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+                background:wylaczona?"rgba(255,50,50,0.15)":"rgba(255,255,255,0.05)",
+                border:wylaczona?"1px solid #f5544488":"1px solid #2a2a3a",
+                color:wylaczona?"#f55":"#888",
+                textDecoration:wylaczona?"line-through":"none",
+              }}>
+                {wylaczona?"🚫 ":""}{c.nazwa}
+              </button>
+            );
+          })}
+        </div>
+        {wylaczoneOsoby.size>0&&(
+          <div style={{fontSize:10,color:"#666",marginTop:6}}>
+            Wyłączone osoby nie dostają kart w tej wymianie (mogą nadal wysyłać jako dawcy).
           </div>
         )}
       </div>
@@ -2304,9 +2364,27 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
             </div>
           </div>
           {isAdmin&&(
-            <button onClick={zamknijWymiane} disabled={zamykanie} style={{padding:"5px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544488",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>
-              {zamykanie?"⏳":"🗑"} Zamknij wymianę
-            </button>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={async()=>{
+                const historia = await pobierzHistorieWymian();
+                const wpis={
+                  id:Date.now(),
+                  data:aktywnaWymiana.data||new Date().toISOString(),
+                  typWymiany:aktywnaWymiana.typWymiany,
+                  wymiany:aktywnaWymiana.wymiany||[],
+                  potwierdzone:aktywnaWymiana.potwierdzone||{},
+                  potwierdzonychCount:Object.values(aktywnaWymiana.potwierdzone||{}).filter(Boolean).length,
+                  lacznieWymian:(aktywnaWymiana.wymiany||[]).length,
+                };
+                await zapiszHistorieWymian([wpis,...historia].slice(0,50));
+                alert("✅ Zarchiwizowano!");
+              }} style={{padding:"5px 12px",background:"rgba(135,206,235,0.15)",border:"1px solid #87CEEB88",borderRadius:6,color:"#87CEEB",cursor:"pointer",fontSize:11}}>
+                📥 Archiwizuj
+              </button>
+              <button onClick={zamknijWymiane} disabled={zamykanie} style={{padding:"5px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544488",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>
+                {zamykanie?"⏳":"🗑"} Zamknij
+              </button>
+            </div>
           )}
         </div>
         <div style={{marginTop:12}}>
@@ -2476,6 +2554,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"historia",label:"📜 Historia"},
     {id:"reset",label:"🔄 Reset"},
     {id:"push",label:"🔔 Powiadomienia"},
+    {id:"duple",label:"🃏 Duple"},
     {id:"ogloszenie",label:"📢 Ogłoszenie"},
     {id:"logi",label:"🔒 Logi logowań"},
     {id:"kalendarz",label:"📅 Kalendarz"},
@@ -2507,6 +2586,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
+      {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
       {tryb==="logi"&&<LogiLogowan/>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
@@ -3134,10 +3214,23 @@ function KalkulatorSezonu({talie,czlonkowie,posiadane,duplikaty,typWymiany}) {
 // HISTORIA WYMIAN
 // ============================================================
 function HistoriaWymian({zapiszStrukture,aktywnaWymiana}) {
-  const [historia,setHistoria]=useState(()=>{
-    try{ return JSON.parse(localStorage.getItem("gang_historia_wymian")||"[]"); }
-    catch{ return []; }
-  });
+  const [historia,setHistoria]=useState([]);
+
+  useEffect(()=>{
+    // Migruj z localStorage do Firebase jeśli jest stara historia
+    const stara = localStorage.getItem("gang_historia_wymian");
+    if (stara) {
+      try {
+        const parsed = JSON.parse(stara);
+        if (parsed.length > 0) {
+          zapiszHistorieWymian(parsed);
+          localStorage.removeItem("gang_historia_wymian");
+        }
+      } catch {}
+    }
+    const unsub = subscribeHistoria(setHistoria);
+    return () => unsub();
+  }, []);
 
   const archiwizuj=async()=>{
     if(!aktywnaWymiana) return;
@@ -3150,16 +3243,14 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana}) {
       potwierdzonychCount:Object.values(aktywnaWymiana.potwierdzone||{}).filter(Boolean).length,
       lacznieWymian:(aktywnaWymiana.wymiany||[]).length,
     };
-    const nowaHistoria=[wpis,...historia].slice(0,50); // max 50 wpisów
-    setHistoria(nowaHistoria);
-    localStorage.setItem("gang_historia_wymian",JSON.stringify(nowaHistoria));
+    const nowaHistoria=[wpis,...historia].slice(0,50);
+    await zapiszHistorieWymian(nowaHistoria);
     alert("✅ Wymiana zarchiwizowana!");
   };
 
-  const usunWpis=(id)=>{
+  const usunWpis=async(id)=>{
     const nowa=historia.filter(w=>w.id!==id);
-    setHistoria(nowa);
-    localStorage.setItem("gang_historia_wymian",JSON.stringify(nowa));
+    await zapiszHistorieWymian(nowa);
   };
 
   return (
@@ -4472,6 +4563,138 @@ function LogiLogowan() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// DUPLE — kto ile ma duplikatów
+// ============================================================
+function DupleView({czlonkowie, talie, duplikaty}) {
+  const [filtrTyp, setFiltrTyp] = useState("wszystkie");
+  const [filtrTalia, setFiltrTalia] = useState("wszystkie");
+
+  // Policz duplikaty per osoba
+  const statystyki = czlonkowie.map(c => {
+    const klucze = Object.entries(duplikaty).filter(([k, v]) => v && k.startsWith(`${c.id}_`));
+    const zlote = klucze.filter(([k]) => {
+      const [,taliaId,kartaNazwa] = k.split("_");
+      const talia = talie.find(t => t.id === taliaId);
+      const karta = talia?.karty.find(k2 => k2.nazwa === kartaNazwa);
+      return karta?.typ === "złota";
+    });
+    const diamentowe = klucze.filter(([k]) => {
+      const [,taliaId,kartaNazwa] = k.split("_");
+      const talia = talie.find(t => t.id === taliaId);
+      const karta = talia?.karty.find(k2 => k2.nazwa === kartaNazwa);
+      return karta?.typ === "diamentowa";
+    });
+
+    // Szczegóły per talia
+    const perTalia = talie.map(t => {
+      const duple = t.karty.filter(k => duplikaty[`${c.id}_${t.id}_${k.nazwa}`]);
+      return { talia: t, duple };
+    }).filter(x => x.duple.length > 0);
+
+    return {
+      czlonek: c,
+      lacznie: klucze.length,
+      zlote: zlote.length,
+      diamentowe: diamentowe.length,
+      perTalia,
+    };
+  }).sort((a,b) => b.lacznie - a.lacznie);
+
+  const filtered = statystyki.filter(s => {
+    if (filtrTyp === "złote" && s.zlote === 0) return false;
+    if (filtrTyp === "diamentowe" && s.diamentowe === 0) return false;
+    if (filtrTalia !== "wszystkie") {
+      return s.perTalia.some(p => p.talia.id === filtrTalia);
+    }
+    return true;
+  });
+
+  const lacznie = statystyki.reduce((s,x)=>s+x.lacznie,0);
+  const lacznieZlote = statystyki.reduce((s,x)=>s+x.zlote,0);
+  const lacznie💎 = statystyki.reduce((s,x)=>s+x.diamentowe,0);
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70033",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>🃏 Ranking duplikatów</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"8px 14px",flex:1,textAlign:"center"}}>
+            <div style={{fontSize:24,fontWeight:"bold",color:"#ffd700"}}>{lacznie}</div>
+            <div style={{fontSize:11,color:"#888"}}>duplikatów łącznie</div>
+          </div>
+          <div style={{background:"rgba(255,215,0,0.08)",borderRadius:8,padding:"8px 14px",flex:1,textAlign:"center"}}>
+            <div style={{fontSize:24,fontWeight:"bold",color:"#ffd700"}}>{lacznieZlote} ⭐</div>
+            <div style={{fontSize:11,color:"#888"}}>złotych</div>
+          </div>
+          <div style={{background:"rgba(135,206,235,0.08)",borderRadius:8,padding:"8px 14px",flex:1,textAlign:"center"}}>
+            <div style={{fontSize:24,fontWeight:"bold",color:"#87CEEB"}}>{lacznie💎} 💎</div>
+            <div style={{fontSize:11,color:"#888"}}>diamentowych</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filtry */}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+        {["wszystkie","złote","diamentowe"].map(t=>(
+          <button key={t} onClick={()=>setFiltrTyp(t)} style={{
+            padding:"6px 12px",borderRadius:6,fontSize:12,cursor:"pointer",
+            background:filtrTyp===t?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
+            border:filtrTyp===t?"1px solid #ffd700":"1px solid #2a2a3a",
+            color:filtrTyp===t?"#ffd700":"#666",
+          }}>{t==="złote"?"⭐ Złote":t==="diamentowe"?"💎 Diamentowe":"🃏 Wszystkie"}</button>
+        ))}
+        <select value={filtrTalia} onChange={e=>setFiltrTalia(e.target.value)} style={{
+          padding:"6px 10px",background:"#12122a",border:"1px solid #2a2a3a",
+          borderRadius:6,color:"#888",fontSize:12,cursor:"pointer",
+        }}>
+          <option value="wszystkie">Wszystkie talie</option>
+          {talie.map(t=><option key={t.id} value={t.id}>{t.nazwa}</option>)}
+        </select>
+      </div>
+
+      {/* Ranking */}
+      {filtered.map((s,i) => (
+        <div key={s.czlonek.id} style={{
+          background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",
+          borderRadius:8,padding:"10px 12px",marginBottom:6,
+        }}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:s.perTalia.length>0?6:0}}>
+            <span style={{fontSize:12,color:"#555",width:22,textAlign:"right"}}>{i+1}.</span>
+            <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"#ddd"}}>{s.czlonek.nazwa}</span>
+            <span style={{fontSize:12,color:"#ffd700",background:"rgba(255,215,0,0.1)",padding:"2px 8px",borderRadius:6}}>
+              {s.lacznie} duple
+            </span>
+            {s.zlote>0&&<span style={{fontSize:11,color:"#ffd700"}}>⭐{s.zlote}</span>}
+            {s.diamentowe>0&&<span style={{fontSize:11,color:"#87CEEB"}}>💎{s.diamentowe}</span>}
+          </div>
+          {/* Szczegóły per talia */}
+          {s.perTalia.length>0&&(filtrTalia!=="wszystkie"?s.perTalia.filter(p=>p.talia.id===filtrTalia):s.perTalia).map(p=>(
+            <div key={p.talia.id} style={{
+              marginLeft:30,marginTop:3,display:"flex",flexWrap:"wrap",gap:4,alignItems:"center",
+            }}>
+              <span style={{fontSize:10,color:"#666",minWidth:100}}>{p.talia.nazwa}:</span>
+              {p.duple.map(k=>(
+                <span key={k.nazwa} style={{
+                  fontSize:10,padding:"1px 6px",borderRadius:4,
+                  background:k.typ==="złota"?"rgba(255,215,0,0.1)":"rgba(135,206,235,0.1)",
+                  color:k.typ==="złota"?"#ffd70099":"#87CEEB99",
+                  border:`1px solid ${k.typ==="złota"?"#ffd70022":"#87CEEB22"}`,
+                }}>{k.nazwa}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+      {filtered.length===0&&(
+        <div style={{textAlign:"center",padding:30,color:"#555",fontSize:13}}>
+          Brak duplikatów dla wybranych filtrów
+        </div>
+      )}
     </div>
   );
 }
