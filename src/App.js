@@ -355,6 +355,7 @@ export default function App() {
           trybWymiany={trybWymiany} setTrybWymiany={setTrybWymiany}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
           przejdzDoAktywnej={()=>setZakładka("aktywna")}
+          historiaWymian={historiaWymian}
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
@@ -1320,7 +1321,7 @@ function opisFazy(faza, typWymiany) {
   };
 }
 
-function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej}) {
+function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej,historiaWymian=[]}) {
   const [skopiowano,setSkopiowano]=useState(false);
   const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
