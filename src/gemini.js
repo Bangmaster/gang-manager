@@ -12,27 +12,80 @@ function fileToBase64(file) {
   });
 }
 
+// ============================================================
+// PROMPT — przepisany od nowa na podstawie analizy kart
+// ============================================================
 function buildPromptJeden(wszystkieTalie) {
   const info = wszystkieTalie.map(t =>
-    `${t.nazwa}: ${t.karty.map(k => `"${k.nazwa}"(${k.typ[0]})`).join(",")}`
+    `"${t.nazwa}": ${t.karty.map(k => `"${k.nazwa}"(${k.typ === "złota" ? "złota" : "diamentowa"})`).join(", ")}`
   ).join("\n");
-  return `Każda karta w grze The Gang ma na górze GWIAZDKI. Patrz TYLKO na gwiazdki.
 
-POSIADANIE — wypełnienie gwiazdek:
-- Gwiazdki KOLOROWE (wypełnione żółtym, złotym lub fioletowym kolorem) = posiadana: true
-- Gwiazdki SZARE (puste, tylko kontur, bez koloru w środku) = posiadana: false
+  return `Jesteś ekspertem od rozpoznawania kart z gry mobilnej "The Gang".
+Na screenie widać siatkę 3x3 z 9 kartami. Każda karta ma:
+- nazwę na dole (pomarańczowy pasek)
+- gwiazdki NA GÓRZE karty (ponad obrazkiem)
+- opcjonalnie: żółtą liczbę z plusem w prawym dolnym rogu (np. +1, +2, +3)
 
-DUPLIKAT — żółta cyfra (1-9) widoczna gdziekolwiek na karcie:
-- Widzisz cyfrę = duplikaty: 1
-- Brak cyfry = duplikaty: 0
+=== KROK 1: NAZWA TALII ===
+Nazwa talii jest wyświetlona na górze EKRANU (nad siatką kart), nie na kartach.
+Dopasuj ją do jednej z baz poniżej (ignoruj wielkość liter i polskie znaki).
 
-Typ karty (złota/diamentowa) — weź z bazy poniżej, NIE zgaduj.
+=== KROK 2: TYP KARTY (złota vs diamentowa) ===
+Patrz na KOLOR gwiazdek na górze karty:
+- Gwiazdki ŻÓŁTE / ZŁOTE = karta złota
+- Gwiazdki FIOLETOWE / NIEBIESKIE / BŁĘKITNE = karta diamentowa
+Ramka karty też daje wskazówkę: złota = żółta ramka z brokatem, diamentowa = fioletowa/niebieska ramka z iskierkami.
+UWAGA: typ bierz z OBRAZKA, nie z bazy — baza służy tylko do dopasowania nazwy.
 
-Talie (z=złota, d=diamentowa):
+=== KROK 3: POSIADANIE ===
+Patrz na WYPEŁNIENIE gwiazdek NA GÓRZE karty:
+- Gwiazdki WYPEŁNIONE KOLOREM (żółtym lub fioletowym, zależnie od typu) = posiadana: true
+- Gwiazdki SZARE / PUSTE / tylko zarys = posiadana: false
+Wszystkie gwiazdki na jednej karcie są albo wszystkie kolorowe albo wszystkie szare.
+
+=== KROK 4: DUPLIKATY ===
+Szukaj żółtej liczby z plusem (+1, +2, +3 itd.) w PRAWYM DOLNYM ROGU karty.
+- Widzisz "+2" = duplikaty: 2
+- Widzisz "+1" = duplikaty: 1
+- Brak takiej liczby = duplikaty: 0
+WAŻNE: ignoruj poziom gracza (duże cyfry przy awatarze), liczniki amunicji i inne cyfry.
+Szukaj TYLKO małej żółtej cyfry z plusem w rogu karty.
+
+=== BAZA TALII ===
 ${info}
 
-Zidentyfikuj talię z napisu na górze ekranu. Zwróć WYŁĄCZNIE JSON:
-{"talia":"nazwa","karty":[{"nazwa":"...","typ":"złota|diamentowa","posiadana":true|false,"duplikaty":0,"pewnosc":"wysoka|srednia|niska"}]}`;
+=== FORMAT ODPOWIEDZI ===
+Zwróć WYŁĄCZNIE poprawny JSON, bez markdown, bez komentarzy:
+{
+  "talia": "dokładna nazwa talii z bazy",
+  "karty": [
+    {
+      "nazwa": "dokładna nazwa karty z bazy",
+      "typ": "złota|diamentowa",
+      "posiadana": true|false,
+      "duplikaty": 0,
+      "pewnosc": "wysoka|srednia|niska"
+    }
+  ]
+}
+
+Zwróć dokładnie 9 kart (lub tyle ile widać). Nazwy przepisuj DOKŁADNIE z bazy.`;
+}
+
+// Prompt do rozpoznawania struktury talii (zakładka OCR struktury)
+function buildPromptStruktura() {
+  return `Jesteś ekspertem od rozpoznawania kart z gry mobilnej "The Gang".
+Na screenie widać ekran talii: nazwa talii na górze, siatka 3x3 z 9 kartami.
+
+Dla każdej karty rozpoznaj:
+1. NAZWĘ — tekst z pomarańczowego paska na dole karty
+2. TYP — patrz na kolor gwiazdek NA GÓRZE karty:
+   - Gwiazdki ŻÓŁTE/ZŁOTE = "złota"
+   - Gwiazdki FIOLETOWE/NIEBIESKIE = "diamentowa"
+   Ramka karty to potwierdza: złota ramka = złota karta, fioletowa ramka = diamentowa karta.
+
+Zwróć WYŁĄCZNIE JSON:
+{"talia":"nazwa talii","karty":[{"nazwa":"...","typ":"złota|diamentowa"}]}`;
 }
 
 async function geminiRequest(prompt, base64, mimeType) {
@@ -49,13 +102,14 @@ async function geminiRequest(prompt, base64, mimeType) {
       const j = JSON.parse(errText);
       if (response.status === 429) msg = "⏳ Limit tokenów/min — czekaj";
       else if (response.status === 403) msg = "🔑 Błąd autoryzacji API";
-      else msg = `Błąd ${response.status}: ${(j.error||"").substring(0, 100)}`;
+      else msg = `Błąd ${response.status}: ${(j.error || "").substring(0, 100)}`;
     } catch {}
     throw new Error(msg);
   }
 
   const data = await response.json();
   let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+  // Usuń markdown code block jeśli Gemini go doda
   if (text.startsWith("```json")) text = text.slice(7);
   else if (text.startsWith("```")) text = text.slice(3);
   if (text.endsWith("```")) text = text.slice(0, -3);
@@ -118,8 +172,7 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
 export async function analyzeDeckStructure(file) {
   try {
     const { base64, mimeType } = await fileToBase64(file);
-    const prompt = `Rozpoznaj strukturę talii z gry The Gang. Na screenie widać ekran talii z nazwą u góry i 9 kartami w siatce 3x3. Rozpoznaj nazwę talii i dla każdej z 9 kart: nazwę i typ (złota=żółte gwiazdki, diamentowa=fioletowe gwiazdki). Zwróć WYŁĄCZNIE JSON: {"talia":"nazwa talii","karty":[{"nazwa":"...","typ":"złota|diamentowa"}]}`;
-    const text = await geminiRequest(prompt, base64, mimeType);
+    const text = await geminiRequest(buildPromptStruktura(), base64, mimeType);
     const parsed = JSON.parse(text);
     return { sukces: true, dane: parsed };
   } catch (e) {
@@ -139,25 +192,63 @@ export async function analyzeImage(file, wszystkieTalie) {
 
 export function matchTalia(ocrWynik, wszystkieTalie) {
   if (!ocrWynik.sukces) return null;
-  const n = (ocrWynik.dane.talia || "").toLowerCase().trim();
-  return wszystkieTalie.find(t => t.nazwa.toLowerCase() === n)
-    || wszystkieTalie.find(t => t.nazwa.toLowerCase().includes(n) || n.includes(t.nazwa.toLowerCase()))
-    || null;
+  const n = normalizujOCR(ocrWynik.dane.talia || "");
+  // 1. Dokładne trafienie
+  let t = wszystkieTalie.find(t => normalizujOCR(t.nazwa) === n);
+  if (t) return t;
+  // 2. Jeden zawiera drugi
+  t = wszystkieTalie.find(t => {
+    const tn = normalizujOCR(t.nazwa);
+    return tn.includes(n) || n.includes(tn);
+  });
+  if (t) return t;
+  // 3. Dopasowanie po słowach kluczowych (min 4 znaki)
+  const slowa = n.split(/\s+/).filter(w => w.length >= 4);
+  if (slowa.length > 0) {
+    let best = null, bestScore = 0;
+    wszystkieTalie.forEach(talia => {
+      const tn = normalizujOCR(talia.nazwa);
+      let score = slowa.filter(w => tn.includes(w)).length;
+      if (score > bestScore) { bestScore = score; best = talia; }
+    });
+    if (bestScore > 0) return best;
+  }
+  return null;
 }
 
 export function matchKarta(nazwaOCR, talia) {
   if (!talia) return null;
-  const norm = (nazwaOCR || "").toLowerCase().trim();
+  const norm = normalizujOCR(nazwaOCR || "");
   if (!norm) return null;
-  let k = talia.karty.find(k => k.nazwa.toLowerCase() === norm);
+  // 1. Dokładne trafienie
+  let k = talia.karty.find(k => normalizujOCR(k.nazwa) === norm);
   if (k) return k;
+  // 2. Jeden zawiera drugi
+  k = talia.karty.find(k => {
+    const kn = normalizujOCR(k.nazwa);
+    return kn.includes(norm) || norm.includes(kn);
+  });
+  if (k) return k;
+  // 3. Scoring po słowach (min 3 znaki)
   let best = null, bestScore = 0;
   talia.karty.forEach(kk => {
-    const kn = kk.nazwa.toLowerCase();
+    const kn = normalizujOCR(kk.nazwa);
     let score = 0;
-    if (kn.includes(norm) || norm.includes(kn)) score = Math.min(kn.length, norm.length);
-    norm.split(" ").forEach(w => { if (w.length > 3 && kn.includes(w)) score += w.length; });
+    norm.split(/\s+/).forEach(w => {
+      if (w.length >= 3 && kn.includes(w)) score += w.length;
+    });
     if (score > bestScore) { bestScore = score; best = kk; }
   });
-  return bestScore > 2 ? best : null;
+  return bestScore >= 3 ? best : null;
+}
+
+// Normalizacja do porównań — usuwa polskie znaki, małe litery, trim
+function normalizujOCR(s) {
+  return (s || "")
+    .toLowerCase()
+    .trim()
+    .replace(/ą/g, "a").replace(/ć/g, "c").replace(/ę/g, "e")
+    .replace(/ł/g, "l").replace(/ń/g, "n").replace(/ó/g, "o")
+    .replace(/ś/g, "s").replace(/ź/g, "z").replace(/ż/g, "z")
+    .replace(/\s+/g, " ");
 }
