@@ -4616,7 +4616,7 @@ function DupleView({czlonkowie, talie, duplikaty}) {
 
   const lacznie = statystyki.reduce((s,x)=>s+x.lacznie,0);
   const lacznieZlote = statystyki.reduce((s,x)=>s+x.zlote,0);
-  const lacznie💎 = statystyki.reduce((s,x)=>s+x.diamentowe,0);
+  const lacznie_dia = statystyki.reduce((s,x)=>s+x.diamentowe,0);
 
   return (
     <div>
@@ -4632,7 +4632,7 @@ function DupleView({czlonkowie, talie, duplikaty}) {
             <div style={{fontSize:11,color:"#888"}}>złotych</div>
           </div>
           <div style={{background:"rgba(135,206,235,0.08)",borderRadius:8,padding:"8px 14px",flex:1,textAlign:"center"}}>
-            <div style={{fontSize:24,fontWeight:"bold",color:"#87CEEB"}}>{lacznie💎} 💎</div>
+            <div style={{fontSize:24,fontWeight:"bold",color:"#87CEEB"}}>{lacznie_dia} 💎</div>
             <div style={{fontSize:11,color:"#888"}}>diamentowych</div>
           </div>
         </div>
