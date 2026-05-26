@@ -1026,17 +1026,6 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     };
 
     // Sprawdź czy talia może być faktycznie zamknięta — czy wszystkie brakujące karty mają potencjalnych dawców
-    const czyMoznaZamknac = (s) => {
-      return s.brakT.every(karta => {
-        const juzWPlanie = planoweWymiany.some(w =>
-          w.do === s.osoba.nazwa && w.talia === s.talia.nazwa && w.karta === karta.nazwa
-        );
-        if (juzWPlanie) return true;
-        return czlonkowie.some(o2 =>
-          o2.id !== s.osoba.id && duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]
-        );
-      });
-    };
 
     const potrzebyGrup = staneTalii
       .map(s => {
