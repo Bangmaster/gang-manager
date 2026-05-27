@@ -217,7 +217,7 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
 // Upload wideo do Google Files API przez nasz proxy
 // Zwraca fileUri który można przekazać do Gemini
 async function uploadVideoDoGoogle(file, onProgress) {
-  const CHUNK_SIZE = 3.5 * 1024 * 1024; // 3.5MB — bezpieczny limit dla Vercela
+  const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB — bezpieczny limit dla Vercela (body = chunk + base64 overhead + JSON)
   const mimeType = file.type || "video/mp4";
 
   // Krok 1: Zainicjuj upload przez nasz serwer
