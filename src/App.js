@@ -173,16 +173,24 @@ export default function App() {
     // Subskrybuj listę online
     const unsub = subscribeOnline(setStatusOnline);
     // Wyloguj się z online przy zamknięciu okna
-    const handleUnload = () => {
-      setOffline(login);
-      // Zapisz wszystkie pending zmiany natychmiast przed zamknięciem
-      Object.entries(pendingRef.current).forEach(([typ, klucze]) => {
-        Object.entries(klucze).forEach(([key, val]) => {
-          setCardField(typ, key, val);
-        });
-      });
-    };
+    const handleUnload = () => setOffline(login);
     window.addEventListener("beforeunload", handleUnload);
+
+    // Zapisz log "wejście na apkę" — działa też gdy użytkownik był już zalogowany
+    // (np. admin otwiera laptopa i apka ładuje się z localStorage)
+    (async () => {
+      try {
+        const fp = getFingerprint();
+        await zapiszLog({
+          nick: login,
+          rola: zalogowany.rola || "czlonek",
+          czas: Date.now(),
+          fp,
+          typ: "wejscie", // odróżnia od "login" — brak wpisywania nicku
+        });
+      } catch(e) { console.error("Błąd zapisu logu wejścia:", e); }
+    })();
+
     return () => {
       clearInterval(interval);
       unsub();
@@ -195,23 +203,30 @@ export default function App() {
   useEffect(() => {
     let unsub = null;
     (async () => {
-      const start = await loadGangData();
-      if (!start) {
-        await saveGangData(DOMYSLNE_DANE);
-        setDane(DOMYSLNE_DANE);
-      } else {
-        // Połącz domyślne dane (jeśli brak pól) z tym co jest w bazie
-        setDane({
-          talie: start.talie || DOMYSLNE_DANE.talie,
-          czlonkowie: start.czlonkowie || DOMYSLNE_DANE.czlonkowie,
-          posiadane: start.posiadane || {},
-          duplikaty: start.duplikaty || {},
-          walki: start.walki || [],
-          aktywnaWymiana: start.aktywnaWymiana || null,
-        });
+      try {
+        const start = await loadGangData();
+        if (start === null) {
+          // Dokument naprawdę nie istnieje w bazie — inicjalizuj (tylko przy pierwszym uruchomieniu)
+          await saveGangData(DOMYSLNE_DANE);
+          setDane(DOMYSLNE_DANE);
+        } else {
+          // Dokument istnieje — użyj danych z bazy
+          setDane({
+            talie: start.talie || DOMYSLNE_DANE.talie,
+            czlonkowie: start.czlonkowie || DOMYSLNE_DANE.czlonkowie,
+            posiadane: start.posiadane || {},
+            duplikaty: start.duplikaty || {},
+            walki: start.walki || [],
+            aktywnaWymiana: start.aktywnaWymiana || null,
+          });
+        }
+      } catch (e) {
+        // Błąd sieci — NIE inicjalizuj danych, poczekaj na subskrypcję
+        console.error("Błąd inicjalizacji Firebase:", e);
       }
+
+      // Subskrypcja real-time — niezależna od błędu inicjalizacji
       unsub = subscribeGangData((d) => {
-        // ZAWSZE aktualizuj — nawet po własnym zapisie. Server jest źródłem prawdy.
         setDane({
           talie: d.talie || DOMYSLNE_DANE.talie,
           czlonkowie: d.czlonkowie || DOMYSLNE_DANE.czlonkowie,
@@ -226,34 +241,11 @@ export default function App() {
   }, []);
 
   // Atomowy zapis pojedynczej karty (bez nadpisywania innych zmian)
-  // Bufor debounce — zbiera zmiany i zapisuje do Firebase po 400ms ciszy
-  const debounceRef = useRef({});
-  const pendingRef = useRef({});
-
-  const zapiszKarte = (typ, key, value) => {
-    // Aktualizuj lokalny stan natychmiast (UI reaguje od razu)
-    setDane(prev => {
-      const nowe = { ...prev, [typ]: { ...(prev[typ]||{}), [key]: value } };
-      if (value === null || value === undefined) {
-        const copy = { ...(prev[typ]||{}) };
-        delete copy[key];
-        return { ...prev, [typ]: copy };
-      }
-      return nowe;
-    });
-
-    // Zapamiętaj co ma być zapisane
-    if (!pendingRef.current[typ]) pendingRef.current[typ] = {};
-    pendingRef.current[typ][key] = value;
-
-    // Anuluj poprzedni timer dla tego klucza i ustaw nowy
-    const timerKey = `${typ}_${key}`;
-    if (debounceRef.current[timerKey]) clearTimeout(debounceRef.current[timerKey]);
-    debounceRef.current[timerKey] = setTimeout(async () => {
-      const val = pendingRef.current[typ]?.[key];
-      delete pendingRef.current[typ]?.[key];
-      await setCardField(typ, key, val);
-    }, 400);
+  const zapiszKarte = async (typ, key, value) => {
+    setStatusZapisu("⏳ Zapisywanie...");
+    const ok = await setCardField(typ, key, value);
+    setStatusZapisu(ok ? "✓ Zapisano" : "❌ Błąd");
+    setTimeout(() => setStatusZapisu(""), 1200);
   };
 
   // Zapis strukturalny (talie, członkowie)
@@ -471,8 +463,8 @@ function LoginScreen({onLogin, czlonkowie}) {
     const u=ADMIN_CREDENTIALS.find(c=>c.login===login&&c.haslo===haslo);
     if(u){
       // Zapisz log admina
-      zapiszLog({ nick: u.login, rola: u.rola, czas: teraz, fp, typ: "login" });
-      zapiszFingerprint(u.login, fp);
+      await zapiszLog({ nick: u.login, rola: u.rola, czas: teraz, fp, typ: "login" });
+      await zapiszFingerprint(u.login, fp);
       onLogin(u);
       return;
     }
@@ -486,13 +478,13 @@ function LoginScreen({onLogin, czlonkowie}) {
       const znane = await pobierzFingerprinty();
       const znaneNicka = znane[oryginalny.nazwa] || [];
       const noweUrzadzenie = znaneNicka.length > 0 && !znaneNicka.includes(fp);
-      // Zapisz log
-      zapiszLog({
+      // Zapisz log (await — żeby zdążyło zapisać przy szybkim logowaniu)
+      await zapiszLog({
         nick: oryginalny.nazwa, rola: "czlonek", czas: teraz, fp,
         typ: noweUrzadzenie ? "login_nowe_urzadzenie" : "login",
         noweUrzadzenie,
       });
-      zapiszFingerprint(oryginalny.nazwa, fp);
+      await zapiszFingerprint(oryginalny.nazwa, fp);
       onLogin({login: oryginalny.nazwa, rola:"czlonek", noweUrzadzenie});
       return;
     }
@@ -1864,6 +1856,15 @@ function EdycjaTalii({talie,zapisz}) {
   };
   const usunKarte=n=>zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.filter(k=>k.nazwa!==n)}:t));
   const zmienTyp=(n,typ)=>zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.map(k=>k.nazwa===n?{...k,typ}:k)}:t));
+  const [edytujKarte,setEdytujKarte]=useState(null); // nazwa karty którą edytujemy
+  const [tempNazwaKarty,setTempNazwaKarty]=useState("");
+  const zmienNazweKarty=(stara,nowa)=>{
+    const nowaNazwa=nowa.trim();
+    if(!nowaNazwa||nowaNazwa===stara){setEdytujKarte(null);return;}
+    if(talia.karty.find(k=>k.nazwa===nowaNazwa)){alert("Karta o tej nazwie już istnieje!");return;}
+    zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.map(k=>k.nazwa===stara?{...k,nazwa:nowaNazwa}:k)}:t));
+    setEdytujKarte(null);
+  };
   const zapiszPole=(pole,val)=>zapisz(talie.map(t=>t.id===talia.id?{...t,[pole]:pole==="numer"?parseInt(val)||t.numer:parseInt(val)||t.nagroda_amunicja}:t));
   const dodajTalie=()=>{
     if(!nowaTalia.nazwa.trim()) return;
@@ -1971,8 +1972,30 @@ function EdycjaTalii({talie,zapisz}) {
             </div>
           </div>
           {talia.karty.map((k,ki)=>(
-            <div key={ki} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #12122a"}}>
-              <span style={{flex:1,fontSize:12,color:"#ccc"}}>{k.nazwa}</span>
+            <div key={ki} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid #12122a"}}>
+              {edytujKarte===k.nazwa?(
+                <input
+                  autoFocus
+                  value={tempNazwaKarty}
+                  onChange={e=>setTempNazwaKarty(e.target.value)}
+                  onBlur={()=>zmienNazweKarty(k.nazwa,tempNazwaKarty)}
+                  onKeyDown={e=>{
+                    if(e.key==="Enter") zmienNazweKarty(k.nazwa,tempNazwaKarty);
+                    if(e.key==="Escape"){setEdytujKarte(null);}
+                  }}
+                  style={{flex:1,padding:"3px 8px",background:"#1a1a3a",border:"1px solid #ffd700",borderRadius:4,color:"#fff",fontSize:12}}
+                />
+              ):(
+                <span
+                  onClick={()=>{setEdytujKarte(k.nazwa);setTempNazwaKarty(k.nazwa);}}
+                  title="Kliknij żeby edytować nazwę"
+                  style={{flex:1,fontSize:12,color:"#ccc",cursor:"text",padding:"2px 4px",borderRadius:3,transition:"background 0.15s"}}
+                  onMouseEnter={e=>e.target.style.background="rgba(255,215,0,0.07)"}
+                  onMouseLeave={e=>e.target.style.background="transparent"}
+                >
+                  {k.nazwa} <span style={{fontSize:9,color:"#444",marginLeft:2}}>✏️</span>
+                </span>
+              )}
               <select value={k.typ} onChange={e=>zmienTyp(k.nazwa,e.target.value)} style={{padding:"3px 6px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:k.typ==="złota"?"#ffd700":"#87CEEB",fontSize:11,cursor:"pointer"}}>
                 <option value="złota">⭐ Złota</option>
                 <option value="diamentowa">💎 Diamentowa</option>
@@ -4589,11 +4612,16 @@ function LogiLogowan() {
             border:`1px solid ${l.noweUrzadzenie?"#f5544433":"#1a1a2e"}`,
             borderRadius:6,
           }}>
-            <span style={{fontSize:14}}>{l.noweUrzadzenie?"🔴":l.rola==="admin"?"👑":l.rola==="zastepca"?"⚔️":"👤"}</span>
+            <span style={{fontSize:14}}>
+              {l.noweUrzadzenie?"🔴":l.typ==="wejscie"?"🟢":l.rola==="admin"?"👑":l.rola==="zastepca"?"⚔️":"👤"}
+            </span>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:"bold",color:l.noweUrzadzenie?"#f55":"#ddd"}}>
                 {l.nick}
                 {l.noweUrzadzenie&&<span style={{fontSize:10,color:"#f55",marginLeft:6,background:"rgba(255,50,50,0.15)",padding:"1px 5px",borderRadius:4}}>NOWE URZĄDZENIE!</span>}
+                {l.typ==="wejscie"&&<span style={{fontSize:10,color:"#0c6",marginLeft:6,background:"rgba(0,200,100,0.1)",padding:"1px 5px",borderRadius:4}}>wejście</span>}
+                {l.typ==="login"&&<span style={{fontSize:10,color:"#888",marginLeft:6,background:"rgba(255,255,255,0.05)",padding:"1px 5px",borderRadius:4}}>logowanie</span>}
+                {l.typ==="login_nowe_urzadzenie"&&<span style={{fontSize:10,color:"#f55",marginLeft:6,background:"rgba(255,50,50,0.1)",padding:"1px 5px",borderRadius:4}}>nowe urządzenie</span>}
                 <span style={{fontSize:10,color:"#555",marginLeft:6}}>{l.rola}</span>
               </div>
               <div style={{fontSize:10,color:"#555",display:"flex",gap:8}}>
