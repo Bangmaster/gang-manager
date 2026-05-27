@@ -1,7 +1,11 @@
 // Logika rozpoznawania kart — klucze API są na serwerze (api/gemini.js)
 // Frontend NIE ma dostępu do kluczy Gemini
 
-function nastepnyKlucz() {} // no-op — rotacja kluczy jest na serwerze
+// Licznik kluczy — atomowo inkrementowany przy każdym requeście
+let aktualnyKluczIdx = 0;
+function nastepnyKlucz() {
+  return aktualnyKluczIdx++;
+}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -89,10 +93,11 @@ Zwróć WYŁĄCZNIE JSON:
 }
 
 async function geminiRequest(prompt, base64, mimeType) {
+  const kluczIdx = nastepnyKlucz(); // pobierz indeks przed requestem (thread-safe)
   const response = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, base64, mimeType })
+    body: JSON.stringify({ prompt, base64, mimeType, kluczIdx })
   });
 
   if (!response.ok) {
@@ -116,57 +121,228 @@ async function geminiRequest(prompt, base64, mimeType) {
   return text.trim();
 }
 
+// Ile równoległych requestów wysyłamy naraz
+// 3 = bezpieczny limit przy 5 kluczach (każdy klucz ~7 req/min, limit to 10)
+const ROWNOLEGLE = 3;
+
+// Pauza między grupami — daje czas serwerowi na reset okna limitów
+const PAUZA_MIEDZY_GRUPAMI = 1500; // ms
+
+// Przeanalizuj jeden plik z retry przy limicie
+async function analyzeImageZRetry(file, wszystkieTalie, onSingleProgress) {
+  for (let proba = 0; proba < 3; proba++) {
+    try {
+      const wynik = await analyzeImage(file, wszystkieTalie);
+      if (wynik.sukces) return wynik;
+
+      // Limit API — czekaj i spróbuj ponownie
+      if (wynik.blad?.includes("⏳") || wynik.blad?.includes("limit") || wynik.blad?.includes("429")) {
+        const czekaj = Math.min(60, 20 * (proba + 1));
+        onSingleProgress?.(`⏳ Limit — czekam ${czekaj}s...`);
+        await new Promise(r => setTimeout(r, czekaj * 1000));
+        continue;
+      }
+
+      // Inny błąd — zwróć od razu
+      return wynik;
+    } catch (e) {
+      if (proba < 2) await new Promise(r => setTimeout(r, 8000));
+    }
+  }
+  return { sukces: false, blad: "Nie udało się po 3 próbach", fileName: file.name };
+}
+
 export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
   if (files.length === 0) return [];
-  const PAUZA = 2000;
-  const wyniki = [];
+
+  // Wyniki w oryginalnej kolejności plików
+  const wyniki = new Array(files.length);
+  let ukonczono = 0;
   let kolejneBledy = 0;
 
-  for (let i = 0; i < files.length; i++) {
-    onProgress?.(i, files.length, `🤖 Analizuję screen ${i + 1}/${files.length}: ${files[i].name}`);
+  // Podziel pliki na grupy po ROWNOLEGLE
+  for (let start = 0; start < files.length; start += ROWNOLEGLE) {
+    const grupa = files.slice(start, start + ROWNOLEGLE);
+    const indeksy = grupa.map((_, gi) => start + gi);
 
-    let sukces = false;
-    for (let proba = 0; proba < 3; proba++) {
-      try {
-        const wynik = await analyzeImage(files[i], wszystkieTalie);
-        if (wynik.sukces) {
-          wyniki.push(wynik);
-          kolejneBledy = 0;
-          sukces = true;
-          nastepnyKlucz();
-          break;
-        } else if (wynik.blad?.includes("⏳") || wynik.blad?.includes("limit")) {
-          const czekaj = Math.min(60, 15 * (proba + 1));
-          onProgress?.(i, files.length, `⏳ Limit — czekam ${czekaj}s... (próba ${proba + 2}/3)`);
-          await new Promise(r => setTimeout(r, czekaj * 1000));
-        } else {
-          wyniki.push(wynik);
-          sukces = true;
-          break;
-        }
-      } catch (e) {
-        if (proba < 2) await new Promise(r => setTimeout(r, 10000));
-      }
-    }
+    // Aktywne nazwy plików w tej grupie
+    const nazwyGrupy = grupa.map(f => f.name.length > 15 ? f.name.slice(0, 13) + "…" : f.name).join(", ");
+    onProgress?.(
+      ukonczono,
+      files.length,
+      `🤖 Analizuję ${ukonczono + 1}–${Math.min(ukonczono + grupa.length, files.length)}/${files.length}: ${nazwyGrupy}`
+    );
 
-    if (!sukces) {
-      wyniki.push({ sukces: false, blad: "Nie udało się po 3 próbach", fileName: files[i].name });
-      kolejneBledy++;
-    }
+    // Capture w const przed callbackiem — fix no-loop-func
+    const offsetUkonczono = ukonczono;
 
-    if (kolejneBledy >= 3) {
+    // Wszystkie pliki w grupie analizowane równolegle
+    const rezultaty = await Promise.all(
+      grupa.map((file, gi) =>
+        analyzeImageZRetry(file, wszystkieTalie, (msg) => {
+          onProgress?.(offsetUkonczono + gi, files.length, msg);
+        })
+      )
+    );
+
+    // Zapisz wyniki zachowując kolejność
+    let noweBledy = 0;
+    rezultaty.forEach((wynik, gi) => {
+      wyniki[indeksy[gi]] = wynik;
+      if (!wynik.sukces) noweBledy++;
+    });
+    if (noweBledy > 0) kolejneBledy += noweBledy;
+    else kolejneBledy = 0;
+
+    ukonczono += grupa.length;
+
+    // Zbyt wiele błędów z rzędu — przerywamy
+    if (kolejneBledy >= 6) {
       onProgress?.(files.length, files.length, "❌ Zbyt wiele błędów z rzędu — przerywam");
       break;
     }
 
-    if (i < files.length - 1) {
-      onProgress?.(i + 1, files.length, `⏱️ Pauza ${PAUZA / 1000}s...`);
-      await new Promise(r => setTimeout(r, PAUZA));
+    // Pauza między grupami (nie po ostatniej)
+    if (start + ROWNOLEGLE < files.length) {
+      onProgress?.(ukonczono, files.length, `⏱️ Pauza...`);
+      await new Promise(r => setTimeout(r, PAUZA_MIEDZY_GRUPAMI));
     }
   }
 
   onProgress?.(files.length, files.length, "✓ Zakończono");
-  return wyniki;
+  // Wypełnij ewentualne luki (przerwane przez błędy)
+  return wyniki.map((w, i) => w || { sukces: false, blad: "Pominięto", fileName: files[i].name });
+}
+
+// Upload wideo do Google Files API przez nasz proxy
+// Zwraca fileUri który można przekazać do Gemini
+async function uploadVideoDoGoogle(file, onProgress) {
+  // Krok 1: pobierz upload URL z naszego serwera
+  onProgress?.("📡 Inicjuję upload...");
+  const initResp = await fetch("/api/get-upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mimeType: file.type || "video/mp4",
+      displayName: file.name,
+      fileSize: file.size,
+    }),
+  });
+
+  if (!initResp.ok) {
+    const err = await initResp.text();
+    throw new Error(`Upload init failed: ${err}`);
+  }
+
+  const { uploadUrl } = await initResp.json();
+
+  // Krok 2: wyślij plik bezpośrednio do Google (omija Vercel)
+  onProgress?.("⬆️ Wysyłam film do Google...");
+  const uploadResp = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type || "video/mp4",
+      "X-Goog-Upload-Command": "upload, finalize",
+      "X-Goog-Upload-Offset": "0",
+    },
+    body: file,
+  });
+
+  if (!uploadResp.ok) {
+    const err = await uploadResp.text();
+    throw new Error(`Upload failed: ${err}`);
+  }
+
+  const uploadData = await uploadResp.json();
+  const fileUri = uploadData?.file?.uri;
+  if (!fileUri) throw new Error("Brak fileUri w odpowiedzi Google");
+
+  onProgress?.("✓ Film przesłany, analizuję...");
+  return { fileUri, mimeType: file.type || "video/mp4" };
+}
+
+export async function analyzeVideo(file, wszystkieTalie, onProgress) {
+  try {
+    // Upload przez Files API — omija limit 4.5MB Vercela
+    const { fileUri, mimeType } = await uploadVideoDoGoogle(file, onProgress);
+
+    const info = wszystkieTalie.map(t =>
+      `"${t.nazwa}": ${t.karty.map(k => `"${k.nazwa}"(${k.typ === "złota" ? "złota" : "diamentowa"})`).join(", ")}`
+    ).join("\n");
+
+    const prompt = `Jesteś ekspertem od gry mobilnej "The Gang: Street Mafia Wars".
+Na nagraniu widać gracza który powoli przewija swoją kolekcję kart przez wszystkie talie.
+
+Dla każdej widocznej talii i każdej karty w niej określ:
+
+=== TYP KARTY ===
+- Gwiazdki ŻÓŁTE/ZŁOTE na górze karty = karta złota
+- Gwiazdki FIOLETOWE/NIEBIESKIE na górze karty = karta diamentowa
+
+=== POSIADANIE ===
+- Gwiazdki WYPEŁNIONE KOLOREM = posiadana: true
+- Gwiazdki SZARE/PUSTE = posiadana: false
+
+=== DUPLIKATY ===
+- Żółta liczba "+1"/"+2"/"+3" w prawym dolnym rogu karty = duplikaty: ta liczba
+- Brak takiej liczby = duplikaty: 0
+
+=== BAZA TALII ===
+${info}
+
+Przeanalizuj CAŁE nagranie i zwróć wyniki dla WSZYSTKICH talii które widzisz.
+Jeśli ta sama talia pojawi się kilka razy — weź stan z ostatniego wyraźnego ujęcia.
+
+Zwróć WYŁĄCZNIE JSON (bez markdown):
+{
+  "talie": [
+    {
+      "talia": "nazwa talii z bazy",
+      "karty": [
+        { "nazwa": "...", "typ": "złota|diamentowa", "posiadana": true|false, "duplikaty": 0, "pewnosc": "wysoka|srednia|niska" }
+      ]
+    }
+  ]
+}`;
+
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, fileUri, mimeType, kluczIdx: 0 })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      let msg = `Błąd ${response.status}`;
+      try {
+        const j = JSON.parse(errText);
+        if (response.status === 429) msg = "⏳ Limit tokenów/min — czekaj";
+        else if (response.status === 403) msg = "🔑 Błąd autoryzacji API";
+        else msg = `Błąd ${response.status}: ${(j.error || "").substring(0, 100)}`;
+      } catch {}
+      return { sukces: false, blad: msg, fileName: file.name };
+    }
+
+    const data = await response.json();
+    let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+    if (text.startsWith("```json")) text = text.slice(7);
+    else if (text.startsWith("```")) text = text.slice(3);
+    if (text.endsWith("```")) text = text.slice(0, -3);
+    text = text.trim();
+
+    const parsed = JSON.parse(text);
+
+    // Rozbij na osobne wyniki per talia (tak jak analyzeImage zwraca per talia)
+    const wyniki = (parsed.talie || []).map(t => ({
+      sukces: true,
+      dane: { talia: t.talia, karty: t.karty },
+      fileName: file.name,
+    }));
+
+    return { sukces: true, wieleTalii: true, wyniki, fileName: file.name };
+  } catch (e) {
+    return { sukces: false, blad: e.message, fileName: file.name };
+  }
 }
 
 export async function analyzeDeckStructure(file) {
