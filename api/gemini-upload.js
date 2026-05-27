@@ -1,6 +1,13 @@
 // api/gemini-upload.js
 // Obsługuje chunked upload wideo do Google Files API
-// Każdy chunk max 4MB — mieści się w limicie Vercela
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "4mb",
+    },
+  },
+};
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
