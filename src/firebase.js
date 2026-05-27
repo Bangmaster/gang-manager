@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -45,10 +45,11 @@ export async function loadGangData() {
   try {
     const snap = await getDoc(GANG_DOC);
     if (snap.exists()) return snap.data();
-    return null;
+    return null; // dokument naprawdę nie istnieje
   } catch (e) {
     console.error("Błąd ładowania:", e);
-    return null;
+    // Rzuć błąd dalej — NIE zwracaj null żeby App.js nie pomylił błędu z brakiem danych
+    throw e;
   }
 }
 
@@ -131,11 +132,21 @@ const LOGI_DOC = doc(db, "gang", "logi");
 
 export async function zapiszLog(wpis) {
   try {
+    // arrayUnion jest atomowy — brak race condition przy równoczesnych logowaniach
+    await setDoc(LOGI_DOC, { logi: arrayUnion(wpis) }, { merge: true });
+
+    // Przytnij do 200 wpisów jeśli jest ich za dużo (robimy to rzadko)
     const snap = await getDoc(LOGI_DOC);
-    const stare = snap.exists() ? (snap.data().logi || []) : [];
-    // Max 200 wpisów
-    const nowe = [wpis, ...stare].slice(0, 200);
-    await setDoc(LOGI_DOC, { logi: nowe });
+    if (snap.exists()) {
+      const logi = snap.data().logi || [];
+      if (logi.length > 200) {
+        // Sortuj po timestamp i przytnij
+        const przycięte = [...logi]
+          .sort((a, b) => (b.czas || 0) - (a.czas || 0))
+          .slice(0, 200);
+        await setDoc(LOGI_DOC, { logi: przycięte });
+      }
+    }
     return true;
   } catch(e) { console.error("Błąd zapisu logu:", e); return false; }
 }
