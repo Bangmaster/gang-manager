@@ -859,7 +859,6 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
 
   // 17. Suchy żart o gangu — kilka wariantów
   const totalTarcze = wszyscy.reduce((s,g)=>s+g.tarczeLacznie,0);
-  const srObr1Os = Math.round(lacznie / Math.max(1, wszyscy.length));
   // Raport końcowy — dokładnie 4 rotacje zgodnie ze specą
   const srObr1Os2 = Math.round(lacznie / Math.max(1, wszyscy.length));
   const zarty4 = [
