@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { analyzeMultiple, matchTalia, matchKarta } from "./gemini";
+import { useState, useEffect, useRef } from "react";
+import { analyzeMultiple, analyzeVideo, matchTalia, matchKarta } from "./gemini";
 
 // ============================================================
 // TRYB MASOWY — zbierasz screeny dla wielu osób, analizujesz
@@ -14,6 +14,11 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
   // kolejka: [{ osobaId, pliki: File[] }]
   const [kolejka, setKolejka] = useState([]);
   const [wybranaOsobaMasowa, setWybranaOsobaMasowa] = useState(czlonkowie[0]?.id || null);
+
+  // === TRYB WIDEO ===
+  // kolejkaWideo: [{ osobaId, plik: File }]
+  const [kolejkaWideo, setKolejkaWideo] = useState([]);
+  const [wybranaOsobaWideo, setWybranaOsobaWideo] = useState(czlonkowie[0]?.id || null);
 
   // === TRYB POJEDYNCZY (stary) ===
   const [wybranaOsoba, setWybranaOsoba] = useState(czlonkowie[0]?.id || null);
@@ -30,6 +35,40 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
   const [cooldownDo, setCooldownDo] = useState(null);
   const [pozostalo, setPozostalo] = useState(0);
   const [cooldownAktywowanyZBleduLimitu, setCooldownAktywowanyZBleduLimitu] = useState(false);
+  const [wakeLockInfo, setWakeLockInfo] = useState(null); // "wakeLock" | "webLock" | null
+  const wakeLockRef = useRef(null);
+
+  // Zwolnij Wake Lock gdy komponent się odmontuje w trakcie analizy
+  useEffect(() => {
+    return () => {
+      if (wakeLockRef.current) {
+        try { wakeLockRef.current.release(); } catch {}
+        wakeLockRef.current = null;
+      }
+    };
+  }, []);
+
+  // Zdobądź Wake Lock Screen — zapobiega wygaszeniu ekranu
+  const acquireWakeLock = async () => {
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+        setWakeLockInfo("wakeLock");
+        wakeLockRef.current.addEventListener("release", () => {
+          wakeLockRef.current = null;
+          setWakeLockInfo(null);
+        });
+      }
+    } catch {} // Brak uprawnień lub nieobsługiwane — ignoruj, analiza i tak działa
+  };
+
+  const releaseWakeLock = () => {
+    if (wakeLockRef.current) {
+      try { wakeLockRef.current.release(); } catch {}
+      wakeLockRef.current = null;
+    }
+    setWakeLockInfo(null);
+  };
 
   useEffect(() => {
     if (!cooldownDo) return;
@@ -92,7 +131,17 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
     const propozycje = [];
     const bledy = [];
 
+    // Rozwiń wyniki wideo (wieleTalii) na pojedyncze wyniki per talia
+    const rozwinięte = [];
     rawWyniki.forEach(w => {
+      if (w.wieleTalii && w.wyniki) {
+        rozwinięte.push(...w.wyniki);
+      } else {
+        rozwinięte.push(w);
+      }
+    });
+
+    rozwinięte.forEach(w => {
       if (!w.sukces) {
         bledy.push({ fileName: w.fileName, blad: w.blad });
         return;
@@ -140,41 +189,111 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
     setZapisaneOsoby([]);
     setAktywnyWynikIdx(0);
 
-    const wszystkieWyniki = [];
-    let globalnyNr = 0;
-    const globalnyTotal = laczbnaScreenow;
+    // Wake Lock — ekran nie wygasza się podczas analizy
+    await acquireWakeLock();
 
-    for (const pozycja of kolejka) {
-      const osoba = czlonkowie.find(c => c.id === pozycja.osobaId);
-      const offsetNr = globalnyNr; // capture w const żeby callback nie miał referencji do zmiennej pętli
-      const rawWyniki = await analyzeMultiple(
-        pozycja.pliki,
-        talie,
-        (i, total, plik) => {
-          setProgress({
-            aktualny: offsetNr + i,
-            total: globalnyTotal,
-            plik,
-            osobaNazwa: osoba?.nazwa || "?",
-          });
+    const wykonaj = async () => {
+      const wszystkieWyniki = [];
+      let globalnyNr = 0;
+      const globalnyTotal = laczbnaScreenow;
+
+      for (const pozycja of kolejka) {
+        const osoba = czlonkowie.find(c => c.id === pozycja.osobaId);
+        const offsetNr = globalnyNr;
+        const rawWyniki = await analyzeMultiple(
+          pozycja.pliki,
+          talie,
+          (i, total, plik) => {
+            setProgress({
+              aktualny: offsetNr + i,
+              total: globalnyTotal,
+              plik,
+              osobaNazwa: osoba?.nazwa || "?",
+            });
+          }
+        );
+        globalnyNr += pozycja.pliki.length;
+
+        const { propozycje, bledy } = przetworz(rawWyniki, pozycja.osobaId);
+        wszystkieWyniki.push({ osobaId: pozycja.osobaId, propozycje, bledy });
+
+        const bladLimitu = bledy.some(b => b.blad?.includes("⏳") || b.blad?.includes("limit"));
+        if (bladLimitu) {
+          setCooldownAktywowanyZBleduLimitu(true);
+          setCooldownDo(Date.now() + 10 * 60 * 1000);
         }
-      );
-      globalnyNr += pozycja.pliki.length;
-
-      const { propozycje, bledy } = przetworz(rawWyniki, pozycja.osobaId);
-      wszystkieWyniki.push({ osobaId: pozycja.osobaId, propozycje, bledy });
-
-      // Sprawdź limit
-      const bladLimitu = bledy.some(b => b.blad?.includes("⏳") || b.blad?.includes("limit"));
-      if (bladLimitu) {
-        setCooldownAktywowanyZBleduLimitu(true);
-        setCooldownDo(Date.now() + 10 * 60 * 1000);
-        // Nie przerywaj — kontynuuj dla reszty osób
       }
-    }
 
-    setWyniki(wszystkieWyniki);
-    setAnalizujac(false);
+      setWyniki(wszystkieWyniki);
+      setAnalizujac(false);
+      releaseWakeLock();
+    };
+
+    // Web Lock API — zapobiega throttlingowi zakładki w tle
+    if ("locks" in navigator) {
+      await navigator.locks.request("gang-ocr-analysis", wykonaj);
+    } else {
+      await wykonaj();
+    }
+  };
+
+  // ============================================================
+  // ANALIZUJ WIDEO — jeden film per osoba
+  // ============================================================
+  const analizujWideo = async () => {
+    if (kolejkaWideo.length === 0) return;
+    setAnalizujac(true);
+    setWyniki(null);
+    setZapisaneOsoby([]);
+    setAktywnyWynikIdx(0);
+
+    await acquireWakeLock();
+
+    const wykonaj = async () => {
+      const wszystkieWyniki = [];
+
+      for (let i = 0; i < kolejkaWideo.length; i++) {
+        const { osobaId, plik } = kolejkaWideo[i];
+        const osoba = czlonkowie.find(c => c.id === osobaId);
+
+        setProgress({
+          aktualny: i,
+          total: kolejkaWideo.length,
+          plik: plik.name,
+          osobaNazwa: osoba?.nazwa || "?",
+        });
+
+        let wynikRaw;
+        try {
+          wynikRaw = await analyzeVideo(plik, talie);
+        } catch (e) {
+          wynikRaw = { sukces: false, blad: e.message, fileName: plik.name };
+        }
+
+        const { propozycje, bledy } = przetworz(
+          wynikRaw.sukces ? [wynikRaw] : [],
+          osobaId
+        );
+        if (!wynikRaw.sukces) bledy.push({ fileName: plik.name, blad: wynikRaw.blad });
+        wszystkieWyniki.push({ osobaId, propozycje, bledy });
+
+        // Pauza między osobami
+        if (i < kolejkaWideo.length - 1) {
+          setProgress({ aktualny: i + 1, total: kolejkaWideo.length, plik: "⏱️ Pauza...", osobaNazwa: "" });
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+
+      setWyniki(wszystkieWyniki);
+      setAnalizujac(false);
+      releaseWakeLock();
+    };
+
+    if ("locks" in navigator) {
+      await navigator.locks.request("gang-ocr-analysis", wykonaj);
+    } else {
+      await wykonaj();
+    }
   };
 
   // ============================================================
@@ -189,18 +308,29 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
     setZapisaneOsoby([]);
     setAktywnyWynikIdx(0);
 
-    const rawWyniki = await analyzeMultiple(pliki, talie, (i, total, plik) => {
-      setProgress({ aktualny: i, total, plik, osobaNazwa: osoba.nazwa });
-    });
+    await acquireWakeLock();
 
-    const { propozycje, bledy } = przetworz(rawWyniki, wybranaOsoba);
-    setWyniki([{ osobaId: wybranaOsoba, propozycje, bledy }]);
-    setAnalizujac(false);
+    const wykonaj = async () => {
+      const rawWyniki = await analyzeMultiple(pliki, talie, (i, total, plik) => {
+        setProgress({ aktualny: i, total, plik, osobaNazwa: osoba.nazwa });
+      });
 
-    const bladLimitu = bledy.some(b => b.blad?.includes("limit") || b.blad?.includes("⏳"));
-    if (bladLimitu) {
-      setCooldownAktywowanyZBleduLimitu(true);
-      setCooldownDo(Date.now() + 10 * 60 * 1000);
+      const { propozycje, bledy } = przetworz(rawWyniki, wybranaOsoba);
+      setWyniki([{ osobaId: wybranaOsoba, propozycje, bledy }]);
+      setAnalizujac(false);
+      releaseWakeLock();
+
+      const bladLimitu = bledy.some(b => b.blad?.includes("limit") || b.blad?.includes("⏳"));
+      if (bladLimitu) {
+        setCooldownAktywowanyZBleduLimitu(true);
+        setCooldownDo(Date.now() + 10 * 60 * 1000);
+      }
+    };
+
+    if ("locks" in navigator) {
+      await navigator.locks.request("gang-ocr-analysis", wykonaj);
+    } else {
+      await wykonaj();
     }
   };
 
@@ -344,19 +474,20 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
       </div>
 
       {/* Przełącznik trybu */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
         {[
-          { id: "masowy", label: "🚀 Tryb masowy", opis: "Wiele osób naraz" },
-          { id: "pojedynczy", label: "👤 Tryb pojedynczy", opis: "Jedna osoba" },
+          { id: "masowy", label: "🚀 Masowy", opis: "Screeny wielu osób" },
+          { id: "wideo", label: "🎬 Wideo", opis: "Film 30s / osoba" },
+          { id: "pojedynczy", label: "👤 Pojedynczy", opis: "Jedna osoba" },
         ].map(t => (
           <button key={t.id} onClick={() => { setTryb(t.id); setWyniki(null); }} style={{
-            flex: 1, padding: "10px 12px", borderRadius: 8, cursor: "pointer", textAlign: "center",
+            flex: 1, padding: "10px 6px", borderRadius: 8, cursor: "pointer", textAlign: "center",
             background: tryb === t.id ? "linear-gradient(135deg,#b8860b,#ffd700)" : "rgba(255,255,255,0.05)",
             border: tryb === t.id ? "none" : "1px solid #2a2a3a",
             color: tryb === t.id ? "#000" : "#aaa",
             fontWeight: tryb === t.id ? "bold" : "normal",
           }}>
-            <div style={{ fontSize: 13 }}>{t.label}</div>
+            <div style={{ fontSize: 12 }}>{t.label}</div>
             <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{t.opis}</div>
           </button>
         ))}
@@ -507,6 +638,153 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
         </div>
       )}
 
+      {/* ========== TRYB WIDEO ========== */}
+      {tryb === "wideo" && !wyniki && !analizujac && (
+        <div>
+          {/* Info */}
+          <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid #2a2a3a", borderRadius: 10, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>
+              🎬 Jak nagrać film kolekcji:
+            </div>
+            <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.9 }}>
+              1️⃣ Na telefonie włącz <strong style={{ color: "#ddd" }}>nagrywanie ekranu</strong> (Android: panel powiadomień → Nagrywanie ekranu)<br />
+              2️⃣ Otwórz grę → przejdź do <strong style={{ color: "#ddd" }}>kolekcji kart</strong><br />
+              3️⃣ Powoli przewijaj przez <strong style={{ color: "#ddd" }}>wszystkie 15 talii</strong> — ~30 sekund<br />
+              4️⃣ Zatrzymaj nagrywanie → wyślij plik na komputer<br />
+              5️⃣ Wgraj poniżej dla każdej osoby
+            </div>
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(255,215,0,0.06)", border: "1px solid #ffd70022", borderRadius: 6, fontSize: 11, color: "#ffd700" }}>
+              ⚡ Zamiast 15 screenów per osoba → <strong>1 film per osoba</strong> → 20× szybciej!
+            </div>
+            <div style={{ marginTop: 6, padding: "6px 12px", background: "rgba(255,100,100,0.06)", border: "1px solid #f5544422", borderRadius: 6, fontSize: 11, color: "#aaa" }}>
+              ⚠️ Limit: film max <strong style={{ color: "#f55" }}>~37MB</strong> (po base64 = 50MB). Dla dłuższych filmów skompresuj lub przytnij.
+            </div>
+          </div>
+
+          {/* Wybór osoby */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: "#aaa", marginBottom: 6 }}>Wybierz osobę:</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {czlonkowie.map(c => {
+                const maWideo = kolejkaWideo.find(q => q.osobaId === c.id);
+                return (
+                  <button key={c.id} onClick={() => setWybranaOsobaWideo(c.id)} style={{
+                    padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12,
+                    background: wybranaOsobaWideo === c.id
+                      ? "linear-gradient(135deg,#b8860b,#ffd700)"
+                      : maWideo ? "rgba(0,200,100,0.15)" : "rgba(255,255,255,0.06)",
+                    border: wybranaOsobaWideo === c.id ? "none"
+                      : maWideo ? "1px solid #0c655" : "1px solid #2a2a3a",
+                    color: wybranaOsobaWideo === c.id ? "#000" : maWideo ? "#0c6" : "#aaa",
+                    fontWeight: wybranaOsobaWideo === c.id ? "bold" : "normal",
+                  }}>
+                    {c.nazwa}
+                    {maWideo && <span style={{ fontSize: 9, marginLeft: 4 }}>🎬</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Upload wideo */}
+          {wybranaOsobaWideo && (
+            <div style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 12, marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: "#ffd700", marginBottom: 8 }}>
+                🎬 Film dla: <strong>{czlonkowie.find(c => c.id === wybranaOsobaWideo)?.nazwa}</strong>
+              </div>
+              <label style={{
+                display: "block", padding: "12px 14px", background: "rgba(184,134,11,0.1)",
+                border: "2px dashed #b8860b55", borderRadius: 8, cursor: "pointer",
+                textAlign: "center", fontSize: 12, color: "#b8860b",
+              }}>
+                🎥 Kliknij żeby wybrać film (mp4, mov, webm)
+                <input
+                  type="file"
+                  accept="video/mp4,video/mov,video/quicktime,video/mpeg,video/webm,video/avi,video/3gpp"
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    e.target.value = "";
+                    const mb = (f.size / 1024 / 1024).toFixed(1);
+                    if (f.size > 37 * 1024 * 1024) {
+                      alert(`⚠️ Film za duży: ${mb}MB. Maksimum to ~37MB.
+Przytnij film lub zmniejsz jakość nagrania.`);
+                      return;
+                    }
+                    setKolejkaWideo(prev => {
+                      const bez = prev.filter(q => q.osobaId !== wybranaOsobaWideo);
+                      return [...bez, { osobaId: wybranaOsobaWideo, plik: f, rozmiar: mb }];
+                    });
+                  }}
+                  style={{ display: "none" }}
+                />
+              </label>
+              {kolejkaWideo.find(q => q.osobaId === wybranaOsobaWideo) && (() => {
+                const q = kolejkaWideo.find(q => q.osobaId === wybranaOsobaWideo);
+                return (
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "#0c6" }}>✓ {q.plik.name} ({q.rozmiar}MB)</span>
+                    <button onClick={() => setKolejkaWideo(prev => prev.filter(p => p.osobaId !== wybranaOsobaWideo))}
+                      style={{ fontSize: 10, padding: "2px 6px", background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", borderRadius: 4, color: "#f55", cursor: "pointer" }}>
+                      ✕
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Kolejka wideo */}
+          {kolejkaWideo.length > 0 && (
+            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid #2a2a3a", borderRadius: 10, padding: 14, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
+                <span>🎬 Kolejka wideo ({kolejkaWideo.length} {kolejkaWideo.length === 1 ? "osoba" : "osób"})</span>
+                <span style={{ fontSize: 11, color: "#888" }}>~{kolejkaWideo.length * 25}s</span>
+              </div>
+
+              {kolejkaWideo.map(q => {
+                const osoba = czlonkowie.find(c => c.id === q.osobaId);
+                return (
+                  <div key={q.osobaId} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+                    background: "rgba(255,255,255,0.03)", border: "1px solid #1a1a2e", borderRadius: 6, marginBottom: 4,
+                  }}>
+                    <span style={{ flex: 1, fontSize: 12, color: "#ddd" }}>{osoba?.nazwa}</span>
+                    <span style={{ fontSize: 10, color: "#888" }}>{q.rozmiar}MB</span>
+                    <span style={{ fontSize: 10, color: "#0c6" }}>🎬 {q.plik.name.length > 20 ? q.plik.name.slice(0,18)+"…" : q.plik.name}</span>
+                    <button onClick={() => setKolejkaWideo(prev => prev.filter(p => p.osobaId !== q.osobaId))}
+                      style={{ fontSize: 10, padding: "2px 6px", background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", borderRadius: 4, color: "#f55", cursor: "pointer" }}>✕</button>
+                  </div>
+                );
+              })}
+
+              <button
+                onClick={analizujWideo}
+                disabled={analizujac || pozostalo > 0}
+                style={{
+                  width: "100%", marginTop: 10, padding: 14,
+                  background: analizujac || pozostalo > 0 ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,#8a2be2,#da70d6)",
+                  border: "none", borderRadius: 8,
+                  color: analizujac || pozostalo > 0 ? "#666" : "#fff",
+                  fontSize: 15, fontWeight: "bold", cursor: analizujac || pozostalo > 0 ? "not-allowed" : "pointer",
+                  letterSpacing: 1,
+                }}>
+                {pozostalo > 0
+                  ? `⏱️ Cooldown ${formatCzas(pozostalo)}`
+                  : `🎬 Analizuj ${kolejkaWideo.length} filmów (~${kolejkaWideo.length * 25}s)`}
+              </button>
+            </div>
+          )}
+
+          {kolejkaWideo.length === 0 && (
+            <div style={{ textAlign: "center", padding: 40, color: "#555", fontSize: 13 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🎬</div>
+              Wybierz osobę i wgraj jej film z kolekcją.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ========== TRYB POJEDYNCZY ========== */}
       {tryb === "pojedynczy" && !wyniki && !analizujac && (
         <div>
@@ -572,8 +850,14 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
               transition: "width 0.3s",
             }} />
           </div>
-          <div style={{ fontSize: 11, color: "#555" }}>
+          <div style={{ fontSize: 11, color: "#555", marginBottom: 6 }}>
             Pozostało ~{szacujCzas(Math.max(0, progress.total - progress.aktualny))}
+          </div>
+          {/* Wake Lock status */}
+          <div style={{ fontSize: 10, color: wakeLockInfo ? "#0c6" : "#666", padding: "4px 10px", background: wakeLockInfo ? "rgba(0,200,100,0.08)" : "rgba(255,255,255,0.03)", borderRadius: 20, display: "inline-block" }}>
+            {wakeLockInfo
+              ? "🔒 Ekran aktywny — możesz zminimalizować okno, analiza działa w tle"
+              : "⚠️ Wake Lock niedostępny — zostaw zakładkę aktywną"}
           </div>
         </div>
       )}
