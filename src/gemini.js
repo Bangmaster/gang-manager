@@ -218,46 +218,70 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
 // Zwraca fileUri który można przekazać do Gemini
 async function uploadVideoDoGoogle(file, onProgress) {
   // Krok 1: pobierz upload URL z naszego serwera
-  onProgress?.("📡 Inicjuję upload...");
-  const initResp = await fetch("/api/get-upload-url", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      mimeType: file.type || "video/mp4",
-      displayName: file.name,
-      fileSize: file.size,
-    }),
-  });
+  onProgress?.("📡 Krok 1/3: Inicjuję upload...");
+  let initResp;
+  try {
+    initResp = await fetch("/api/get-upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mimeType: file.type || "video/mp4",
+        displayName: file.name,
+        fileSize: file.size,
+      }),
+    });
+  } catch (e) {
+    throw new Error(`KROK1_FETCH: ${e.message}`);
+  }
 
   if (!initResp.ok) {
     const err = await initResp.text();
-    throw new Error(`Upload init failed: ${err}`);
+    throw new Error(`KROK1_HTTP_${initResp.status}: ${err.substring(0, 200)}`);
   }
 
-  const { uploadUrl } = await initResp.json();
+  let uploadUrl;
+  try {
+    const data = await initResp.json();
+    uploadUrl = data.uploadUrl;
+  } catch (e) {
+    throw new Error(`KROK1_JSON: ${e.message}`);
+  }
+
+  if (!uploadUrl) throw new Error("KROK1_BRAK_URL: Serwer nie zwrócił uploadUrl");
 
   // Krok 2: wyślij plik bezpośrednio do Google (omija Vercel)
-  onProgress?.("⬆️ Wysyłam film do Google...");
-  const uploadResp = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": file.type || "video/mp4",
-      "X-Goog-Upload-Command": "upload, finalize",
-      "X-Goog-Upload-Offset": "0",
-    },
-    body: file,
-  });
+  onProgress?.(`⬆️ Krok 2/3: Wysyłam film (${(file.size/1024/1024).toFixed(1)}MB)...`);
+  let uploadResp;
+  try {
+    uploadResp = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "video/mp4",
+        "X-Goog-Upload-Command": "upload, finalize",
+        "X-Goog-Upload-Offset": "0",
+      },
+      body: file,
+    });
+  } catch (e) {
+    throw new Error(`KROK2_FETCH: ${e.message} — możliwy błąd CORS`);
+  }
 
   if (!uploadResp.ok) {
     const err = await uploadResp.text();
-    throw new Error(`Upload failed: ${err}`);
+    throw new Error(`KROK2_HTTP_${uploadResp.status}: ${err.substring(0, 200)}`);
   }
 
-  const uploadData = await uploadResp.json();
-  const fileUri = uploadData?.file?.uri;
-  if (!fileUri) throw new Error("Brak fileUri w odpowiedzi Google");
+  let uploadData;
+  try {
+    uploadData = await uploadResp.json();
+  } catch (e) {
+    throw new Error(`KROK2_JSON: ${e.message}`);
+  }
 
-  onProgress?.("✓ Film przesłany, analizuję...");
+  const fileUri = uploadData?.file?.uri;
+  if (!fileUri) throw new Error(`KROK2_BRAK_URI: odpowiedź = ${JSON.stringify(uploadData).substring(0, 200)}`);
+
+  onProgress?.("🤖 Krok 3/3: Analizuję film...");
   return { fileUri, mimeType: file.type || "video/mp4" };
 }
 
