@@ -3,6 +3,15 @@
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
+// Zwiększ limit body do 50MB dla obsługi wideo
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "50mb",
+    },
+  },
+};
+
 // Pobierz klucz na podstawie indeksu z requestu
 // W serverless każde wywołanie to nowa instancja — globalny licznik nie działa
 // Frontend wysyła kluczIdx żeby rotacja była deterministyczna
