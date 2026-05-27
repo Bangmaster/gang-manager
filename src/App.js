@@ -187,23 +187,30 @@ export default function App() {
   useEffect(() => {
     let unsub = null;
     (async () => {
-      const start = await loadGangData();
-      if (!start) {
-        await saveGangData(DOMYSLNE_DANE);
-        setDane(DOMYSLNE_DANE);
-      } else {
-        // Połącz domyślne dane (jeśli brak pól) z tym co jest w bazie
-        setDane({
-          talie: start.talie || DOMYSLNE_DANE.talie,
-          czlonkowie: start.czlonkowie || DOMYSLNE_DANE.czlonkowie,
-          posiadane: start.posiadane || {},
-          duplikaty: start.duplikaty || {},
-          walki: start.walki || [],
-          aktywnaWymiana: start.aktywnaWymiana || null,
-        });
+      try {
+        const start = await loadGangData();
+        if (start === null) {
+          // Dokument naprawdę nie istnieje w bazie — inicjalizuj (tylko przy pierwszym uruchomieniu)
+          await saveGangData(DOMYSLNE_DANE);
+          setDane(DOMYSLNE_DANE);
+        } else {
+          // Dokument istnieje — użyj danych z bazy
+          setDane({
+            talie: start.talie || DOMYSLNE_DANE.talie,
+            czlonkowie: start.czlonkowie || DOMYSLNE_DANE.czlonkowie,
+            posiadane: start.posiadane || {},
+            duplikaty: start.duplikaty || {},
+            walki: start.walki || [],
+            aktywnaWymiana: start.aktywnaWymiana || null,
+          });
+        }
+      } catch (e) {
+        // Błąd sieci — NIE inicjalizuj danych, poczekaj na subskrypcję
+        console.error("Błąd inicjalizacji Firebase:", e);
       }
+
+      // Subskrypcja real-time — niezależna od błędu inicjalizacji
       unsub = subscribeGangData((d) => {
-        // ZAWSZE aktualizuj — nawet po własnym zapisie. Server jest źródłem prawdy.
         setDane({
           talie: d.talie || DOMYSLNE_DANE.talie,
           czlonkowie: d.czlonkowie || DOMYSLNE_DANE.czlonkowie,
