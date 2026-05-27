@@ -173,21 +173,26 @@ export async function analyzeMultiple(files, wszystkieTalie, onProgress) {
       `🤖 Analizuję ${ukonczono + 1}–${Math.min(ukonczono + grupa.length, files.length)}/${files.length}: ${nazwyGrupy}`
     );
 
+    // Capture w const przed callbackiem — fix no-loop-func
+    const offsetUkonczono = ukonczono;
+
     // Wszystkie pliki w grupie analizowane równolegle
     const rezultaty = await Promise.all(
       grupa.map((file, gi) =>
         analyzeImageZRetry(file, wszystkieTalie, (msg) => {
-          onProgress?.(ukonczono + gi, files.length, msg);
+          onProgress?.(offsetUkonczono + gi, files.length, msg);
         })
       )
     );
 
     // Zapisz wyniki zachowując kolejność
+    let noweBledy = 0;
     rezultaty.forEach((wynik, gi) => {
       wyniki[indeksy[gi]] = wynik;
-      if (!wynik.sukces) kolejneBledy++;
-      else kolejneBledy = 0;
+      if (!wynik.sukces) noweBledy++;
     });
+    if (noweBledy > 0) kolejneBledy += noweBledy;
+    else kolejneBledy = 0;
 
     ukonczono += grupa.length;
 
@@ -272,9 +277,9 @@ Zwróć WYŁĄCZNIE JSON (bez markdown):
 
     const data = await response.json();
     let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
-    if (text.startsWith("\`\`\`json")) text = text.slice(7);
-    else if (text.startsWith("\`\`\`")) text = text.slice(3);
-    if (text.endsWith("\`\`\`")) text = text.slice(0, -3);
+    if (text.startsWith("```json")) text = text.slice(7);
+    else if (text.startsWith("```")) text = text.slice(3);
+    if (text.endsWith("```")) text = text.slice(0, -3);
     text = text.trim();
 
     const parsed = JSON.parse(text);
