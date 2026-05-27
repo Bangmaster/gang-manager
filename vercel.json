@@ -1,1 +1,13 @@
-{}
+{
+  "functions": {
+    "api/gemini.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "api": {
+    "bodyParser": {
+      "sizeLimit": "50mb"
+    }
+  }
+}
