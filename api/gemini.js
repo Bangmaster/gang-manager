@@ -3,9 +3,10 @@
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
-// Pobierz klucz rotacyjnie
-let aktualnyKluczIdx = 0;
-function pobierzKlucz() {
+// Pobierz klucz na podstawie indeksu z requestu
+// W serverless każde wywołanie to nowa instancja — globalny licznik nie działa
+// Frontend wysyła kluczIdx żeby rotacja była deterministyczna
+function pobierzKlucz(kluczIdx = 0) {
   const klucze = [
     process.env.REACT_APP_GEMINI_API_KEY,
     process.env.REACT_APP_GEMINI_API_KEY_2,
@@ -15,9 +16,7 @@ function pobierzKlucz() {
   ].filter(Boolean);
 
   if (klucze.length === 0) return null;
-  const klucz = klucze[aktualnyKluczIdx % klucze.length];
-  aktualnyKluczIdx++;
-  return klucz;
+  return klucze[kluczIdx % klucze.length];
 }
 
 export default async function handler(req, res) {
@@ -34,16 +33,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const klucz = pobierzKlucz();
-  if (!klucz) {
-    return res.status(500).json({ error: "🔑 Brak klucza API na serwerze" });
-  }
-
   try {
-    const { prompt, base64, mimeType } = req.body;
+    const { prompt, base64, mimeType, kluczIdx = 0 } = req.body;
 
     if (!prompt || !base64 || !mimeType) {
       return res.status(400).json({ error: "Brak wymaganych pól: prompt, base64, mimeType" });
+    }
+
+    const klucz = pobierzKlucz(kluczIdx);
+    if (!klucz) {
+      return res.status(500).json({ error: "🔑 Brak klucza API na serwerze" });
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${klucz}`;
