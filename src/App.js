@@ -1840,6 +1840,15 @@ function EdycjaTalii({talie,zapisz}) {
   };
   const usunKarte=n=>zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.filter(k=>k.nazwa!==n)}:t));
   const zmienTyp=(n,typ)=>zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.map(k=>k.nazwa===n?{...k,typ}:k)}:t));
+  const [edytujKarte,setEdytujKarte]=useState(null); // nazwa karty którą edytujemy
+  const [tempNazwaKarty,setTempNazwaKarty]=useState("");
+  const zmienNazweKarty=(stara,nowa)=>{
+    const nowaNazwa=nowa.trim();
+    if(!nowaNazwa||nowaNazwa===stara){setEdytujKarte(null);return;}
+    if(talia.karty.find(k=>k.nazwa===nowaNazwa)){alert("Karta o tej nazwie już istnieje!");return;}
+    zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.map(k=>k.nazwa===stara?{...k,nazwa:nowaNazwa}:k)}:t));
+    setEdytujKarte(null);
+  };
   const zapiszPole=(pole,val)=>zapisz(talie.map(t=>t.id===talia.id?{...t,[pole]:pole==="numer"?parseInt(val)||t.numer:parseInt(val)||t.nagroda_amunicja}:t));
   const dodajTalie=()=>{
     if(!nowaTalia.nazwa.trim()) return;
@@ -1947,8 +1956,30 @@ function EdycjaTalii({talie,zapisz}) {
             </div>
           </div>
           {talia.karty.map((k,ki)=>(
-            <div key={ki} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #12122a"}}>
-              <span style={{flex:1,fontSize:12,color:"#ccc"}}>{k.nazwa}</span>
+            <div key={ki} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid #12122a"}}>
+              {edytujKarte===k.nazwa?(
+                <input
+                  autoFocus
+                  value={tempNazwaKarty}
+                  onChange={e=>setTempNazwaKarty(e.target.value)}
+                  onBlur={()=>zmienNazweKarty(k.nazwa,tempNazwaKarty)}
+                  onKeyDown={e=>{
+                    if(e.key==="Enter") zmienNazweKarty(k.nazwa,tempNazwaKarty);
+                    if(e.key==="Escape"){setEdytujKarte(null);}
+                  }}
+                  style={{flex:1,padding:"3px 8px",background:"#1a1a3a",border:"1px solid #ffd700",borderRadius:4,color:"#fff",fontSize:12}}
+                />
+              ):(
+                <span
+                  onClick={()=>{setEdytujKarte(k.nazwa);setTempNazwaKarty(k.nazwa);}}
+                  title="Kliknij żeby edytować nazwę"
+                  style={{flex:1,fontSize:12,color:"#ccc",cursor:"text",padding:"2px 4px",borderRadius:3,transition:"background 0.15s"}}
+                  onMouseEnter={e=>e.target.style.background="rgba(255,215,0,0.07)"}
+                  onMouseLeave={e=>e.target.style.background="transparent"}
+                >
+                  {k.nazwa} <span style={{fontSize:9,color:"#444",marginLeft:2}}>✏️</span>
+                </span>
+              )}
               <select value={k.typ} onChange={e=>zmienTyp(k.nazwa,e.target.value)} style={{padding:"3px 6px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:k.typ==="złota"?"#ffd700":"#87CEEB",fontSize:11,cursor:"pointer"}}>
                 <option value="złota">⭐ Złota</option>
                 <option value="diamentowa">💎 Diamentowa</option>
