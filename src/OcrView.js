@@ -146,12 +146,13 @@ export default function OcrView({ talie, czlonkowie, posiadane, duplikaty, zapis
 
     for (const pozycja of kolejka) {
       const osoba = czlonkowie.find(c => c.id === pozycja.osobaId);
+      const offsetNr = globalnyNr; // capture w const żeby callback nie miał referencji do zmiennej pętli
       const rawWyniki = await analyzeMultiple(
         pozycja.pliki,
         talie,
         (i, total, plik) => {
           setProgress({
-            aktualny: globalnyNr + i,
+            aktualny: offsetNr + i,
             total: globalnyTotal,
             plik,
             osobaNazwa: osoba?.nazwa || "?",
