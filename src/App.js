@@ -1664,9 +1664,10 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 const progInfo=obliczProg(liczKartyOsoby(id,talie,posiadane));
                 // Breakdown talii per faza dla VIP
                 const aktywneT = talie.filter(t=>!wylaczoneTalie.has(t.id));
+                const vipOppTyp = typWymiany==="złote"?"diamentowa":"złota";
                 const talieVip = aktywneT.map(talia=>{
                   const kartyT = talia.karty.filter(k=>k.typ===typ);
-                  const kartyO = talia.karty.filter(k=>k.typ===oppTyp);
+                  const kartyO = talia.karty.filter(k=>k.typ===vipOppTyp);
                   const brakT = kartyT.filter(k=>!posiadane[`${id}_${talia.id}_${k.nazwa}`]);
                   const brakO = kartyO.filter(k=>!posiadane[`${id}_${talia.id}_${k.nazwa}`]);
                   if(!brakT.length) return null;
