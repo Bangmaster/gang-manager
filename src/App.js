@@ -2811,7 +2811,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="screen"&&<ScreenCapture talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte}/>}
       {tryb==="postep"&&<PostepSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane}/>}
       {tryb==="kalkulator"&&<KalkulatorSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} typWymiany={typWymiany}/>}
-      {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana}/>}
+      {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana} czlonkowie={czlonkowie}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
@@ -3441,7 +3441,7 @@ function KalkulatorSezonu({talie,czlonkowie,posiadane,duplikaty,typWymiany}) {
 // ============================================================
 // HISTORIA WYMIAN
 // ============================================================
-function HistoriaWymian({zapiszStrukture,aktywnaWymiana}) {
+function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
   const [historia,setHistoria]=useState([]);
 
   useEffect(()=>{
@@ -3503,6 +3503,64 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana}) {
           <div style={{fontSize:11,color:"#555"}}>Brak aktywnej wymiany do archiwizacji</div>
         )}
       </div>
+
+      {/* Ranking długu */}
+      {historia.length>0&&(()=>{
+        const licznik = obliczLicznikOtrzymanych(historia);
+        const lacznieRozdano = Object.values(licznik).reduce((s,v)=>s+v,0);
+        const srednia = lacznieRozdano / Math.max(1, czlonkowie.length);
+        const ranking = czlonkowie.map(c=>({
+          nazwa: c.nazwa,
+          dostala: licznik[c.nazwa]||0,
+          dług: srednia - (licznik[c.nazwa]||0),
+        })).sort((a,b)=>b.dług-a.dług);
+        const maxDług = Math.max(...ranking.map(r=>Math.abs(r.dług)),0.1);
+        return (
+          <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
+              ⚖️ Sprawiedliwość wymian
+            </div>
+            <div style={{fontSize:11,color:"#888",marginBottom:10}}>
+              Średnia: <strong style={{color:"#ddd"}}>{srednia.toFixed(1)}</strong> kart/osoba z {historia.length} wymian.
+              Dług = ile poniżej średniej — im wyższy tym bardziej pominięty.
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              {ranking.map((r,i)=>{
+                const kolor = r.dług>1?"#f55":r.dług>0?"#fa0":r.dług<-1?"#0c6":"#87CEEB";
+                const ikonka = r.dług>2?"🔴":r.dług>0.5?"🟡":r.dług<-2?"🟢":r.dług<-0.5?"🟢":"⚪";
+                const szerokoscPaska = Math.min(100, Math.abs(r.dług)/maxDług*100);
+                return (
+                  <div key={r.nazwa} style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:11,width:16,textAlign:"center"}}>{ikonka}</span>
+                    <span style={{fontSize:12,color:"#ddd",width:90,flexShrink:0}}>{r.nazwa}</span>
+                    <span style={{fontSize:11,color:"#888",width:50,flexShrink:0,textAlign:"right"}}>{r.dostala} kart</span>
+                    {/* Pasek długu */}
+                    <div style={{flex:1,height:6,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{
+                        height:"100%",
+                        width:`${szerokoscPaska}%`,
+                        background:kolor,
+                        marginLeft: r.dług>=0?"0":"auto",
+                        borderRadius:3,
+                        transition:"width 0.3s",
+                      }}/>
+                    </div>
+                    <span style={{
+                      fontSize:11,fontWeight:"bold",color:kolor,
+                      width:50,flexShrink:0,textAlign:"right",
+                    }}>
+                      {r.dług>0?"+":""}{r.dług.toFixed(1)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:10,color:"#555",marginTop:8}}>
+              🔴 Pominięty (dostaje mniej) · 🟢 Uprzywilejowany (dostaje więcej) · ⚪ W normie
+            </div>
+          </div>
+        );
+      })()}
 
       {historia.length===0?(
         <div style={{textAlign:"center",padding:30,color:"#555",fontSize:12}}>Brak zapisanych wymian</div>
