@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -45,11 +45,10 @@ export async function loadGangData() {
   try {
     const snap = await getDoc(GANG_DOC);
     if (snap.exists()) return snap.data();
-    return null; // dokument naprawdę nie istnieje
+    return null;
   } catch (e) {
     console.error("Błąd ładowania:", e);
-    // Rzuć błąd dalej — NIE zwracaj null żeby App.js nie pomylił błędu z brakiem danych
-    throw e;
+    return null;
   }
 }
 
@@ -132,21 +131,11 @@ const LOGI_DOC = doc(db, "gang", "logi");
 
 export async function zapiszLog(wpis) {
   try {
-    // arrayUnion jest atomowy — brak race condition przy równoczesnych logowaniach
-    await setDoc(LOGI_DOC, { logi: arrayUnion(wpis) }, { merge: true });
-
-    // Przytnij do 200 wpisów jeśli jest ich za dużo (robimy to rzadko)
     const snap = await getDoc(LOGI_DOC);
-    if (snap.exists()) {
-      const logi = snap.data().logi || [];
-      if (logi.length > 200) {
-        // Sortuj po timestamp i przytnij
-        const przycięte = [...logi]
-          .sort((a, b) => (b.czas || 0) - (a.czas || 0))
-          .slice(0, 200);
-        await setDoc(LOGI_DOC, { logi: przycięte });
-      }
-    }
+    const stare = snap.exists() ? (snap.data().logi || []) : [];
+    // Max 200 wpisów
+    const nowe = [wpis, ...stare].slice(0, 200);
+    await setDoc(LOGI_DOC, { logi: nowe });
     return true;
   } catch(e) { console.error("Błąd zapisu logu:", e); return false; }
 }
@@ -189,11 +178,44 @@ export async function pobierzFingerprinty() {
 
 export async function zapiszFingerprint(nick, fp) {
   try {
-    const snap = await getDoc(LOGI_DOC);
-    const stare = snap.exists() ? (snap.data().fingerprinty || {}) : {};
-    const nowe = { ...stare, [nick]: [...new Set([...(stare[nick]||[]), fp])].slice(0,5) };
-    await setDoc(LOGI_DOC, { fingerprinty: nowe }, { merge: true });
+    // Atomowy zapis - nie nadpisuje innych nicków
+    await setDoc(LOGI_DOC, {
+      fingerprinty: { [nick]: arrayUnion(fp) }
+    }, { merge: true });
   } catch(e) { console.error(e); }
+}
+
+// Czarna lista urządzeń - zablokowane fingerprinty
+export async function zablokujUrządzenie(fp, nick, powod="") {
+  try {
+    await setDoc(LOGI_DOC, {
+      zablokowane: arrayUnion({ fp, nick, czas: Date.now(), powod })
+    }, { merge: true });
+    return true;
+  } catch(e) { console.error(e); return false; }
+}
+
+export async function odblokujUrządzenie(fp) {
+  try {
+    const snap = await getDoc(LOGI_DOC);
+    const zablokowane = snap.exists() ? (snap.data().zablokowane || []) : [];
+    const nowe = zablokowane.filter(z => z.fp !== fp);
+    await setDoc(LOGI_DOC, { zablokowane: nowe }, { merge: true });
+    return true;
+  } catch(e) { console.error(e); return false; }
+}
+
+export async function pobierzZablokowane() {
+  try {
+    const snap = await getDoc(LOGI_DOC);
+    return snap.exists() ? (snap.data().zablokowane || []) : [];
+  } catch { return []; }
+}
+
+export function subscribeZablokowane(callback) {
+  return onSnapshot(LOGI_DOC, (snap) => {
+    callback(snap.exists() ? (snap.data().zablokowane || []) : []);
+  });
 }
 
 // === HISTORIA WYMIAN ===
