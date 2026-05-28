@@ -685,9 +685,36 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false}) {
-  // Licznik ile razy każda osoba dostała kartę w historii
-  const licznikOtrzymanych = sprawiedliwe ? obliczLicznikOtrzymanych(historiaWymian) : {};
+function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0}) {
+  // czlonkowie = odbiorcy (aktywni), wszyscyCzlonkowie = dawcy (wszyscy łącznie z wyłączonymi)
+  const dawcy = wszyscyCzlonkowie || czlonkowie;
+  // Licznik kart przydzielonych per odbiorca (do limitu maxKartNaOsobe)
+  const kartDlaosoby = {}; // osobaId -> count
+  const czyMozeDostac = (osobaId) => maxKartNaOsobe <= 0 || (kartDlaosoby[osobaId]||0) < maxKartNaOsobe;
+  const zaznaczDostala = (osobaId) => { kartDlaosoby[osobaId] = (kartDlaosoby[osobaId]||0) + 1; };
+
+  // TRYB SPRAWIEDLIWY — oblicz "dług" każdej osoby
+  // Dług = ile kart poniżej średniej gangu dana osoba otrzymała w historii
+  // Wyższy dług = wyższy priorytet przy konflikcie o duplikat
+  const dlugOsob = {}; // {nazwa: liczba} — im wyższy tym bardziej "poszkodowany"
+  if (sprawiedliwe && historiaWymian.length > 0) {
+    const licznikOtrzymanych = obliczLicznikOtrzymanych(historiaWymian);
+    // Łączna liczba kart rozdanych
+    const lacznieRozdano = Object.values(licznikOtrzymanych).reduce((s,v)=>s+v, 0);
+    // Średnia na osobę (biorąc pod uwagę wszystkich członków)
+    const srednia = lacznieRozdano / Math.max(1, czlonkowie.length);
+    czlonkowie.forEach(c => {
+      const dostala = licznikOtrzymanych[c.nazwa] || 0;
+      dlugOsob[c.nazwa] = srednia - dostala; // ujemny = dostała więcej niż średnia
+    });
+  }
+
+  // Zwraca priorytet sprawiedliwości dla osoby (wyższy = wyższy priorytet)
+  // Używane przy konflikcie o ten sam duplikat
+  const priorytetSprawiedliwy = (nazwaosoby) => {
+    if (!sprawiedliwe) return 0;
+    return dlugOsob[nazwaosoby] || 0;
+  };
   const typ=typWymiany==="złote"?"złota":"diamentowa";
   const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
 
@@ -733,12 +760,13 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       });
       potrzeby.forEach(({talia,karta,nagroda,trudna})=>{
         let dawca=null;
-        for(const o2 of czlonkowie){
+        for(const o2 of dawcy){
           if(o2.id===vipId||wysylajacy.has(o2.id)) continue;
           if(duplikaty[`${o2.id}_${talia.id}_${karta.nazwa}`]){dawca=o2;break;}
         }
-        if(dawca){
+        if(dawca && czyMozeDostac(vip.id)){
           wysylajacy.add(dawca.id);
+          zaznaczDostala(vip.id);
           planoweWymiany.push({od:dawca.nazwa,do:vip.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda,faza:200,brakTCount:1,brakOCount:0,trudna});
         } else {
           nieobsluzone.push({osoba:vip,talia,karta,brakTCount:1});
@@ -746,7 +774,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       });
     }
 
-    // Po kolejce — pozostali dawcy do reszty gangu (fazy 1-2)
+    // Po kolejce VIP — reszta gangu normalnym algorytmem (wszystkie fazy, bez ograniczeń)
     const vipSet=new Set(vipKolejka);
     const kandydaciReszta=[];
     czlonkowie.filter(c=>!vipSet.has(c.id)).forEach(osoba=>{
@@ -758,25 +786,28 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         const brakO=kartyO.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
         if(!brakT.length) return;
         const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
-        if(faza>2) return;
+        const kompletOpp = brakO.length === 0;
         brakT.forEach(karta=>{
-          kandydaciReszta.push({osoba,talia,karta,faza,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
+          kandydaciReszta.push({osoba,talia,karta,faza,kompletOpp,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
         });
       });
     });
+    // Sortuj jak normalny tryb: najpierw talie do zamknięcia (kompletOpp), potem faza, potem nagroda
     kandydaciReszta.sort((a,b)=>{
+      if(a.kompletOpp!==b.kompletOpp) return a.kompletOpp?-1:1;
       if(a.faza!==b.faza) return a.faza-b.faza;
       if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
       return ignorujTrudne ? 0 : (a.trudna?1:0)-(b.trudna?1:0);
     });
     for(const k of kandydaciReszta){
       let dawca=null;
-      for(const o2 of czlonkowie){
+      for(const o2 of dawcy){
         if(o2.id===k.osoba.id||wysylajacy.has(o2.id)) continue;
         if(duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]){dawca=o2;break;}
       }
-      if(dawca){
+      if(dawca && czyMozeDostac(k.osoba.id)){
         wysylajacy.add(dawca.id);
+        zaznaczDostala(k.osoba.id);
         planoweWymiany.push({od:dawca.nazwa,do:k.osoba.nazwa,karta:k.karta.nazwa,talia:k.talia.nazwa,nagroda:k.nagroda,faza:210,brakTCount:k.brakTCount,brakOCount:k.brakOCount,trudna:k.trudna});
       }
     }
@@ -813,7 +844,9 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       if (!brakT.length) return;
       const nagroda = talia.nagroda_amunicja || 0;
       const trudna = TRUDNE_NUMERY.includes(talia.numer);
-      staneTalii.push({ osoba, talia, brakT, brakO, nagroda, trudna });
+      // kompletOpp = gracz ma WSZYSTKIE karty drugiego typu → talia może być zamknięta
+      const kompletOpp = brakO.length === 0;
+      staneTalii.push({ osoba, talia, brakT, brakO, nagroda, trudna, kompletOpp });
     });
   });
 
@@ -846,14 +879,14 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       for (const karta of potrzebne) {
         // Znajdź dawcę dla tej karty
         let dawca = null;
-        for (const o2 of czlonkowie) {
+        for (const o2 of dawcy) {
           if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
           if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) {
             dawca = o2; break;
           }
         }
         if (dawca) {
-          wymianyDlaTejTalii.push({ dawca, karta });
+          if (czyMozeDostac(s.osoba.id)) wymianyDlaTejTalii.push({ dawca, karta });
         } else {
           // Brak dawcy dla tej karty — talia nie zostanie zamknięta tą wymianą
           // (i tak dodaj resztę kart które mają dawców)
@@ -863,6 +896,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       // (nawet jeśli nie zamkniemy 100%, dajemy ile się da)
       wymianyDlaTejTalii.forEach(({ dawca, karta }) => {
         wysylajacy.add(dawca.id);
+        zaznaczDostala(s.osoba.id);
         planoweWymiany.push({
           od: dawca.nazwa, do: s.osoba.nazwa,
           karta: karta.nazwa, talia: s.talia.nazwa,
@@ -887,14 +921,15 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
     for (const s of reszta) {
       for (const karta of s.brakT) {
         let dawca = null;
-        for (const o2 of czlonkowie) {
+        for (const o2 of dawcy) {
           if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
           if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) {
             dawca = o2; break;
           }
         }
-        if (dawca) {
+        if (dawca && czyMozeDostac(s.osoba.id)) {
           wysylajacy.add(dawca.id);
+          zaznaczDostala(s.osoba.id);
           planoweWymiany.push({
             od: dawca.nazwa, do: s.osoba.nazwa,
             karta: karta.nazwa, talia: s.talia.nazwa,
@@ -949,7 +984,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       const t = talie.find(t => t.nazwa === wymiana.talia);
       if (!t) return null;
       const odbiorca = czlonkowie.find(c => c.nazwa === wymiana.do);
-      for (const o2 of czlonkowie) {
+      for (const o2 of dawcy) {
         if (!odbiorca || o2.id === odbiorca.id) continue;
         if (o2.nazwa === wymiana.od) continue;
         if (wysylajacy.has(o2.id)) continue;
@@ -966,7 +1001,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       const t = talie.find(t => t.nazwa === jegaWymiana.talia);
       if (!t) return false;
       const odbiorca = czlonkowie.find(c => c.nazwa === jegaWymiana.do);
-      for (const o2 of czlonkowie) {
+      for (const o2 of dawcy) {
         if (!odbiorca || o2.id === odbiorca.id) continue;
         if (o2.nazwa === jegaWymiana.od) continue;
         if (o2.id === wykluczonaOsobaId) continue;
@@ -980,7 +1015,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
           return true;
         }
       }
-      for (const o2 of czlonkowie) {
+      for (const o2 of dawcy) {
         if (!odbiorca || o2.id === odbiorca.id) continue;
         if (o2.nazwa === jegaWymiana.od) continue;
         if (o2.id === wykluczonaOsobaId) continue;
@@ -1012,21 +1047,22 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       if (juzIdzie >= progInfo.brakujeDoProg) continue; // próg już osiągnięty przez inne karty
 
       let dawca = null;
-      for (const o2 of czlonkowie) {
+      for (const o2 of dawcy) {
         if (o2.id === k.osoba.id || wysylajacy.has(o2.id)) continue;
         if (duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) { dawca = o2; break; }
       }
 
       if (!dawca) {
-        for (const o2 of czlonkowie) {
+        for (const o2 of dawcy) {
           if (o2.id === k.osoba.id || !wysylajacy.has(o2.id)) continue;
           if (!duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) continue;
           if (probujUwolnicProgi(o2, k.osoba.id, new Set())) { dawca = o2; break; }
         }
       }
 
-      if (dawca) {
+      if (dawca && czyMozeDostac(k.osoba.id)) {
         wysylajacy.add(dawca.id);
+        zaznaczDostala(k.osoba.id);
         kartIdaceDo[k.osoba.id] = (kartIdaceDo[k.osoba.id] || 0) + 1;
         const faza = obliczFaze(
           k.talia.karty.filter(c=>c.typ===typ&&!posiadane[`${k.osoba.id}_${k.talia.id}_${c.nazwa}`]).length,
@@ -1125,7 +1161,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       const odbiorca = czlonkowie.find(c => c.nazwa === jegaWymiana.do);
 
       // Szukaj wolnego zastępcy dla jego wymiany
-      for (const o2 of czlonkowie) {
+      for (const o2 of dawcy) {
         if (!odbiorca || o2.id === odbiorca.id) continue;
         if (o2.nazwa === jegaWymiana.od) continue;
         if (o2.id === wykluczonaOsobaId) continue;
@@ -1143,7 +1179,7 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
       }
 
       // Brak wolnego zastępcy — spróbuj rekurencyjnie uwolnić kogoś zajętego
-      for (const o2 of czlonkowie) {
+      for (const o2 of dawcy) {
         if (!odbiorca || o2.id === odbiorca.id) continue;
         if (o2.nazwa === jegaWymiana.od) continue;
         if (o2.id === wykluczonaOsobaId) continue;
@@ -1231,6 +1267,34 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
         });
 
       if (pozostale.length === 0) break;
+
+      // Tryb sprawiedliwy: przy wielu kandydatach na tę samą kartę
+      // wybierz osobę z największym "długiem" (najrzadziej dostawała karty)
+      let wybranyKandydat = pozostale[0];
+      if (sprawiedliwe && pozostale.length > 1) {
+        // Znajdź wszystkich kandydatów którzy chcą TĄ SAMĄ kartę z TEJ SAMEJ talii
+        // i mają wolnego dawcę
+        const duplikacyCandidates = pozostale.filter(k2 =>
+          k2.kartaDoObs.nazwa === pozostale[0].kartaDoObs.nazwa &&
+          k2.talia.id === pozostale[0].talia.id &&
+          k2.osoba.id !== pozostale[0].osoba.id &&
+          czyMozeDostac(k2.osoba.id) &&
+          dawcy.some(o2 => o2.id !== k2.osoba.id && !wysylajacy.has(o2.id) && duplikaty[`${o2.id}_${k2.talia.id}_${k2.kartaDoObs.nazwa}`])
+        );
+        if (duplikacyCandidates.length > 1) {
+          // Wybierz tego z największym długiem (najbardziej poszkodowany)
+          duplikacyCandidates.sort((a, b) => {
+            const dlugA = priorytetSprawiedliwy(a.osoba.nazwa);
+            const dlugB = priorytetSprawiedliwy(b.osoba.nazwa);
+            if (Math.abs(dlugB - dlugA) > 0.5) return dlugB - dlugA; // wyraźna różnica długu
+            return 0; // remis — zostaw oryginalną kolejność (faza/nagroda)
+          });
+          wybranyKandydat = duplikacyCandidates[0];
+          // Przesuń wybranego na początek pozostałych
+          pozostale = [wybranyKandydat, ...pozostale.filter(k2 => k2 !== wybranyKandydat)];
+        }
+      }
+
       const k = pozostale[0];
       pozostale = pozostale.slice(1);
 
@@ -1242,14 +1306,14 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
 
         // Poziom 1: wolny dawca
         let dawca = null;
-        for (const o2 of czlonkowie) {
+        for (const o2 of dawcy) {
           if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
           if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) { dawca = o2; break; }
         }
 
         // Poziom 2: zajęty dawca → próbuj uwolnić przez łańcuch podmian
         if (!dawca) {
-          for (const o2 of czlonkowie) {
+          for (const o2 of dawcy) {
             if (o2.id === s.osoba.id || !wysylajacy.has(o2.id)) continue;
             if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
 
@@ -1260,8 +1324,9 @@ function generujAlgorytm({talie,czlonkowie,posiadane,duplikaty,typWymiany,tryb,v
           }
         }
 
-        if (dawca) {
+        if (dawca && czyMozeDostac(s.osoba.id)) {
           wysylajacy.add(dawca.id);
+          zaznaczDostala(s.osoba.id);
           planoweWymiany.push({
             od: dawca.nazwa, do: s.osoba.nazwa,
             karta: karta.nazwa, talia: s.talia.nazwa,
@@ -1353,6 +1418,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const toggleTalia=id=>setWylaczoneTalie(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleOsoba=id=>setWylaczoneOsoby(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const [ignorujTrudne,setIgnorujTrudne]=useState(false);
+  const [maxKartNaOsobe,setMaxKartNaOsobe]=useState(0); // 0 = bez limitu
   const [sprawiedliwe,setSprawiedliwe]=useState(false);
   const [vipKolejka,setVipKolejka]=useState([]); // lista id osób w kolejności priorytetu
 
@@ -1442,8 +1508,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
 
   const generuj=()=>{
     const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
-    const aktywniCzlonkowie=czlonkowie.filter(c=>!wylaczoneOsoby.has(c.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],ignorujTrudne,historiaWymian,sprawiedliwe}));
+    const aktywniCzlonkowie=czlonkowie.filter(c=>!wylaczoneOsoby.has(c.id)); // odbiorcy
+    // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -1507,9 +1574,38 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       </div>
       {sprawiedliwe&&(
         <div style={{fontSize:11,color:"#888",marginBottom:10,padding:"6px 10px",background:"rgba(0,200,100,0.05)",border:"1px solid #0c633",borderRadius:6}}>
-          ⚖️ Przy remisie (ta sama faza i nagroda) — pierwszeństwo dostaje osoba która rzadziej dostawała karty w poprzednich wymianach. Wymaga zarchiwizowanej historii.
+          ⚖️ <strong style={{color:"#0c6"}}>Jak działa tryb sprawiedliwy:</strong><br/>
+          Gdy kilka osób chce tę samą kartę (1 duplikat, 3 chętnych) — wygrywa osoba która <strong>najrzadziej dostawała karty</strong> w poprzednich wymianach. Liczone jako odchylenie od średniej gangu — kto jest poniżej średniej, ma wyższy priorytet. Wymaga zarchiwizowanej historii.
         </div>
       )}
+
+      {/* Max kart na osobę */}
+      <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:maxKartNaOsobe>0?8:0}}>
+          <span style={{fontSize:12,color:"#aaa",flex:1}}>🃏 Max kart na osobę:</span>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[0,1,2,3,4,5].map(v=>(
+              <button key={v} onClick={()=>setMaxKartNaOsobe(v)} style={{
+                padding:"4px 10px",borderRadius:6,cursor:"pointer",fontSize:12,
+                background:maxKartNaOsobe===v?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
+                border:maxKartNaOsobe===v?"none":"1px solid #2a2a3a",
+                color:maxKartNaOsobe===v?"#000":"#666",
+                fontWeight:maxKartNaOsobe===v?"bold":"normal",
+              }}>{v===0?"∞":v}</button>
+            ))}
+          </div>
+        </div>
+        {maxKartNaOsobe>0&&(
+          <div style={{fontSize:11,color:"#fa0"}}>
+            ⚠️ Każda osoba dostanie max {maxKartNaOsobe} {maxKartNaOsobe===1?"kartę":maxKartNaOsobe<5?"karty":"kart"} — reszta puli trafi do innych.
+          </div>
+        )}
+        {maxKartNaOsobe===0&&(
+          <div style={{fontSize:11,color:"#555"}}>
+            Bez limitu — jedna osoba może dostać tyle kart ile ma dostępnych dawców.
+          </div>
+        )}
+      </div>
       {trybWymiany==="vip"&&(
         <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70044",borderRadius:10,padding:12,marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
