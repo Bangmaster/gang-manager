@@ -1270,28 +1270,31 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
 
       // Tryb sprawiedliwy: przy wielu kandydatach na tę samą kartę
       // wybierz osobę z największym "długiem" (najrzadziej dostawała karty)
-      let wybranyKandydat = pozostale[0];
-      if (sprawiedliwe && pozostale.length > 1) {
+      // Capture w const przed callbackiem — fix no-loop-func
+      const pozostaleSnapshot = pozostale;
+      const pierwszyKandydat = pozostaleSnapshot[0];
+      let wybranyKandydat = pierwszyKandydat;
+
+      if (sprawiedliwe && pozostaleSnapshot.length > 1) {
         // Znajdź wszystkich kandydatów którzy chcą TĄ SAMĄ kartę z TEJ SAMEJ talii
-        // i mają wolnego dawcę
-        const duplikacyCandidates = pozostale.filter(k2 =>
-          k2.kartaDoObs.nazwa === pozostale[0].kartaDoObs.nazwa &&
-          k2.talia.id === pozostale[0].talia.id &&
-          k2.osoba.id !== pozostale[0].osoba.id &&
+        const nazwaKarty = pierwszyKandydat.kartaDoObs.nazwa;
+        const taliaId = pierwszyKandydat.talia.id;
+        const duplikacyCandidates = pozostaleSnapshot.filter(k2 =>
+          k2.kartaDoObs.nazwa === nazwaKarty &&
+          k2.talia.id === taliaId &&
+          k2.osoba.id !== pierwszyKandydat.osoba.id &&
           czyMozeDostac(k2.osoba.id) &&
           dawcy.some(o2 => o2.id !== k2.osoba.id && !wysylajacy.has(o2.id) && duplikaty[`${o2.id}_${k2.talia.id}_${k2.kartaDoObs.nazwa}`])
         );
         if (duplikacyCandidates.length > 1) {
-          // Wybierz tego z największym długiem (najbardziej poszkodowany)
           duplikacyCandidates.sort((a, b) => {
             const dlugA = priorytetSprawiedliwy(a.osoba.nazwa);
             const dlugB = priorytetSprawiedliwy(b.osoba.nazwa);
-            if (Math.abs(dlugB - dlugA) > 0.5) return dlugB - dlugA; // wyraźna różnica długu
-            return 0; // remis — zostaw oryginalną kolejność (faza/nagroda)
+            if (Math.abs(dlugB - dlugA) > 0.5) return dlugB - dlugA;
+            return 0;
           });
           wybranyKandydat = duplikacyCandidates[0];
-          // Przesuń wybranego na początek pozostałych
-          pozostale = [wybranyKandydat, ...pozostale.filter(k2 => k2 !== wybranyKandydat)];
+          pozostale = [wybranyKandydat, ...pozostaleSnapshot.filter(k2 => k2 !== wybranyKandydat)];
         }
       }
 
