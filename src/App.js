@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -163,6 +163,8 @@ export default function App() {
   const [statusZapisu, setStatusZapisu] = useState("");
 
   const [statusOnline, setStatusOnline] = useState({});
+  const [zablokowane, setZablokowane] = useState([]);
+  const [alertNoweUrzadzenie, setAlertNoweUrzadzenie] = useState(null); // {nick, fp, czas}
 
   // Heartbeat obecności — co 30 sekund zapisuj że jesteś online
   useEffect(() => {
@@ -170,14 +172,11 @@ export default function App() {
     const login = zalogowany.login;
     setOnline(login);
     const interval = setInterval(() => setOnline(login), 30000);
-    // Subskrybuj listę online
     const unsub = subscribeOnline(setStatusOnline);
-    // Wyloguj się z online przy zamknięciu okna
     const handleUnload = () => setOffline(login);
     window.addEventListener("beforeunload", handleUnload);
 
-    // Zapisz log "wejście na apkę" — działa też gdy użytkownik był już zalogowany
-    // (np. admin otwiera laptopa i apka ładuje się z localStorage)
+    // Zapisz log wejścia
     (async () => {
       try {
         const fp = getFingerprint();
@@ -186,14 +185,36 @@ export default function App() {
           rola: zalogowany.rola || "czlonek",
           czas: Date.now(),
           fp,
-          typ: "wejscie", // odróżnia od "login" — brak wpisywania nicku
+          typ: "wejscie",
         });
       } catch(e) { console.error("Błąd zapisu logu wejścia:", e); }
     })();
 
+    // Admin: subskrybuj logi żeby wykrywać nowe urządzenia w czasie rzeczywistym
+    let unsubLogi = null;
+    if (zalogowany.rola === "admin") {
+      const { subscribeLogi: subLogi } = require("./firebase");
+      let poprzednieLogi = null;
+      unsubLogi = subLogi((logi) => {
+        if (poprzednieLogi === null) { poprzednieLogi = logi; return; }
+        // Znajdź nowe wpisy z nowym urządzeniem których wcześniej nie było
+        const noweAlerty = logi.filter(l =>
+          l.noweUrzadzenie &&
+          !poprzednieLogi.some(p => p.fp === l.fp && p.nick === l.nick && p.czas === l.czas)
+        );
+        if (noweAlerty.length > 0) {
+          setAlertNoweUrzadzenie(noweAlerty[0]);
+        }
+        poprzednieLogi = logi;
+      });
+      // Subskrybuj czarną listę
+      subscribeZablokowane(setZablokowane);
+    }
+
     return () => {
       clearInterval(interval);
       unsub();
+      if (unsubLogi) unsubLogi();
       window.removeEventListener("beforeunload", handleUnload);
       setOffline(login);
     };
@@ -284,8 +305,47 @@ export default function App() {
     ]:[]),
   ];
 
+  const handleZablokuj = async (fp, nick) => {
+    if (!window.confirm(`Zablokować urządzenie (${fp}) użytkownika ${nick}?\n\nOsoba nie będzie mogła się zalogować z tego urządzenia.`)) return;
+    await zablokujUrządzenie(fp, nick, "Zablokowane przez admina");
+    setAlertNoweUrzadzenie(null);
+    alert("✅ Urządzenie zablokowane.");
+  };
+
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c29,#302b63,#24243e)",fontFamily:"'Georgia',serif",color:"#f0e6d3"}}>
+
+      {/* Alert nowego urządzenia — tylko dla admina */}
+      {alertNoweUrzadzenie && zalogowany?.rola === "admin" && (
+        <div style={{
+          position:"fixed",top:0,left:0,right:0,zIndex:9999,
+          background:"linear-gradient(135deg,#7a0000,#b00000)",
+          borderBottom:"2px solid #f55",padding:"12px 16px",
+          display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",
+          boxShadow:"0 4px 20px rgba(255,50,50,0.4)",
+        }}>
+          <span style={{fontSize:20}}>🔴</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:"#fff"}}>
+              NOWE URZĄDZENIE: <strong>{alertNoweUrzadzenie.nick}</strong>
+            </div>
+            <div style={{fontSize:11,color:"#ffaaaa",marginTop:2}}>
+              Fingerprint: {alertNoweUrzadzenie.fp} · {new Date(alertNoweUrzadzenie.czas).toLocaleString("pl-PL")}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <button onClick={()=>handleZablokuj(alertNoweUrzadzenie.fp, alertNoweUrzadzenie.nick)}
+              style={{padding:"7px 14px",background:"#f55",border:"none",borderRadius:6,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:"bold"}}>
+              🚫 Zablokuj urządzenie
+            </button>
+            <button onClick={()=>setAlertNoweUrzadzenie(null)}
+              style={{padding:"7px 14px",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:6,color:"#fff",cursor:"pointer",fontSize:12}}>
+              ✓ To ja / Zignoruj
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{background:"rgba(0,0,0,0.75)",padding:"12px 16px",borderBottom:"2px solid #b8860b",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
         <div>
           <div style={{fontSize:19,fontWeight:"bold",color:"#ffd700",letterSpacing:2}}>🃏 GANG — MENADŻER WYMIAN</div>
@@ -462,8 +522,17 @@ function LoginScreen({onLogin, czlonkowie}) {
 
     const u=ADMIN_CREDENTIALS.find(c=>c.login===login&&c.haslo===haslo);
     if(u){
-      // Zapisz log admina
-      await zapiszLog({ nick: u.login, rola: u.rola, czas: teraz, fp, typ: "login" });
+      // Sprawdź czarną listę
+      const zablok = await pobierzZablokowane();
+      if (zablok.some(z => z.fp === fp)) {
+        setBlad("🚫 To urządzenie zostało zablokowane przez administratora.");
+        return;
+      }
+      // Wykryj nowe urządzenie dla admina
+      const znane = await pobierzFingerprinty();
+      const znaneAdmina = znane[u.login] || [];
+      const noweUrz = znaneAdmina.length > 0 && !znaneAdmina.includes(fp);
+      await zapiszLog({ nick: u.login, rola: u.rola, czas: teraz, fp, typ: noweUrz ? "login_nowe_urzadzenie" : "login", noweUrzadzenie: noweUrz });
       await zapiszFingerprint(u.login, fp);
       onLogin(u);
       return;
@@ -472,6 +541,12 @@ function LoginScreen({onLogin, czlonkowie}) {
       const oryginalny=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(login.trim()));
       if(!oryginalny){
         setBlad(`Nick "${login.trim()}" nie istnieje w gangu. Sprawdź pisownię.`);
+        return;
+      }
+      // Sprawdź czarną listę PRZED zalogowaniem
+      const zablokowane = await pobierzZablokowane();
+      if (zablokowane.some(z => z.fp === fp)) {
+        setBlad("🚫 To urządzenie zostało zablokowane przez administratora. Skontaktuj się z adminem.");
         return;
       }
       // Sprawdź czy to nowe urządzenie
@@ -2816,7 +2891,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
-      {tryb==="logi"&&<LogiLogowan/>}
+      {tryb==="logi"&&<LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={async(fp,nick)=>{if(!window.confirm(`Zablokować urządzenie ${fp} (${nick})?`)) return; await zablokujUrządzenie(fp,nick,"Zablokowane z logów"); alert("✅ Zablokowano");}} onOdblokuj={async(fp)=>{if(!window.confirm(`Odblokować urządzenie ${fp}?`)) return; await odblokujUrządzenie(fp); alert("✅ Odblokowano");}}/>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
     </div>
   );
@@ -4763,7 +4838,7 @@ body {
 // ============================================================
 // LOGI LOGOWAŃ
 // ============================================================
-function LogiLogowan() {
+function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
   const [logi, setLogi] = useState([]);
   const [filtrNick, setFiltrNick] = useState("");
   const [pokazTylkoNowe, setPokazTylkoNowe] = useState(false);
@@ -4854,6 +4929,13 @@ function LogiLogowan() {
                 {l.typ==="login"&&<span style={{fontSize:10,color:"#888",marginLeft:6,background:"rgba(255,255,255,0.05)",padding:"1px 5px",borderRadius:4}}>logowanie</span>}
                 {l.typ==="login_nowe_urzadzenie"&&<span style={{fontSize:10,color:"#f55",marginLeft:6,background:"rgba(255,50,50,0.1)",padding:"1px 5px",borderRadius:4}}>nowe urządzenie</span>}
                 <span style={{fontSize:10,color:"#555",marginLeft:6}}>{l.rola}</span>
+                {l.noweUrzadzenie&&isAdmin&&(
+                  <button
+                    onClick={()=>onZablokuj(l.fp, l.nick)}
+                    style={{fontSize:9,padding:"1px 6px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544455",borderRadius:3,color:"#f55",cursor:"pointer",marginLeft:4}}>
+                    🚫 Zablokuj
+                  </button>
+                )}
               </div>
               <div style={{fontSize:10,color:"#555",display:"flex",gap:8}}>
                 <span>🕐 {formatCzas(l.czas)}</span>
@@ -4863,6 +4945,28 @@ function LogiLogowan() {
           </div>
         ))}
       </div>
+
+      {/* Zablokowane urządzenia */}
+      {isAdmin && zablokowane.length > 0 && (
+        <div style={{marginTop:16,background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:10,padding:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#f55",marginBottom:10}}>
+            🚫 Zablokowane urządzenia ({zablokowane.length})
+          </div>
+          {zablokowane.map((z,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"rgba(0,0,0,0.2)",borderRadius:6,marginBottom:4}}>
+              <div style={{flex:1}}>
+                <span style={{fontSize:12,color:"#f88",fontWeight:"bold"}}>{z.nick}</span>
+                <span style={{fontSize:10,color:"#555",marginLeft:8}}>fp: {z.fp}</span>
+                {z.czas&&<span style={{fontSize:10,color:"#444",marginLeft:8}}>{new Date(z.czas).toLocaleDateString("pl-PL")}</span>}
+              </div>
+              <button onClick={()=>onOdblokuj(z.fp)}
+                style={{fontSize:10,padding:"3px 8px",background:"rgba(0,200,100,0.1)",border:"1px solid #0c633",borderRadius:4,color:"#0c6",cursor:"pointer"}}>
+                ✓ Odblokuj
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
