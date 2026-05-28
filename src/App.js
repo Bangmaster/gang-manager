@@ -1252,10 +1252,10 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
             const aPerDawca = a.aktEfNagroda / Math.max(1, a.aktBrakT);
             const bPerDawca = b.aktEfNagroda / Math.max(1, b.aktBrakT);
             if (Math.round(bPerDawca) !== Math.round(aPerDawca)) return bPerDawca - aPerDawca;
-            // TIEBREAKER: kto rzadziej dostawał karty w historii → wyższy priorytet
-            const aOtrzymal = licznikOtrzymanych[a.osoba.nazwa] || 0;
-            const bOtrzymal = licznikOtrzymanych[b.osoba.nazwa] || 0;
-            if (aOtrzymal !== bOtrzymal) return aOtrzymal - bOtrzymal;
+            // TIEBREAKER: kto ma większy dług (rzadziej dostawał karty) → wyższy priorytet
+            const dlugA = priorytetSprawiedliwy(a.osoba.nazwa);
+            const dlugB = priorytetSprawiedliwy(b.osoba.nazwa);
+            if (Math.abs(dlugB - dlugA) > 0.5) return dlugB - dlugA;
             if (pa !== pb) return pa - pb;
             return 0;
           }
