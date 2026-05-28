@@ -27,6 +27,7 @@ const PROGI = [
   {prog:100, ammo:2500},
   {prog:110, ammo:3500},
   {prog:120, ammo:5000},
+  {prog:135, ammo:2000}, // KOMPLET — wszystkie karty
 ];
 
 // Liczy unikalne posiadane karty osoby (bez duplikatów)
