@@ -4510,35 +4510,51 @@ function OgloszenieGenerator({czlonkowie, posiadane, talie}) {
   const laczonaLvl = Object.values(poziomy).reduce((s,l)=>s+(parseInt(l)||0),0);
 
   const analizujScreen = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    e.target.value = "";
     setAnalizuje(true);
-    try {
+
+    const analizujJeden = (file) => new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64 = reader.result.split(",")[1];
-        const resp = await fetch("/api/gemini", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({
-            prompt: `Na tym screenie z gry The Gang widać listę członków gangu z ich poziomami.
+        try {
+          const base64 = reader.result.split(",")[1];
+          const resp = await fetch("/api/gemini", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+              prompt: `Na tym screenie z gry The Gang widać listę członków gangu z ich poziomami.
 Rozpoznaj każdego gracza i jego poziom liczbowy.
-Zwróć WYŁĄCZNIE JSON: {"gracze":[{"nazwa":"...","lvl":123}]}`,
-            base64, mimeType: file.type || "image/jpeg"
-          })
-        });
-        const data = await resp.json();
-        let text = (data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
-        if(text.startsWith("```json")) text=text.slice(7);
-        if(text.startsWith("```")) text=text.slice(3);
-        if(text.endsWith("```")) text=text.slice(0,-3);
-        const parsed = JSON.parse(text.trim());
-        const nowe = {};
-        parsed.gracze?.forEach(g => { nowe[normalizuj(g.nazwa)] = g.lvl; });
-        setPoziomy(nowe);
+Zwróć WYŁĄCZNIE JSON bez markdown: {"gracze":[{"nazwa":"...","lvl":123}]}`,
+              base64, mimeType: file.type || "image/jpeg"
+            })
+          });
+          const data = await resp.json();
+          let text = (data.candidates?.[0]?.content?.parts?.[0]?.text||"").trim();
+          if(text.startsWith("```json")) text=text.slice(7);
+          if(text.startsWith("```")) text=text.slice(3);
+          if(text.endsWith("```")) text=text.slice(0,-3);
+          const parsed = JSON.parse(text.trim());
+          resolve(parsed.gracze || []);
+        } catch { resolve([]); }
       };
       reader.readAsDataURL(file);
+    });
+
+    try {
+      // Analizuj wszystkie screeny równolegle
+      const wyniki = await Promise.all(files.map(analizujJeden));
+      // Scal wyniki — jeśli gracz pojawia się na wielu screenach, weź wyższy lvl
+      const scaleni = {};
+      wyniki.flat().forEach(g => {
+        const key = normalizuj(g.nazwa);
+        if (!scaleni[key] || g.lvl > scaleni[key]) scaleni[key] = g.lvl;
+      });
+      setPoziomy(scaleni);
+      if (files.length > 1) alert(`✅ Scalono ${files.length} screenów — rozpoznano ${Object.keys(scaleni).length} graczy`);
     } catch(err) { alert("Błąd: "+err.message); }
+
     setAnalizuje(false);
   };
 
@@ -4804,13 +4820,20 @@ body {
 
       {/* Screen z poziomami */}
       <div style={{marginBottom:14,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:12}}>
-        <div style={{fontSize:12,color:"#87CEEB",fontWeight:"bold",marginBottom:6}}>💎 Wgraj screen z poziomami (opcjonalnie)</div>
-        <input type="file" accept="image/*" onChange={analizujScreen} disabled={analizuje}
+        <div style={{fontSize:12,color:"#87CEEB",fontWeight:"bold",marginBottom:4}}>💎 Wgraj screeny z poziomami (opcjonalnie)</div>
+        <div style={{fontSize:11,color:"#555",marginBottom:8}}>
+          Możesz wgrać kilka screenów naraz — lista jest za długa na jeden? Wgraj 2-3 screeny, AI scali je automatycznie.
+        </div>
+        <input type="file" accept="image/*" multiple onChange={analizujScreen} disabled={analizuje}
           style={{width:"100%",padding:8,background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,boxSizing:"border-box"}}/>
-        {analizuje&&<div style={{fontSize:12,color:"#87CEEB",marginTop:6}}>🤖 Analizuję poziomy...</div>}
+        {analizuje&&<div style={{fontSize:12,color:"#87CEEB",marginTop:6}}>🤖 Analizuję i scalanie screenów...</div>}
         {Object.keys(poziomy).length>0&&(
-          <div style={{marginTop:6,fontSize:11,color:"#0c6"}}>
-            ✅ {Object.keys(poziomy).length} graczy • łączny lvl: {laczonaLvl.toLocaleString()}
+          <div style={{marginTop:6,fontSize:11,color:"#0c6",display:"flex",gap:12,flexWrap:"wrap"}}>
+            <span>✅ {Object.keys(poziomy).length} graczy rozpoznanych</span>
+            <span>💪 Łączny lvl: {laczonaLvl.toLocaleString()}</span>
+            <button onClick={()=>setPoziomy({})} style={{fontSize:10,padding:"1px 6px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544455",borderRadius:3,color:"#f55",cursor:"pointer"}}>
+              ✕ Wyczyść
+            </button>
           </div>
         )}
       </div>
