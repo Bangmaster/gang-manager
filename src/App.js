@@ -460,6 +460,10 @@ export default function App() {
           walki={dane.walki||[]}
           typWymiany={typWymiany}
           dane={dane}
+          isAdmin={isAdmin}
+          zablokowane={zablokowane}
+          onZablokuj={async(fp,nick)=>{if(!window.confirm(`Zablokować urządzenie ${fp} (${nick})?`)) return; await zablokujUrządzenie(fp,nick,"Zablokowane z logów"); alert("✅ Zablokowano");}}
+          onOdblokuj={async(fp)=>{if(!window.confirm(`Odblokować urządzenie ${fp}?`)) return; await odblokujUrządzenie(fp); alert("✅ Odblokowano");}}
         />}
       </div>
     </div>
@@ -2842,7 +2846,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 // ============================================================
 // TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane}) {
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaOsobaSkaner,setWybranaOsobaSkaner]=useState(0);
@@ -2891,7 +2895,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
-      {tryb==="logi"&&<LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={async(fp,nick)=>{if(!window.confirm(`Zablokować urządzenie ${fp} (${nick})?`)) return; await zablokujUrządzenie(fp,nick,"Zablokowane z logów"); alert("✅ Zablokowano");}} onOdblokuj={async(fp)=>{if(!window.confirm(`Odblokować urządzenie ${fp}?`)) return; await odblokujUrządzenie(fp); alert("✅ Odblokowano");}}/>}
+      {tryb==="logi"&&<LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={onZablokuj} onOdblokuj={onOdblokuj}/>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
     </div>
   );
