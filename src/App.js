@@ -749,16 +749,29 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
       if(!vip) continue;
       const potrzeby=[];
       talie.forEach(talia=>{
-        const brakT=talia.karty.filter(k=>k.typ===typ&&!posiadane[`${vipId}_${talia.id}_${k.nazwa}`]);
+        const kartyT=talia.karty.filter(k=>k.typ===typ);
+        const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
+        const brakT=kartyT.filter(k=>!posiadane[`${vipId}_${talia.id}_${k.nazwa}`]);
+        const brakO=kartyO.filter(k=>!posiadane[`${vipId}_${talia.id}_${k.nazwa}`]);
+        if(!brakT.length) return;
+        const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
+        const kompletOpp=brakO.length===0;
         brakT.forEach(karta=>{
-          potrzeby.push({talia,karta,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer)});
+          potrzeby.push({talia,karta,faza,kompletOpp,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
         });
       });
+      // Sortuj VIP tak samo jak normalny tryb:
+      // 1. Talie do zamknięcia (brakuje tylko kilku kart + ma komplet drugiego typu)
+      // 2. Faza (im niższa tym bliżej zamknięcia)
+      // 3. Nagroda (wyższa lepsza)
       potrzeby.sort((a,b)=>{
+        if(a.kompletOpp!==b.kompletOpp) return a.kompletOpp?-1:1;
+        if(a.faza!==b.faza) return a.faza-b.faza;
         if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
         return ignorujTrudne ? 0 : (a.trudna?1:0)-(b.trudna?1:0);
       });
-      potrzeby.forEach(({talia,karta,nagroda,trudna})=>{
+      potrzeby.forEach((p)=>{
+        const {talia,karta,nagroda,trudna}=p;
         let dawca=null;
         for(const o2 of dawcy){
           if(o2.id===vipId||wysylajacy.has(o2.id)) continue;
@@ -767,7 +780,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
         if(dawca && czyMozeDostac(vip.id)){
           wysylajacy.add(dawca.id);
           zaznaczDostala(vip.id);
-          planoweWymiany.push({od:dawca.nazwa,do:vip.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda,faza:200,brakTCount:1,brakOCount:0,trudna});
+          planoweWymiany.push({od:dawca.nazwa,do:vip.nazwa,karta:karta.nazwa,talia:talia.nazwa,nagroda,faza:200,brakTCount:p.brakTCount||1,brakOCount:p.brakOCount||0,trudna});
         } else {
           nieobsluzone.push({osoba:vip,talia,karta,brakTCount:1});
         }
@@ -1649,26 +1662,86 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   s+talia.karty.filter(k=>k.typ===typ&&!posiadane[`${id}_${talia.id}_${k.nazwa}`]).length
                 ,0);
                 const progInfo=obliczProg(liczKartyOsoby(id,talie,posiadane));
+                // Breakdown talii per faza dla VIP
+                const aktywneT = talie.filter(t=>!wylaczoneTalie.has(t.id));
+                const talieVip = aktywneT.map(talia=>{
+                  const kartyT = talia.karty.filter(k=>k.typ===typ);
+                  const kartyO = talia.karty.filter(k=>k.typ===oppTyp);
+                  const brakT = kartyT.filter(k=>!posiadane[`${id}_${talia.id}_${k.nazwa}`]);
+                  const brakO = kartyO.filter(k=>!posiadane[`${id}_${talia.id}_${k.nazwa}`]);
+                  if(!brakT.length) return null;
+                  const faza = obliczFaze(brakT.length, brakO.length, typWymiany);
+                  const kompletOpp = brakO.length===0;
+                  return {talia, brakT: brakT.length, brakO: brakO.length, faza, kompletOpp, nagroda: talia.nagroda_amunicja||0};
+                }).filter(Boolean).sort((a,b)=>{
+                  if(a.kompletOpp!==b.kompletOpp) return a.kompletOpp?-1:1;
+                  if(a.faza!==b.faza) return a.faza-b.faza;
+                  return b.nagroda-a.nagroda;
+                });
+                const moznaZamknac = talieVip.filter(t=>t.kompletOpp);
+                const bliskie = talieVip.filter(t=>!t.kompletOpp && t.faza<=3);
                 return (
-                  <div key={id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(255,215,0,0.06)",borderRadius:6,marginBottom:4}}>
-                    <span style={{fontSize:14,fontWeight:"bold",color:"#ffd700",width:20}}>{idx+1}.</span>
-                    <div style={{flex:1}}>
-                      <span style={{fontSize:12,color:"#ddd"}}>{osoba?.nazwa}</span>
-                      {progInfo.nastepnyProg&&progInfo.brakujeDoProg<=5&&(
-                        <span style={{fontSize:10,color:"#fa0",marginLeft:6,background:"rgba(255,165,0,0.12)",padding:"1px 5px",borderRadius:4}}>
-                          🎯 próg {progInfo.nastepnyProg.prog}: brakuje {progInfo.brakujeDoProg} kart (+{progInfo.ammoProg.toLocaleString()})
-                        </span>
-                      )}
+                  <div key={id} style={{padding:"8px 10px",background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70022",borderRadius:8,marginBottom:6}}>
+                    {/* Nagłówek */}
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                      <span style={{fontSize:14,fontWeight:"bold",color:"#ffd700",width:20}}>{idx+1}.</span>
+                      <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"#ddd"}}>{osoba?.nazwa}</span>
+                      <span style={{fontSize:11,color:"#f55"}}>−{brakCount} kart łącznie</span>
+                      <div style={{display:"flex",gap:2}}>
+                        <button onClick={()=>przesunVip(id,-1)} disabled={idx===0}
+                          style={{padding:"2px 7px",background:"rgba(255,255,255,0.07)",border:"none",borderRadius:3,color:idx===0?"#333":"#aaa",cursor:idx===0?"default":"pointer",fontSize:11}}>▲</button>
+                        <button onClick={()=>przesunVip(id,1)} disabled={idx===vipKolejka.length-1}
+                          style={{padding:"2px 7px",background:"rgba(255,255,255,0.07)",border:"none",borderRadius:3,color:idx===vipKolejka.length-1?"#333":"#aaa",cursor:idx===vipKolejka.length-1?"default":"pointer",fontSize:11}}>▼</button>
+                        <button onClick={()=>toggleVip(id)}
+                          style={{padding:"2px 7px",background:"rgba(255,50,50,0.1)",border:"none",borderRadius:3,color:"#f5544488",cursor:"pointer",fontSize:11}}>✕</button>
+                      </div>
                     </div>
-                    <span style={{fontSize:11,color:"#f55"}}>−{brakCount} kart</span>
-                    <div style={{display:"flex",gap:2}}>
-                      <button onClick={()=>przesunVip(id,-1)} disabled={idx===0}
-                        style={{padding:"2px 7px",background:"rgba(255,255,255,0.07)",border:"none",borderRadius:3,color:idx===0?"#333":"#aaa",cursor:idx===0?"default":"pointer",fontSize:11}}>▲</button>
-                      <button onClick={()=>przesunVip(id,1)} disabled={idx===vipKolejka.length-1}
-                        style={{padding:"2px 7px",background:"rgba(255,255,255,0.07)",border:"none",borderRadius:3,color:idx===vipKolejka.length-1?"#333":"#aaa",cursor:idx===vipKolejka.length-1?"default":"pointer",fontSize:11}}>▼</button>
-                      <button onClick={()=>toggleVip(id)}
-                        style={{padding:"2px 7px",background:"rgba(255,50,50,0.1)",border:"none",borderRadius:3,color:"#f5544488",cursor:"pointer",fontSize:11}}>✕</button>
-                    </div>
+
+                    {/* Próg amunicji */}
+                    {progInfo.nastepnyProg&&(
+                      <div style={{fontSize:10,color:"#fa0",marginBottom:5,padding:"2px 7px",background:"rgba(255,165,0,0.08)",borderRadius:4,display:"inline-block"}}>
+                        🎯 próg {progInfo.nastepnyProg.prog}: brakuje {progInfo.brakujeDoProg} kart (+{progInfo.ammoProg.toLocaleString()} amunicji)
+                      </div>
+                    )}
+
+                    {/* Talie do zamknięcia */}
+                    {moznaZamknac.length>0&&(
+                      <div style={{marginBottom:4}}>
+                        <div style={{fontSize:10,color:"#0c6",fontWeight:"bold",marginBottom:3}}>
+                          🔒 Do zamknięcia ({moznaZamknac.length}):
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                          {moznaZamknac.map(t=>(
+                            <span key={t.talia.id} style={{fontSize:10,padding:"2px 7px",background:"rgba(0,200,100,0.12)",border:"1px solid #0c633",borderRadius:4,color:"#0c6"}}>
+                              {t.talia.nazwa} <strong>−{t.brakT}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Talie bliskie zamknięcia (faza 1-3) */}
+                    {bliskie.length>0&&(
+                      <div style={{marginBottom:4}}>
+                        <div style={{fontSize:10,color:"#fa0",fontWeight:"bold",marginBottom:3}}>
+                          ⚡ Bliskie zamknięcia faza 1-3 ({bliskie.length}):
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                          {bliskie.map(t=>(
+                            <span key={t.talia.id} style={{fontSize:10,padding:"2px 7px",background:"rgba(255,165,0,0.08)",border:"1px solid #fa033",borderRadius:4,color:"#fa0"}}>
+                              {t.talia.nazwa} −{t.brakT}kart (f{t.faza})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pozostałe talie — skrócone */}
+                    {talieVip.filter(t=>!t.kompletOpp&&t.faza>3).length>0&&(
+                      <div style={{fontSize:10,color:"#555"}}>
+                        Pozostałe: {talieVip.filter(t=>!t.kompletOpp&&t.faza>3).map(t=>`${t.talia.nazwa.split(" ")[0]} −${t.brakT}(f${t.faza})`).join(" · ")}
+                      </div>
+                    )}
                   </div>
                 );
               })}
