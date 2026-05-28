@@ -3527,7 +3527,7 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
               {ranking.map((r,i)=>{
                 const kolor = r.dług>1?"#f55":r.dług>0?"#fa0":r.dług<-1?"#0c6":"#87CEEB";
-                const ikonka = r.dług>2?"🔴":r.dług>0.5?"🟡":r.dług<-2?"🟢":r.dług<-0.5?"🟢":"⚪";
+                const ikonka = r.dług>=1?"🔴":r.dług>0?"🟡":r.dług<=-1?"🟢":r.dług<0?"🟢":"⚪";
                 const szerokoscPaska = Math.min(100, Math.abs(r.dług)/maxDług*100);
                 return (
                   <div key={r.nazwa} style={{display:"flex",alignItems:"center",gap:8}}>
@@ -3556,7 +3556,7 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
               })}
             </div>
             <div style={{fontSize:10,color:"#555",marginTop:8}}>
-              🔴 Pominięty (dostaje mniej) · 🟢 Uprzywilejowany (dostaje więcej) · ⚪ W normie
+              🔴 Pominięty (dostał mniej niż średnia) · 🟡 Lekko pominięty · 🟢 Uprzywilejowany (dostał więcej) · ⚪ W normie
             </div>
           </div>
         );
