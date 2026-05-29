@@ -2188,7 +2188,6 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                             <div style={{fontSize:11,color:"#666"}}>Brak alternatyw — {x.od} nie ma innych duplikatów które ktoś potrzebuje (faza ≤20)</div>
                           ):alternatywy.map((alt,ai)=>{
                             const zamknieTalie = alt.faza===1 && alt.brakOCount===0;
-                            const brakuje = alt.brakTCount || 1;
                             const progInfo = alt.nastepnyProg ? ` 🎯+${alt.ammoProg?.toLocaleString()} próg!` : "";
                             return (
                             <div key={ai} style={{
