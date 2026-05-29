@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -129,7 +129,7 @@ const DOMYSLNE_TALIE = [
     {nazwa:"Garbarstwo",typ:"diamentowa"},{nazwa:"Kucie metalu",typ:"diamentowa"},{nazwa:"Rzeźbienie w drewnie",typ:"diamentowa"},
     {nazwa:"Barwienie tekstyliów",typ:"diamentowa"},{nazwa:"Wzory haftu",typ:"diamentowa"},{nazwa:"Wydmuchiwanie szkła",typ:"diamentowa"},
   ]},
-  { id: "liderzy_spolecznosci", numer: 13, nazwa: "Liderzy społeczności", nagroda_amunicja: 500, nagroda_amunicja_k2: 2500, karty: [
+  { id: "liderzy_spolecznosci", numer: 13, nazwa: "Liderzy społeczności", nagroda_amunicja: 1500, nagroda_amunicja_k2: 2500, karty: [
     {nazwa:"Empatia",typ:"złota"},{nazwa:"Wizja",typ:"złota"},{nazwa:"Wpływ",typ:"złota"},
     {nazwa:"Adaptacyjność",typ:"złota"},{nazwa:"Rozwiązywanie konfliktów",typ:"złota"},{nazwa:"Inkluzywność",typ:"złota"},
     {nazwa:"Współpraca",typ:"złota"},{nazwa:"Podejmowanie decyzji",typ:"złota"},{nazwa:"Mentoring",typ:"złota"},
@@ -157,8 +157,11 @@ function uzupelnijTalie(talieZBazy) {
     if (!domyslna) return t;
     return {
       ...t,
-      // Uzupełnij nagroda_amunicja_k2 jeśli brakuje
-      nagroda_amunicja_k2: t.nagroda_amunicja_k2 ?? domyslna.nagroda_amunicja_k2,
+      // Uzupełnij nagroda_amunicja_k2 TYLKO jeśli brakuje w Firebase
+      // Jeśli admin edytował przez UI — Firebase ma wyższy priorytet
+      nagroda_amunicja_k2: t.nagroda_amunicja_k2 !== undefined
+        ? t.nagroda_amunicja_k2
+        : domyslna.nagroda_amunicja_k2,
     };
   });
 }
@@ -190,6 +193,7 @@ export default function App() {
 
   const [statusOnline, setStatusOnline] = useState({});
   const [zablokowane, setZablokowane] = useState([]);
+  const [archiwumWalk, setArchiwumWalk] = useState([]);
   const [alertNoweUrzadzenie, setAlertNoweUrzadzenie] = useState(null); // {nick, fp, czas}
 
   // Heartbeat obecności — co 30 sekund zapisuj że jesteś online
@@ -500,6 +504,7 @@ export default function App() {
         {zakładka==="walki"&&<WalkiView
           czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
           zapiszWalki={(now)=>zapiszStrukture("walki",now)}
+          archiwumWalk={archiwumWalk}
           isAdmin={isAdmin}
         />}
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
@@ -2243,7 +2248,7 @@ function EdycjaTalii({talie,zapisz}) {
     zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.map(k=>k.nazwa===stara?{...k,nazwa:nowaNazwa}:k)}:t));
     setEdytujKarte(null);
   };
-  const zapiszPole=(pole,val)=>zapisz(talie.map(t=>t.id===talia.id?{...t,[pole]:pole==="numer"?parseInt(val)||t.numer:parseInt(val)||t.nagroda_amunicja}:t));
+  const zapiszPole=(pole,val)=>zapisz(talie.map(t=>t.id===talia.id?{...t,[pole]:pole==="numer"?parseInt(val)||t.numer:parseInt(val)||0}:t));
   const dodajTalie=()=>{
     if(!nowaTalia.nazwa.trim()) return;
     const id=nowaTalia.nazwa.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now();
@@ -2317,9 +2322,9 @@ function EdycjaTalii({talie,zapisz}) {
       {nowyModal&&(
         <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid #0c655",borderRadius:10,padding:16,marginBottom:14}}>
           <div style={{fontWeight:"bold",color:"#0c6",marginBottom:10}}>Nowa talia</div>
-          {[{p:"nazwa",l:"Nazwa"},{p:"numer",l:"Numer"},{p:"nagroda_amunicja",l:"Nagroda (amunicja)"}].map(f=>(
-            <input key={f.p} value={nowaTalia[f.p]} onChange={e=>setNowaTalia(n=>({...n,[f.p]:e.target.value}))} placeholder={f.l}
-              style={{display:"block",width:"100%",marginBottom:8,padding:"8px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13,boxSizing:"border-box"}}/>
+          {[{p:"nazwa",l:"Nazwa"},{p:"numer",l:"Numer"},{p:"nagroda_amunicja",l:"Nagroda K1 (amunicja)"},{p:"nagroda_amunicja_k2",l:"Nagroda K2 (opcjonalnie)"}].map(f=>(
+            <input key={f.p} value={nowaTalia[f.p]||""} onChange={e=>setNowaTalia(n=>({...n,[f.p]:e.target.value}))} placeholder={f.l}
+              style={{display:"block",width:"100%",marginBottom:8,padding:"8px 10px",background:"#12122a",border:`1px solid ${f.p==="nagroda_amunicja_k2"?"#da70d655":"#333"}`,borderRadius:6,color:f.p==="nagroda_amunicja_k2"?"#da70d6":"#fff",fontSize:13,boxSizing:"border-box"}}/>
           ))}
           <div style={{display:"flex",gap:8}}>
             <button onClick={dodajTalie} style={{padding:"8px 16px",background:"#0c6",border:"none",borderRadius:6,color:"#fff",cursor:"pointer",fontWeight:"bold"}}>Dodaj</button>
@@ -2342,10 +2347,19 @@ function EdycjaTalii({talie,zapisz}) {
       {talia&&(
         <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:8}}>
-            <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700"}}>{talia.nazwa} <span style={{fontSize:12,color:"#888"}}>({talia.karty.length} kart)</span></div>
+            <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700"}}>
+              {talia.nazwa} <span style={{fontSize:12,color:"#888"}}>({talia.karty.length} kart)</span>
+              <span style={{fontSize:11,color:"#ffd700",marginLeft:8}}>K1: {(talia.nagroda_amunicja||0).toLocaleString()} 💰</span>
+              {talia.nagroda_amunicja_k2&&<span style={{fontSize:11,color:"#da70d6",marginLeft:6}}>K2: {talia.nagroda_amunicja_k2.toLocaleString()} 💜</span>}
+            </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
               <label style={{fontSize:11,color:"#aaa"}}>Nr: <input key={`nr-${talia.id}`} type="number" defaultValue={talia.numer} onBlur={e=>zapiszPole("numer",e.target.value)} style={{width:45,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
-              <label style={{fontSize:11,color:"#aaa"}}>Nagroda: <input key={`nr-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja} onBlur={e=>zapiszPole("nagroda_amunicja",e.target.value)} style={{width:70,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
+              <label style={{fontSize:11,color:"#aaa"}}>
+                K1 💰: <input key={`k1-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja} onBlur={e=>zapiszPole("nagroda_amunicja",e.target.value)} style={{width:65,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#ffd700",fontSize:11}}/>
+              </label>
+              <label style={{fontSize:11,color:"#aaa"}}>
+                K2 💜: <input key={`k2-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja_k2??""} placeholder="K2" onBlur={e=>zapiszPole("nagroda_amunicja_k2",e.target.value)} style={{width:65,padding:"3px 5px",background:"#12122a",border:"1px solid #da70d655",borderRadius:4,color:"#da70d6",fontSize:11}}/>
+              </label>
               <button onClick={()=>usunTalie(talia.id)} style={{padding:"4px 10px",background:"rgba(255,50,50,0.12)",border:"1px solid #f5544455",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>🗑 Usuń</button>
             </div>
           </div>
@@ -3030,7 +3044,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="postep"&&<PostepSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane}/>}
       {tryb==="kalkulator"&&<KalkulatorSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} typWymiany={typWymiany}/>}
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana} czlonkowie={czlonkowie}/>}
-      {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture}/>}
+      {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture} walki={dane.walki||[]}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
@@ -3834,16 +3848,35 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
 // ============================================================
 // RESET SEZONU
 // ============================================================
-function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
+function ResetSezonu({talie,czlonkowie,zapiszStrukture,walki=[]}) {
   const [krok,setKrok]=useState(0); // 0=info, 1=potwierdzenie, 2=sukces
   const [resetujace,setResetujace]=useState(false);
 
   const wykonajReset=async()=>{
     setResetujace(true);
+    // Przenieś aktualne walki do archiwum przed kasowaniem
+    if (walki && walki.length > 0) {
+      const dataSezonu = new Date().toLocaleDateString("pl-PL");
+      await zapiszArchiwumWalk({
+        sezon: dataSezonu,
+        data: Date.now(),
+        walki: walki,
+      });
+    }
     await zapiszStrukture("posiadane",{});
     await zapiszStrukture("duplikaty",{});
     await zapiszStrukture("aktywnaWymiana",null);
-    await zapiszStrukture("talie",[]);
+    await zapiszStrukture("walki",[]);
+    // Kasuj nazwy talii i kart, ale zachowaj nagrody K1/K2
+    const talieZachowaneNagrody = talie.map(t => ({
+      id: t.id,
+      numer: t.numer,
+      nazwa: "",
+      nagroda_amunicja: t.nagroda_amunicja || 0,
+      nagroda_amunicja_k2: t.nagroda_amunicja_k2,
+      karty: [],
+    }));
+    await zapiszStrukture("talie", talieZachowaneNagrody);
     setResetujace(false);
     setKrok(2);
   };
@@ -3854,7 +3887,7 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
     <div style={{textAlign:"center",padding:30}}>
       <div style={{fontSize:40,marginBottom:10}}>🎉</div>
       <div style={{fontSize:16,fontWeight:"bold",color:"#0c6",marginBottom:8}}>Reset sezonu zakończony!</div>
-      <div style={{fontSize:12,color:"#888",marginBottom:16}}>Karty, duplikaty i talie wyczyszczone. Wgraj nowe talie przez OCR w zakładce ⚙️ Talie.</div>
+      <div style={{fontSize:12,color:"#888",marginBottom:16}}>Reset zakończony. Nagrody za talie zachowane. Wgraj nowe karty przez OCR w zakładce ⚙️ Talie.</div>
       <button onClick={()=>setKrok(0)} style={{padding:"8px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:6,color:"#ffd700",cursor:"pointer",fontSize:12}}>
         ← Wróć
       </button>
@@ -3867,9 +3900,12 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
       <div style={{fontSize:12,color:"#aaa",marginBottom:16,lineHeight:1.6}}>
         Zostaną wymazane:<br/>
         • <strong style={{color:"#f55"}}>Wszystkie posiadane karty i duplikaty</strong><br/>
-        • <strong style={{color:"#f55"}}>Wszystkie talie ({talie.length} talii, {kartyCount} kart)</strong><br/>
+        • <strong style={{color:"#f55"}}>Nazwy talii i kart ({talie.length} talii, {kartyCount} kart)</strong><br/>
         • Aktywna wymiana<br/><br/>
-        Zostaną zachowani członkowie i historia walk.<br/>
+        Zostaną zachowane:<br/>
+        • <strong style={{color:"#0c6"}}>Nagrody za talie K1 i K2</strong><br/>
+        • Członkowie gangu<br/>
+        • Historia walk<br/><br/>
         <strong>Tej operacji nie można cofnąć!</strong>
       </div>
       <div style={{display:"flex",gap:8}}>
@@ -3890,13 +3926,14 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture}) {
         <div style={{fontSize:11,color:"#888",lineHeight:1.7}}>
           Używasz gdy zaczyna się nowy sezon i chcesz wyczyścić dane kart.<br/>
           <strong style={{color:"#aaa"}}>Co zostanie wyczyszczone:</strong><br/>
-          • Wszystkie posiadane karty<br/>
-          • Wszystkie duplikaty<br/>
-          • Wszystkie talie i karty (nowy sezon = nowe talie)<br/>
-          • Aktywna wymiana<br/><br/>
+          • Wszystkie posiadane karty i duplikaty<br/>
+          • Nazwy talii i kart (nowy sezon = nowe karty)<br/>
+          • Aktywna wymiana<br/>
+          • Walki bieżącego sezonu (przeniesione do archiwum)<br/><br/>
           <strong style={{color:"#aaa"}}>Co zostanie zachowane:</strong><br/>
+          • <strong style={{color:"#0c6"}}>Nagrody za talie K1 i K2</strong><br/>
+          • <strong style={{color:"#0c6"}}>Historia walk → zakładka Poprzednie sezony</strong><br/>
           • Członkowie gangu ({czlonkowie.length} osób)<br/>
-          • Historia walk<br/>
           • Kalendarz eventów
         </div>
       </div>
