@@ -148,6 +148,21 @@ const DOMYSLNE_TALIE = [
 
 const DOMYSLNI_CZLONKOWIE = Array.from({length:20},(_,i)=>({id:i+1,nazwa:`Osoba ${i+1}`}));
 
+// Uzupełnij talie z Firebase o pola których może brakować (np. nagroda_amunicja_k2)
+// Dane w Firebase mogły być zapisane przed dodaniem nowych pól
+function uzupelnijTalie(talieZBazy) {
+  if (!talieZBazy) return DOMYSLNE_TALIE;
+  return talieZBazy.map(t => {
+    const domyslna = DOMYSLNE_TALIE.find(d => d.id === t.id || d.numer === t.numer);
+    if (!domyslna) return t;
+    return {
+      ...t,
+      // Uzupełnij nagroda_amunicja_k2 jeśli brakuje
+      nagroda_amunicja_k2: t.nagroda_amunicja_k2 ?? domyslna.nagroda_amunicja_k2,
+    };
+  });
+}
+
 const DOMYSLNE_DANE = {
   talie: DOMYSLNE_TALIE,
   czlonkowie: DOMYSLNI_CZLONKOWIE,
@@ -244,7 +259,7 @@ export default function App() {
         } else {
           // Dokument istnieje — użyj danych z bazy
           setDane({
-            talie: start.talie || DOMYSLNE_DANE.talie,
+            talie: uzupelnijTalie(start.talie) || DOMYSLNE_DANE.talie,
             czlonkowie: start.czlonkowie || DOMYSLNE_DANE.czlonkowie,
             posiadane: start.posiadane || {},
             duplikaty: start.duplikaty || {},
@@ -260,7 +275,7 @@ export default function App() {
       // Subskrypcja real-time — niezależna od błędu inicjalizacji
       unsub = subscribeGangData((d) => {
         setDane({
-          talie: d.talie || DOMYSLNE_DANE.talie,
+          talie: uzupelnijTalie(d.talie) || DOMYSLNE_DANE.talie,
           czlonkowie: d.czlonkowie || DOMYSLNE_DANE.czlonkowie,
           posiadane: d.posiadane || {},
           duplikaty: d.duplikaty || {},
