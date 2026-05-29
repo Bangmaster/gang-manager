@@ -1711,12 +1711,15 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           // Dawca musi mieć duplikat tej karty
           if(!duplikaty[`${dawca.id}_${talia.id}_${karta.nazwa}`]) return;
           const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
+          const progInfoAlt = progiOsob?.[odbiorca.id];
           kandydaci.push({
             od:dawcaNazwa, do:odbiorca.nazwa,
             karta:karta.nazwa, talia:talia.nazwa,
             nagroda:pobierzNagrode(talia, odbiorca?.krag||1), faza,
             brakTCount:brakT.length, brakOCount:brakO.length,
             trudna:TRUDNE_NUMERY.includes(talia.numer),
+            nastepnyProg: progInfoAlt?.nastepnyProg || null,
+            ammoProg: progInfoAlt?.ammoProg || 0,
           });
         });
       });
@@ -2178,19 +2181,53 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                             🔄 Alternatywne wymiany dla <strong>{x.od}</strong> — karta wpadła odbiorcy z paczki?
                           </div>
                           {alternatywy.length===0?(
-                            <div style={{fontSize:11,color:"#666"}}>Brak alternatyw — {x.od} nie ma innych duplikatów które ktoś potrzebuje</div>
-                          ):alternatywy.map((alt,ai)=>(
-                            <div key={ai} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",flexWrap:"wrap"}}>
-                              <span style={{fontSize:11,color:["#f55","#ff7a00","#fa0","#d4b800","#6af"][Math.min(alt.faza-1,4)]||"#aaa"}}>F{alt.faza}</span>
-                              <span style={{fontSize:11,color:"#888"}}>→ <strong style={{color:"#ddd"}}>{alt.do}</strong>: {alt.karta}</span>
-                              <span style={{fontSize:10,color:"#666"}}>[{alt.talia}]</span>
-                              <span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>
+                            <div style={{fontSize:11,color:"#666"}}>Brak alternatyw — {x.od} nie ma innych duplikatów które ktoś potrzebuje (faza ≤20)</div>
+                          ):alternatywy.map((alt,ai)=>{
+                            const zamknieTalie = alt.faza===1 && alt.brakOCount===0;
+                            const brakuje = alt.brakTCount || 1;
+                            const brakujeTekst = brakuje===1?"brakuje 1 karty":brakuje===2?"brakuje 2 kart":brakuje===3?"brakuje 3 kart":`brakuje ${brakuje} kart`;
+                            const progInfo = alt.nastepnyProg ? ` 🎯+${alt.ammoProg?.toLocaleString()} próg!` : "";
+                            return (
+                            <div key={ai} style={{
+                              display:"flex",alignItems:"center",gap:6,
+                              padding:"6px 8px",marginBottom:3,borderRadius:6,flexWrap:"wrap",
+                              background: zamknieTalie
+                                ? "rgba(0,200,100,0.08)"
+                                : alt.faza<=2 ? "rgba(255,165,0,0.05)" : "rgba(255,255,255,0.02)",
+                              border: zamknieTalie
+                                ? "1px solid #0c633"
+                                : alt.faza<=2 ? "1px solid #fa055" : "1px solid #1a1a2e",
+                            }}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginBottom:2}}>
+                                  <strong style={{fontSize:12,color:"#ddd"}}>{alt.do}</strong>
+                                  <span style={{fontSize:10,color:"#666"}}>← {alt.karta}</span>
+                                  <span style={{fontSize:10,color:"#555"}}>[{alt.talia}]</span>
+                                </div>
+                                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                  {zamknieTalie?(
+                                    <span style={{fontSize:11,fontWeight:"bold",color:"#0c6",background:"rgba(0,200,100,0.12)",padding:"1px 6px",borderRadius:4}}>
+                                      🎉 ZAMKNIE TALIĘ +{alt.nagroda?.toLocaleString()} 💰
+                                    </span>
+                                  ):(
+                                    <span style={{fontSize:11,color:alt.faza<=2?"#fa0":alt.faza<=5?"#d4b800":"#888"}}>
+                                      {brakuje===2?"⚠️ BRAKUJE DWÓCH":brakuje===3?"⚠️ BRAKUJE TRZECH":`F${alt.faza} — ${brakujeTekst}`}
+                                    </span>
+                                  )}
+                                  {!zamknieTalie&&<span style={{fontSize:10,color:"#666"}}>💰{alt.nagroda?.toLocaleString()}</span>}
+                                  {progInfo&&<span style={{fontSize:10,color:"#fa0",fontWeight:"bold"}}>{progInfo}</span>}
+                                </div>
+                              </div>
                               <button onClick={()=>podmienWymiane(globalIdx,alt)} style={{
-                                marginLeft:"auto",padding:"2px 10px",background:"rgba(0,200,100,0.15)",
-                                border:"1px solid #0c644",borderRadius:4,color:"#0c6",cursor:"pointer",fontSize:10,fontWeight:"bold",
+                                flexShrink:0,padding:"4px 12px",
+                                background: zamknieTalie?"linear-gradient(135deg,#0c6,#0fa)":"rgba(0,200,100,0.12)",
+                                border:"1px solid #0c644",borderRadius:5,
+                                color: zamknieTalie?"#000":"#0c6",
+                                cursor:"pointer",fontSize:11,fontWeight:"bold",
                               }}>Wybierz</button>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
