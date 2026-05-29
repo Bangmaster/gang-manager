@@ -1729,9 +1729,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       return a.brakTCount-b.brakTCount;
     });
 
-    // Wyklucz wymiany które już są w planie (ten dawca już wysyła tę kartę)
+    // Wyklucz wymiany które już są w planie (ten dawca już wysyła tę kartę do tej osoby)
     const juzWysylane=new Set(wynik.planoweWymiany.filter(w=>w.od===dawcaNazwa).map(w=>`${w.do}_${w.karta}`));
-    return kandydaci.filter(k=>`${k.do}_${k.karta}`!==juzWysylane.values().next().value).slice(0,5);
+    return kandydaci.filter(k=>!juzWysylane.has(`${k.do}_${k.karta}`));
   };
 
   const podmienWymiane=(idx,nowaWymiana)=>{
