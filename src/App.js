@@ -1054,6 +1054,19 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
     // Wśród nich — największa nagroda, potem najmniej brakuje
     // Dla każdej talii pakuj WIELE kart (od różnych dawców) żeby ją domknąć
 
+    // Sprawdź czy dawca jest potrzebny dla cenniejszej talii w dozamkniecia
+    // Definiujemy jako funkcję lazy — dozamkniecia obliczane poniżej
+    const dozamknieciaRef = { list: [] };
+    const dawcaRezerwowanyDozamkniecia = (dawcaId, nagroda) => {
+      return dozamknieciaRef.list.some(st => {
+        if (st.nagroda <= nagroda) return false;
+        return st.brakT.some(k =>
+          duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`] &&
+          !wysylajacy.has(dawcaId)
+        );
+      });
+    };
+
     const dozamkniecia = staneTalii
       .filter(s => s.kompletOpp) // tylko talie z kompletem drugiego typu — można je realnie zamknąć
       .sort((a, b) => {
@@ -1065,6 +1078,8 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
         const aT = a.trudna ? 1 : 0, bT = b.trudna ? 1 : 0;
         return ignorujTrudne ? 0 : aT - bT;
       });
+
+    dozamknieciaRef.list = dozamkniecia;
 
     // DWUPRZEBIEGOWY algorytm dla dozamkniecia:
     // Przebieg 1: znajdź optymalne przypisanie dawców (nie blokuj)
@@ -1129,17 +1144,6 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
         // Czy dawca ma duplikat karty potrzebnej do tej talii?
         return st.brakT.some(k =>
           duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`]
-        );
-      });
-    };
-
-    // Sprawdź też w dozamkniecia — dawca rezerwowany dla cenniejszej talii dozamkniecia
-    const dawcaRezerwowanyDozamkniecia = (dawcaId, nagroda) => {
-      return dozamkniecia.some(st => {
-        if (st.nagroda <= nagroda) return false;
-        return st.brakT.some(k =>
-          duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`] &&
-          !wysylajacy.has(dawcaId)
         );
       });
     };
