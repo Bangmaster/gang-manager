@@ -2213,11 +2213,20 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                                     <span style={{fontSize:11,fontWeight:"bold",color:"#0c6",background:"rgba(0,200,100,0.12)",padding:"1px 6px",borderRadius:4}}>
                                       🎉 ZAMKNIE TALIĘ +{alt.nagroda?.toLocaleString()} 💰
                                     </span>
-                                  ):(
-                                    <span style={{fontSize:11,color:alt.faza<=2?"#fa0":alt.faza<=5?"#d4b800":"#888"}}>
-                                      {brakuje===2?"⚠️ BRAKUJE DWÓCH":brakuje===3?"⚠️ BRAKUJE TRZECH":`F${alt.faza} — ${brakujeTekst}`}
-                                    </span>
-                                  )}
+                                  ):(()=>{
+                                    const brakT2 = alt.brakTCount||1;
+                                    const brakO2 = alt.brakOCount||0;
+                                    const maKomplet = brakO2===0;
+                                    const ikona = brakT2===1?"🟢":brakT2===2?"🟡":"🔴";
+                                    const kolorT = brakT2===1?"#0c6":brakT2===2?"#fa0":"#f55";
+                                    const opisBrak = brakT2===1?"Brakuje 1":brakT2===2?"Brakuje 2":brakT2===3?"Brakuje 3":`Brakuje ${brakT2}`;
+                                    const opisOpp = maKomplet?" + komplet drugich":` + brakuje ${brakO2} drugich`;
+                                    return (
+                                      <span style={{fontSize:11,color:kolorT}}>
+                                        {ikona} {opisBrak}{opisOpp}
+                                      </span>
+                                    );
+                                  })()}
                                   {!zamknieTalie&&<span style={{fontSize:10,color:"#666"}}>💰{alt.nagroda?.toLocaleString()}</span>}
                                   {progInfo&&<span style={{fontSize:10,color:"#fa0",fontWeight:"bold"}}>{progInfo}</span>}
                                 </div>
