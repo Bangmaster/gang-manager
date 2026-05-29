@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import "./gangStyles.css";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
@@ -18,6 +19,15 @@ function normalizuj(s) {
 }
 
 const TRUDNE_NUMERY = [10, 11, 12, 14, 15];
+
+// Zwraca nagrodę amunicji uwzględniając krąg gracza
+// krag=1 → nagroda_amunicja, krag>=2 → nagroda_amunicja_k2 (zakładamy k2=k3+)
+function pobierzNagrode(talia, krag) {
+  if ((krag || 1) >= 2 && talia.nagroda_amunicja_k2 !== undefined) {
+    return talia.nagroda_amunicja_k2;
+  }
+  return talia.nagroda_amunicja || 0;
+}
 
 const PROGI = [
   {prog:20, ammo:100},
@@ -55,81 +65,81 @@ function obliczProg(obecnaLiczba) {
 }
 
 const DOMYSLNE_TALIE = [
-  { id: "miejskie_legendy", numer: 1, nazwa: "Miejskie legendy", nagroda_amunicja: 500, karty: [
+  { id: "miejskie_legendy", numer: 1, nazwa: "Miejskie legendy", nagroda_amunicja: 500, nagroda_amunicja_k2: 500, karty: [
     {nazwa:"Tajemnicze zniknięcia",typ:"złota"},{nazwa:"Obserwacje kryptydów",typ:"złota"},{nazwa:"Nawiedzone lokacje",typ:"złota"},
     {nazwa:"Przeklęte przedmioty",typ:"złota"},{nazwa:"Istoty nadprzyrodzone",typ:"złota"},{nazwa:"Miejskie legendy",typ:"złota"},
     {nazwa:"Tajne stowarzyszenia",typ:"złota"},{nazwa:"Widmowe zjawy",typ:"złota"},{nazwa:"Niewyjaśnione zjawiska",typ:"złota"},
   ]},
-  { id: "szkolne_rywalizacje", numer: 2, nazwa: "Szkolne rywalizacje", nagroda_amunicja: 750, karty: [
+  { id: "szkolne_rywalizacje", numer: 2, nazwa: "Szkolne rywalizacje", nagroda_amunicja: 750, nagroda_amunicja_k2: 750, karty: [
     {nazwa:"Zawody Maskotek",typ:"złota"},{nazwa:"Tygodnie duchów",typ:"złota"},{nazwa:"Wiece motywacyjne",typ:"złota"},
     {nazwa:"Wojny na żarty",typ:"złota"},{nazwa:"Gry Powrotu do Domu",typ:"złota"},{nazwa:"Bitwy cheerleaderek",typ:"złota"},
     {nazwa:"Barwy szkoły",typ:"złota"},{nazwa:"Rywalizacje absolwentów",typ:"złota"},{nazwa:"Wyzwania akademickie",typ:"złota"},
   ]},
-  { id: "lokalne_firmy", numer: 3, nazwa: "Lokalne firmy", nagroda_amunicja: 1000, karty: [
+  { id: "lokalne_firmy", numer: 3, nazwa: "Lokalne firmy", nagroda_amunicja: 1000, nagroda_amunicja_k2: 1000, karty: [
     {nazwa:"Relacje z klientami",typ:"złota"},{nazwa:"Zaangażowanie społeczności",typ:"złota"},{nazwa:"Zrównoważone praktyki",typ:"złota"},
     {nazwa:"Lokalne zaopatrzenie",typ:"złota"},{nazwa:"Wyjątkowe oferty",typ:"złota"},{nazwa:"Reputacja na rynku",typ:"złota"},
     {nazwa:"Zdolność adaptacji biznesu",typ:"złota"},{nazwa:"Programy lojalnościowe dla klientów",typ:"złota"},
     {nazwa:"Satysfakcja pracowników",typ:"diamentowa"},
   ]},
-  { id: "ukryte_ogrody", numer: 4, nazwa: "Ukryte ogrody", nagroda_amunicja: 1500, karty: [
+  { id: "ukryte_ogrody", numer: 4, nazwa: "Ukryte ogrody", nagroda_amunicja: 1500, nagroda_amunicja_k2: 1500, karty: [
     {nazwa:"Sekretne ścieżki",typ:"złota"},{nazwa:"Szepczące listowie",typ:"złota"},{nazwa:"Zaczarowane kwiaty",typ:"złota"},
     {nazwa:"Ukryte zakamarki",typ:"złota"},{nazwa:"Ciche zakątki",typ:"złota"},{nazwa:"Botaniczne labirynty",typ:"złota"},
     {nazwa:"Zielone sanktuaria",typ:"złota"},{nazwa:"Spokojne kryjówki",typ:"diamentowa"},{nazwa:"Starożytna mądrość",typ:"diamentowa"},
   ]},
-  { id: "najgoretsze_miejsca", numer: 5, nazwa: "Najgorętsze miejsca nocnego życia", nagroda_amunicja: 1500, karty: [
+  { id: "najgoretsze_miejsca", numer: 5, nazwa: "Najgorętsze miejsca nocnego życia", nagroda_amunicja: 1500, nagroda_amunicja_k2: 2500, karty: [
     {nazwa:"Parkiety taneczne",typ:"złota"},{nazwa:"Popisowe koktajle",typ:"złota"},{nazwa:"Widoki z dachu",typ:"złota"},
     {nazwa:"Line-upy DJ-ów",typ:"złota"},{nazwa:"Dekoracja tematyczna",typ:"złota"},{nazwa:"Sekcje VIP",typ:"złota"},
     {nazwa:"Występy na żywo",typ:"złota"},{nazwa:"Neonowe oświetlenie",typ:"złota"},{nazwa:"Późnonocny posiłek",typ:"diamentowa"},
   ]},
-  { id: "kolorowe_murale", numer: 6, nazwa: "Kolorowe murale", nagroda_amunicja: 2500, karty: [
+  { id: "kolorowe_murale", numer: 6, nazwa: "Kolorowe murale", nagroda_amunicja: 2500, nagroda_amunicja_k2: 3000, karty: [
     {nazwa:"Miejska estetyka",typ:"złota"},{nazwa:"Historie społeczności",typ:"złota"},{nazwa:"Tożsamość kulturowa",typ:"złota"},
     {nazwa:"Techniki artystyczne",typ:"złota"},{nazwa:"Wpływ historyczny",typ:"złota"},{nazwa:"Tematy środowiskowe",typ:"złota"},
     {nazwa:"Zaangażowanie społeczne",typ:"diamentowa"},{nazwa:"Sztuka współpracy",typ:"diamentowa"},{nazwa:"Efekt wizualny",typ:"diamentowa"},
   ]},
-  { id: "miejska_dzika_przyroda", numer: 7, nazwa: "Miejska dzika przyroda", nagroda_amunicja: 3000, karty: [
+  { id: "miejska_dzika_przyroda", numer: 7, nazwa: "Miejska dzika przyroda", nagroda_amunicja: 3000, nagroda_amunicja_k2: 3500, karty: [
     {nazwa:"Przystosowania zwierząt",typ:"złota"},{nazwa:"Miejskie ekosystemy",typ:"złota"},{nazwa:"Nocne zachowanie",typ:"złota"},
     {nazwa:"Korytarze dla dzikiej przyrody",typ:"złota"},{nazwa:"Źródła żywności",typ:"złota"},
     {nazwa:"Lokalizacje schronów",typ:"diamentowa"},{nazwa:"Interakcja człowieka z dziką przyrodą",typ:"diamentowa"},
     {nazwa:"Ekosystemy na dachach",typ:"diamentowa"},{nazwa:"Zachowanie szopa",typ:"diamentowa"},
   ]},
-  { id: "artysci_uliczni", numer: 8, nazwa: "Artyści uliczni", nagroda_amunicja: 3500, karty: [
+  { id: "artysci_uliczni", numer: 8, nazwa: "Artyści uliczni", nagroda_amunicja: 3500, nagroda_amunicja_k2: 4000, karty: [
     {nazwa:"Busking",typ:"złota"},{nazwa:"Sztuka cyrku",typ:"złota"},{nazwa:"Żywe posągi",typ:"złota"},
     {nazwa:"Improwizacja teatralna",typ:"złota"},{nazwa:"Taniec uliczny",typ:"złota"},
     {nazwa:"Magia uliczna",typ:"diamentowa"},{nazwa:"Malarstwo na ciele",typ:"diamentowa"},
     {nazwa:"Muzyka etniczna",typ:"diamentowa"},{nazwa:"Akrobacje",typ:"diamentowa"},
   ]},
-  { id: "festiwale_sasiedzkie", numer: 9, nazwa: "Festiwale sąsiedzkie", nagroda_amunicja: 4000, karty: [
+  { id: "festiwale_sasiedzkie", numer: 9, nazwa: "Festiwale sąsiedzkie", nagroda_amunicja: 4000, nagroda_amunicja_k2: 6000, karty: [
     {nazwa:"Platformy paradne",typ:"złota"},{nazwa:"Parada zwierzaków",typ:"złota"},{nazwa:"Występy kulturalne",typ:"złota"},
     {nazwa:"Jarmarki rzemieślnicze",typ:"diamentowa"},{nazwa:"Tradycyjne gry",typ:"diamentowa"},{nazwa:"Warsztaty społeczności",typ:"diamentowa"},
     {nazwa:"Muzyka na żywo",typ:"diamentowa"},{nazwa:"Dekoracje uliczne",typ:"diamentowa"},{nazwa:"Aktywności rodzinne",typ:"diamentowa"},
   ]},
-  { id: "targowiska_uliczne", numer: 10, nazwa: "Targowiska uliczne", nagroda_amunicja: 4000, karty: [
+  { id: "targowiska_uliczne", numer: 10, nazwa: "Targowiska uliczne", nagroda_amunicja: 4000, nagroda_amunicja_k2: 6000, karty: [
     {nazwa:"Lokalne rzemiosło",typ:"złota"},{nazwa:"Świeże produkty",typ:"złota"},{nazwa:"Egzotyczne przyprawy",typ:"złota"},
     {nazwa:"Jedzenie uliczne",typ:"złota"},{nazwa:"Odzież vintage",typ:"złota"},{nazwa:"Ręcznie robiona biżuteria",typ:"złota"},
     {nazwa:"Stoiska z sztuką",typ:"diamentowa"},{nazwa:"Polowanie na okazje",typ:"diamentowa"},{nazwa:"Różnorodność kulturowa",typ:"diamentowa"},
   ]},
-  { id: "zabytki_historyczne", numer: 11, nazwa: "Zabytki historyczne", nagroda_amunicja: 4500, karty: [
+  { id: "zabytki_historyczne", numer: 11, nazwa: "Zabytki historyczne", nagroda_amunicja: 4500, nagroda_amunicja_k2: 10000, karty: [
     {nazwa:"Styl architektoniczny",typ:"złota"},{nazwa:"Znaczenie kulturowe",typ:"złota"},{nazwa:"Epoka historyczna",typ:"złota"},
     {nazwa:"Ewolucja architektoniczna",typ:"diamentowa"},{nazwa:"Atrakcja turystyczna",typ:"diamentowa"},
     {nazwa:"Obiekt światowego dziedzictwa",typ:"diamentowa"},{nazwa:"Wycieczki z przewodnikiem",typ:"diamentowa"},
     {nazwa:"Monumentalna skala",typ:"diamentowa"},{nazwa:"Projekty renowacji",typ:"diamentowa"},
   ]},
-  { id: "tradycyjne_rzemioslo", numer: 12, nazwa: "Tradycyjne rzemiosło", nagroda_amunicja: 6000, karty: [
+  { id: "tradycyjne_rzemioslo", numer: 12, nazwa: "Tradycyjne rzemiosło", nagroda_amunicja: 6000, nagroda_amunicja_k2: 12000, karty: [
     {nazwa:"Techniki tkackie",typ:"diamentowa"},{nazwa:"Szkliwienie ceramiki",typ:"diamentowa"},{nazwa:"Style plecionkarstwa",typ:"diamentowa"},
     {nazwa:"Garbarstwo",typ:"diamentowa"},{nazwa:"Kucie metalu",typ:"diamentowa"},{nazwa:"Rzeźbienie w drewnie",typ:"diamentowa"},
     {nazwa:"Barwienie tekstyliów",typ:"diamentowa"},{nazwa:"Wzory haftu",typ:"diamentowa"},{nazwa:"Wydmuchiwanie szkła",typ:"diamentowa"},
   ]},
-  { id: "liderzy_spolecznosci", numer: 13, nazwa: "Liderzy społeczności", nagroda_amunicja: 500, karty: [
+  { id: "liderzy_spolecznosci", numer: 13, nazwa: "Liderzy społeczności", nagroda_amunicja: 500, nagroda_amunicja_k2: 2500, karty: [
     {nazwa:"Empatia",typ:"złota"},{nazwa:"Wizja",typ:"złota"},{nazwa:"Wpływ",typ:"złota"},
     {nazwa:"Adaptacyjność",typ:"złota"},{nazwa:"Rozwiązywanie konfliktów",typ:"złota"},{nazwa:"Inkluzywność",typ:"złota"},
     {nazwa:"Współpraca",typ:"złota"},{nazwa:"Podejmowanie decyzji",typ:"złota"},{nazwa:"Mentoring",typ:"złota"},
   ]},
-  { id: "spotkania_rodzinne", numer: 14, nazwa: "Spotkania rodzinne", nagroda_amunicja: 6000, karty: [
+  { id: "spotkania_rodzinne", numer: 14, nazwa: "Spotkania rodzinne", nagroda_amunicja: 6000, nagroda_amunicja_k2: 4500, karty: [
     {nazwa:"Wspólne posiłki",typ:"diamentowa"},{nazwa:"Tradycje opowiadania historii",typ:"diamentowa"},{nazwa:"Więź międzypokoleniowa",typ:"diamentowa"},
     {nazwa:"Rytuały kulturowe",typ:"diamentowa"},{nazwa:"Rodzinne przepisy",typ:"diamentowa"},{nazwa:"Świąteczne uroczystości",typ:"diamentowa"},
     {nazwa:"Dyskusje o pochodzeniu",typ:"diamentowa"},{nazwa:"Albumy ze zdjęciami",typ:"diamentowa"},{nazwa:"Gry spotkania",typ:"diamentowa"},
   ]},
-  { id: "lokalna_kuchnia", numer: 15, nazwa: "Lokalna kuchnia", nagroda_amunicja: 10000, karty: [
+  { id: "lokalna_kuchnia", numer: 15, nazwa: "Lokalna kuchnia", nagroda_amunicja: 10000, nagroda_amunicja_k2: 6000, nagroda_amunicja_k2: 6000, karty: [
     {nazwa:"Regionalne składniki",typ:"diamentowa"},{nazwa:"Techniki gotowania",typ:"diamentowa"},{nazwa:"Tradycyjne potrawy",typ:"diamentowa"},
     {nazwa:"Etykieta przy stole",typ:"diamentowa"},{nazwa:"Profil smakowy",typ:"diamentowa"},{nazwa:"Historia kulinarna",typ:"diamentowa"},
     {nazwa:"Lokalne produkty",typ:"diamentowa"},{nazwa:"Sezonowe warianty",typ:"diamentowa"},{nazwa:"Festiwale jedzenia",typ:"diamentowa"},
@@ -314,7 +324,31 @@ export default function App() {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c29,#302b63,#24243e)",fontFamily:"'Georgia',serif",color:"#f0e6d3"}}>
+    <div style={{minHeight:"100vh",background:"#0a0a12",fontFamily:"'Georgia',serif",color:"#f0e6d3",position:"relative",overflow:"hidden"}}>
+
+      {/* Tło — graffiti/street art efekt */}
+      <div style={{
+        position:"fixed",top:0,left:0,right:0,bottom:0,
+        background:`
+          radial-gradient(ellipse at 20% 20%, rgba(138,43,226,0.08) 0%, transparent 50%),
+          radial-gradient(ellipse at 80% 80%, rgba(184,134,11,0.06) 0%, transparent 50%),
+          radial-gradient(ellipse at 50% 50%, rgba(255,50,50,0.03) 0%, transparent 70%),
+          linear-gradient(180deg, #0a0a18 0%, #0d0d1a 50%, #0a0a14 100%)
+        `,
+        zIndex:0,pointerEvents:"none",
+      }}/>
+
+      {/* Dekoracyjne linie jak w grze — ramy */}
+      <div style={{
+        position:"fixed",top:0,left:0,right:0,bottom:0,
+        backgroundImage:`
+          repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,215,0,0.015) 60px),
+          repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(138,43,226,0.015) 60px)
+        `,
+        zIndex:0,pointerEvents:"none",
+      }}/>
+
+      <div style={{position:"relative",zIndex:1}}>
 
       {/* Alert nowego urządzenia — tylko dla admina */}
       {alertNoweUrzadzenie && zalogowany?.rola === "admin" && (
@@ -347,9 +381,21 @@ export default function App() {
         </div>
       )}
 
-      <div style={{background:"rgba(0,0,0,0.75)",padding:"12px 16px",borderBottom:"2px solid #b8860b",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+      <div style={{
+        background:"linear-gradient(180deg,rgba(0,0,0,0.92) 0%,rgba(10,5,25,0.95) 100%)",
+        padding:"12px 16px",
+        borderBottom:"2px solid transparent",
+        backgroundClip:"padding-box",
+        boxShadow:"0 2px 0 #b8860b, 0 3px 0 #7a4a00, 0 0 30px rgba(184,134,11,0.15)",
+        display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,
+        position:"sticky",top:0,zIndex:100,
+      }}>
         <div>
-          <div style={{fontSize:19,fontWeight:"bold",color:"#ffd700",letterSpacing:2}}>🃏 GANG — MENADŻER WYMIAN</div>
+          <div style={{
+            fontSize:18,fontWeight:"bold",letterSpacing:3,
+            background:"linear-gradient(90deg,#ffd700,#fff8dc,#ffd700)",
+            WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
+          }}>⚔ FAMILY — MENADŻER</div>
           <div style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
             <span><span style={{color:"#ffd700"}}>{zalogowany.login}</span> <span style={{color:"#888"}}>({zalogowany.rola})</span></span>
             {statusZapisu && <span style={{color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
@@ -393,18 +439,28 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{display:"flex",background:"rgba(0,0,0,0.4)",borderBottom:"1px solid #2a2a3a",overflowX:"auto"}}>
+      <div style={{display:"flex",background:"linear-gradient(180deg,rgba(0,0,0,0.7),rgba(5,5,20,0.9))",borderBottom:"1px solid rgba(255,215,0,0.12)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
-            padding:"10px 18px",background:"transparent",border:"none",
+            padding:"10px 16px",background:"transparent",border:"none",
             borderBottom:zakładka===t.id?"2px solid #ffd700":"2px solid transparent",
-            color:zakładka===t.id?"#ffd700":"#666",cursor:"pointer",fontSize:13,
+            borderTop:zakładka===t.id?"2px solid rgba(184,134,11,0.3)":"2px solid transparent",
+            color:zakładka===t.id?"#ffd700":"#555",cursor:"pointer",fontSize:12,
             fontWeight:zakładka===t.id?"bold":"normal",whiteSpace:"nowrap",
-          }}>{t.label}</button>
+            letterSpacing:zakładka===t.id?1:0,
+            textShadow:zakładka===t.id?"0 0 12px rgba(255,215,0,0.5)":"none",
+            transition:"all 0.15s",
+            position:"relative",
+          }}>
+            {t.id==="aktywna"&&dane?.aktywnaWymiana&&(
+              <span style={{position:"absolute",top:6,right:4,width:6,height:6,background:"#f55",borderRadius:"50%",boxShadow:"0 0 5px #f55"}}/>
+            )}
+            {t.label}
+          </button>
         ))}
       </div>
 
-      <div style={{padding:16,maxWidth:900,margin:"0 auto"}}>
+      <div style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
@@ -467,13 +523,14 @@ export default function App() {
           onOdblokuj={async(fp)=>{if(!window.confirm(`Odblokować urządzenie ${fp}?`)) return; await odblokujUrządzenie(fp); alert("✅ Odblokowano");}}
         />}
       </div>
+      </div>
     </div>
   );
 }
 
 function LoadingScreen() {
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c29,#302b63,#24243e)",display:"flex",alignItems:"center",justifyContent:"center",color:"#ffd700",fontFamily:"'Georgia',serif"}}>
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at center,#0d0820 0%,#0a0a12 100%)",display:"flex",alignItems:"center",justifyContent:"center",color:"#ffd700",fontFamily:"'Georgia',serif"}}>
       <div style={{textAlign:"center"}}>
         <div style={{fontSize:44,marginBottom:10}}>🃏</div>
         <div style={{fontSize:16}}>Ładowanie danych gangu...</div>
@@ -572,18 +629,40 @@ function LoginScreen({onLogin, czlonkowie}) {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c29,#302b63,#24243e)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Georgia',serif",padding:20}}>
-      <div style={{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:12}}>
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 50% 30%,#130d2e 0%,#0a0a12 60%,#0d0a10 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Georgia',serif",padding:20,position:"relative",overflow:"hidden"}}>
+
+      {/* Dekoracyjne graffiti koła w tle */}
+      <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",border:"1px solid rgba(184,134,11,0.05)",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",width:600,height:600,borderRadius:"50%",border:"1px solid rgba(184,134,11,0.03)",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(138,43,226,0.06) 0%,transparent 70%)",top:"30%",right:"10%",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",width:150,height:150,borderRadius:"50%",background:"radial-gradient(circle,rgba(184,134,11,0.08) 0%,transparent 70%)",bottom:"20%",left:"5%",pointerEvents:"none"}}/>
+
+      <div style={{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:12,position:"relative",zIndex:1}}>
         {/* Cytat dnia */}
-        <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid #b8860b44",borderRadius:10,padding:"12px 16px",textAlign:"center"}}>
+        <div style={{background:"rgba(0,0,0,0.5)",border:"1px solid rgba(184,134,11,0.2)",borderRadius:10,padding:"12px 16px",textAlign:"center",backdropFilter:"blur(4px)"}}>
           <div style={{fontSize:16,marginBottom:6}}>🃏</div>
           <div style={{fontSize:11,color:"#b8860b",fontStyle:"italic",lineHeight:1.5}}>"{cytat}"</div>
         </div>
 
         {/* Panel logowania */}
-        <div style={{background:"rgba(0,0,0,0.65)",border:"2px solid #b8860b",borderRadius:16,padding:28,textAlign:"center",boxSizing:"border-box"}}>
-          <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700",marginBottom:2}}>GANG MANAGER</div>
-          <div style={{fontSize:11,color:"#555",marginBottom:20}}>™FAM™ Menadżer wymian kart</div>
+        <div style={{
+          background:"linear-gradient(160deg,rgba(10,5,25,0.95),rgba(5,5,15,0.98))",
+          border:"1px solid rgba(184,134,11,0.4)",
+          borderRadius:16,padding:28,textAlign:"center",boxSizing:"border-box",
+          boxShadow:"0 0 40px rgba(184,134,11,0.1),inset 0 1px 0 rgba(255,215,0,0.05)",
+        }}>
+          {/* Narożniki jak w grze */}
+          <div style={{position:"relative"}}>
+            <div style={{position:"absolute",top:-20,left:-20,width:20,height:20,borderTop:"2px solid #b8860b",borderLeft:"2px solid #b8860b"}}/>
+            <div style={{position:"absolute",top:-20,right:-20,width:20,height:20,borderTop:"2px solid #b8860b",borderRight:"2px solid #b8860b"}}/>
+          </div>
+          <div style={{
+            fontSize:24,fontWeight:"bold",letterSpacing:4,marginBottom:2,
+            background:"linear-gradient(180deg,#fff8dc,#ffd700,#b8860b)",
+            WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
+            filter:"drop-shadow(0 0 15px rgba(255,215,0,0.3))",
+          }}>⚔ FAMILY ⚔</div>
+          <div style={{fontSize:10,color:"#444",marginBottom:20,letterSpacing:3}}>MENADŻER WYMIAN KART</div>
           <input value={login} onChange={e=>setLogin(e.target.value)} placeholder="Twój nick / login admina"
             style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:14,marginBottom:10,boxSizing:"border-box"}}/>
           <input value={haslo} onChange={e=>setHaslo(e.target.value)} type="password" placeholder="Hasło (tylko admin)"
@@ -808,7 +887,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
   // Oblicz efektywną nagrodę: nagroda talii + ewentualna nagroda za próg
   const obliczEfektywnaНagrode=(osobaId, taliaId, brakujaceKarty)=>{
     const prog=progiOsob[osobaId];
-    const nagroda=talie.find(t=>t.id===taliaId)?.nagroda_amunicja||0;
+    const nagrodaTalii=talie.find(t=>t.id===taliaId); const nagroda=nagrodaTalii?pobierzNagrode(nagrodaTalii,osoba?.krag||1):0;
     // Czy ta wymiana (dostając brakujace karty) przekroczy próg?
     let bonusProg=0;
     if(prog.nastepnyProg && prog.brakujeDoProg<=brakujaceKarty){
@@ -837,7 +916,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
         const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
         const kompletOpp=brakO.length===0;
         brakT.forEach(karta=>{
-          potrzeby.push({talia,karta,faza,kompletOpp,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
+          potrzeby.push({talia,karta,faza,kompletOpp,nagroda:pobierzNagrode(talia,vip.krag||1),trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
         });
       });
       // Sortuj VIP tak samo jak normalny tryb:
@@ -881,7 +960,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
         const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
         const kompletOpp = brakO.length === 0;
         brakT.forEach(karta=>{
-          kandydaciReszta.push({osoba,talia,karta,faza,kompletOpp,nagroda:talia.nagroda_amunicja||0,trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
+          kandydaciReszta.push({osoba,talia,karta,faza,kompletOpp,nagroda:pobierzNagrode(talia,osoba.krag),trudna:TRUDNE_NUMERY.includes(talia.numer),brakTCount:brakT.length,brakOCount:brakO.length});
         });
       });
     });
@@ -917,7 +996,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
       czlonkowie.forEach(osoba=>{
         const brakPrzed=talia.karty.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
         const brakPo=talia.karty.filter(k=>!symPos[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-        if(brakPrzed.length>0&&brakPo.length===0) zamknieteTalie.push({osoba:osoba.nazwa,talia:talia.nazwa,nagroda:talia.nagroda_amunicja||0});
+        if(brakPrzed.length>0&&brakPo.length===0) zamknieteTalie.push({osoba:osoba.nazwa,talia:talia.nazwa,nagroda:pobierzNagrode(talia,osoba.krag)});
       });
     });
     return {planoweWymiany,nieobsluzone,zamknieciaInfo:zamknieteTalie};
@@ -935,7 +1014,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
       const brakT = kartyT.filter(k => !posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
       const brakO = kartyO.filter(k => !posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
       if (!brakT.length) return;
-      const nagroda = talia.nagroda_amunicja || 0;
+      const nagroda = pobierzNagrode(talia, osoba.krag);
       const trudna = TRUDNE_NUMERY.includes(talia.numer);
       // kompletOpp = gracz ma WSZYSTKIE karty drugiego typu → talia może być zamknięta
       const kompletOpp = brakO.length === 0;
@@ -1056,7 +1135,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
             brakujeDoProg: progInfo.brakujeDoProg,
             ammoProg: progInfo.ammoProg,
             nastepnyProg: progInfo.nastepnyProg,
-            nagroda: talia.nagroda_amunicja || 0,
+            nagroda: pobierzNagrode(talia, s.osoba?.krag || 1),
             trudna: TRUDNE_NUMERY.includes(talia.numer),
           });
         });
@@ -1455,7 +1534,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
         const progPo=obliczProg(liczbaPoWymianie);
         const nowyProg=progPo.ostatniProg?.prog > (progPrzed.ostatniProg?.prog||0);
         zamknieciaInfo.push({
-          osoba:osoba.nazwa, talia:talia.nazwa, nagroda:talia.nagroda_amunicja,
+          osoba:osoba.nazwa, talia:talia.nazwa, nagroda:pobierzNagrode(talia,osoba.krag),
           nowyProg: nowyProg ? progPo.ostatniProg : null,
         });
       }
@@ -1567,7 +1646,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           kandydaci.push({
             od:dawcaNazwa, do:odbiorca.nazwa,
             karta:karta.nazwa, talia:talia.nazwa,
-            nagroda:talia.nagroda_amunicja||0, faza,
+            nagroda:pobierzNagrode(talia, osoba?.krag||1), faza,
             brakTCount:brakT.length, brakOCount:brakO.length,
             trudna:TRUDNE_NUMERY.includes(talia.numer),
           });
@@ -1753,7 +1832,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   if(!brakT.length) return null;
                   const faza = obliczFaze(brakT.length, brakO.length, typWymiany);
                   const kompletOpp = brakO.length===0;
-                  return {talia, brakT: brakT.length, brakO: brakO.length, faza, kompletOpp, nagroda: talia.nagroda_amunicja||0};
+                  return {talia, brakT: brakT.length, brakO: brakO.length, faza, kompletOpp, nagroda: pobierzNagrode(talia, osoba?.krag||1)};
                 }).filter(Boolean).sort((a,b)=>{
                   if(a.kompletOpp!==b.kompletOpp) return a.kompletOpp?-1:1;
                   if(a.faza!==b.faza) return a.faza-b.faza;
@@ -1767,6 +1846,11 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                       <span style={{fontSize:14,fontWeight:"bold",color:"#ffd700",width:20}}>{idx+1}.</span>
                       <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"#ddd"}}>{osoba?.nazwa}</span>
+                      {(osoba?.krag||1)>1&&(
+                        <span style={{fontSize:10,padding:"1px 6px",background:"rgba(138,43,226,0.2)",border:"1px solid #da70d655",borderRadius:10,color:"#da70d6",fontWeight:"bold"}}>
+                          Krąg {osoba?.krag}
+                        </span>
+                      )}
                       <span style={{fontSize:11,color:"#f55"}}>−{brakCount} kart łącznie</span>
                       <div style={{display:"flex",gap:2}}>
                         <button onClick={()=>przesunVip(id,-1)} disabled={idx===0}
@@ -1892,7 +1976,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 color:wylaczona?"#f55":"#888",
                 textDecoration:wylaczona?"line-through":"none",
               }}>
-                {wylaczona?"🚫 ":""}{c.nazwa}
+                {wylaczona?"🚫 ":""}{c.nazwa}{(c.krag||1)>1&&<span style={{fontSize:9,color:'#da70d6',marginLeft:3}}>K{c.krag}</span>}
               </button>
             );
           })}
@@ -2273,6 +2357,7 @@ function EdycjaTalii({talie,zapisz}) {
 }
 
 function EdycjaCzlonkow({czlonkowie,zapisz}) {
+  const zapiszKrag = (id, krag) => zapisz(czlonkowie.map(c => c.id===id ? {...c, krag: parseInt(krag)||1} : c));
   const [nowyNick,setNowyNick]=useState("");
   const [edytujId,setEdytujId]=useState(null);
   const [tempNazwa,setTempNazwa]=useState("");
@@ -2333,7 +2418,19 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
             ):(
               <>
                 <span style={{flex:1,fontSize:13,color:"#ddd"}}>{c.nazwa}</span>
+                {(c.krag||1) > 1 && (
+                  <span style={{fontSize:10,padding:"1px 6px",background:"rgba(138,43,226,0.2)",border:"1px solid #8a2be255",borderRadius:10,color:"#da70d6",fontWeight:"bold"}}>
+                    K{c.krag||1}
+                  </span>
+                )}
                 <span style={{fontSize:10,color:"#555"}}>{ranga.nazwa}</span>
+                {/* Selector kręgu */}
+                <select value={c.krag||1} onChange={e=>zapiszKrag(c.id,e.target.value)}
+                  style={{padding:"2px 4px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#aaa",fontSize:10,cursor:"pointer"}}>
+                  <option value={1}>K1</option>
+                  <option value={2}>K2</option>
+                  <option value={3}>K3</option>
+                </select>
                 <button onClick={()=>{setEdytujId(c.id);setTempNazwa(c.nazwa);}} style={{padding:"3px 8px",background:"rgba(255,215,0,0.08)",border:"1px solid #b8860b33",borderRadius:5,color:"#b8860b",cursor:"pointer",fontSize:11}}>✏️</button>
                 <button onClick={()=>usun(c.id)} style={{padding:"3px 8px",background:"rgba(255,50,50,0.08)",border:"1px solid #f5544433",borderRadius:5,color:"#f5544488",cursor:"pointer",fontSize:11}}>🗑</button>
               </>
@@ -2628,7 +2725,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           const nastepnyProg=progInfo.nastepnyProg;
           kandydaci.push({
             od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,
-            nagroda:talia.nagroda_amunicja||0,faza,brakTCount:brakT.length,
+            nagroda:pobierzNagrode(talia,osoba?.krag||1),faza,brakTCount:brakT.length,
             brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer),
             zamknieTalie,progBonus,brakujeDoProg,nastepnyProg,
           });
@@ -3371,23 +3468,28 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
 // POSTĘP SEZONU
 // ============================================================
 function PostepSezonu({talie,czlonkowie,posiadane}) {
-  // Łączna amunicja możliwa do zdobycia
   const lacznaMozliwa=talie.reduce((s,t)=>s+(t.nagroda_amunicja||0),0);
+  const kartyTotal135=talie.reduce((s,t)=>s+t.karty.length,0); // łącznie 135
 
-  // Statystyki per osoba
+  // Statystyki per osoba — z uwzględnieniem kręgu
   const stats=czlonkowie.map(osoba=>{
-    let zamkniete=0,ammo=0,kartyPosiadane=0,kartyTotal=0;
+    const krag=osoba.krag||1;
+    let zamkniete=0,ammo=0,kartyPosiadane=0;
     talie.forEach(talia=>{
       const wszystkie=talia.karty.length;
       const pos=talia.karty.filter(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length;
       kartyPosiadane+=pos;
-      kartyTotal+=wszystkie;
-      if(pos===wszystkie&&wszystkie>0){zamkniete++;ammo+=(talia.nagroda_amunicja||0);}
+      if(pos===wszystkie&&wszystkie>0){zamkniete++;ammo+=pobierzNagrode(talia,osoba.krag);}
     });
-    return {nazwa:osoba.nazwa,zamkniete,ammo,kartyPosiadane,kartyTotal,pct:kartyTotal?Math.round((kartyPosiadane/kartyTotal)*100):0};
-  }).sort((a,b)=>b.zamkniete-a.zamkniete||b.kartyPosiadane-a.kartyPosiadane);
+    // Łączny wynik z kręgami: każdy pełny krąg = 135 kart + pełna amunicja
+    const kartyLacznie = (krag-1)*kartyTotal135 + kartyPosiadane;
+    const lacznaMozliwaKrag = krag >= 2 ? talie.reduce((s,t)=>s+(t.nagroda_amunicja_k2||t.nagroda_amunicja||0),0) : lacznaMozliwa;
+    const ammoLacznie = (krag-1)*lacznaMozliwaKrag + ammo;
+    const pct=kartyTotal135?Math.round((kartyPosiadane/kartyTotal135)*100):0;
+    return {nazwa:osoba.nazwa,krag,zamkniete,ammo,ammoLacznie,kartyPosiadane,kartyLacznie,kartyTotal135,pct};
+  // Sortuj: wyższy krąg × 135 + karty posiadane
+  }).sort((a,b)=>b.kartyLacznie-a.kartyLacznie);
 
-  // Talie posortowane po % zamknięcia w gangu
   const talieStats=talie.map(talia=>{
     const zamkniete=czlonkowie.filter(o=>talia.karty.length>0&&talia.karty.every(k=>posiadane[`${o.id}_${talia.id}_${k.nazwa}`])).length;
     return {...talia,zamkniete,pct:Math.round((zamkniete/Math.max(1,czlonkowie.length))*100)};
@@ -3416,18 +3518,34 @@ function PostepSezonu({talie,czlonkowie,posiadane}) {
       {/* Ranking członków */}
       <div style={{marginBottom:14}}>
         <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>🏆 Ranking postępu</div>
-        {stats.map((s,i)=>(
-          <div key={s.nazwa} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:4,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8}}>
+        {stats.map((s,i)=>{
+          const kragKolor = s.krag===3?"#ffd700":s.krag===2?"#da70d6":"transparent";
+          const kragBorder = s.krag>1?`1px solid ${kragKolor}55`:"1px solid #2a2a3a";
+          return (
+          <div key={s.nazwa} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:4,background:s.krag>1?"rgba(138,43,226,0.06)":"rgba(0,0,0,0.2)",border:kragBorder,borderRadius:8}}>
             <span style={{fontSize:12,color:"#666",width:20}}>{i+1}.</span>
-            <span style={{fontSize:12,flex:1,color:"#ddd"}}>{s.nazwa}</span>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                <span style={{fontSize:12,color:"#ddd"}}>{s.nazwa}</span>
+                {s.krag>1&&(
+                  <span style={{fontSize:10,padding:"1px 5px",background:"rgba(138,43,226,0.25)",border:`1px solid ${kragKolor}55`,borderRadius:10,color:kragKolor,fontWeight:"bold"}}>
+                    Krąg {s.krag}
+                  </span>
+                )}
+              </div>
+              <div style={{fontSize:10,color:"#555",marginTop:1}}>
+                {s.krag>1?`${(s.krag-1)*135}+${s.kartyPosiadane} kart łącznie`:`${s.kartyPosiadane}/${s.kartyTotal135} kart`}
+              </div>
+            </div>
             <span style={{fontSize:11,color:"#ffd700"}}>{s.zamkniete}/{talie.length} talii</span>
             <span style={{fontSize:11,color:"#0c6",marginLeft:4}}>{s.ammo.toLocaleString()} 💰</span>
-            <div style={{width:60,height:6,background:"#12122a",borderRadius:3,overflow:"hidden",marginLeft:4}}>
-              <div style={{height:"100%",width:`${(s.ammo/lacznaMozliwa)*100}%`,background:"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
+            <div style={{width:50,height:6,background:"#12122a",borderRadius:3,overflow:"hidden",marginLeft:4}}>
+              <div style={{height:"100%",width:`${s.pct}%`,background:s.krag>1?"linear-gradient(90deg,#8a2be2,#da70d6)":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
             </div>
             <span style={{fontSize:10,color:"#555",width:30}}>{s.pct}%</span>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Postęp talii */}
