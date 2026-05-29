@@ -218,6 +218,22 @@ export function subscribeZablokowane(callback) {
   });
 }
 
+// === ARCHIWUM WALK (poprzednie sezony) ===
+export async function zapiszArchiwumWalk(sezon) {
+  try {
+    await setDoc(GANG_DOC, {
+      archiwumWalk: arrayUnion(sezon)
+    }, { merge: true });
+    return true;
+  } catch(e) { console.error("Błąd zapisu archiwum:", e); return false; }
+}
+
+export function subscribeArchiwumWalk(callback) {
+  return onSnapshot(GANG_DOC, (snap) => {
+    callback(snap.exists() ? (snap.data().archiwumWalk || []) : []);
+  });
+}
+
 // === HISTORIA WYMIAN ===
 const HISTORIA_DOC = doc(db, "gang", "historia");
 
