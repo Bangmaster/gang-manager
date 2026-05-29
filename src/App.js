@@ -1729,9 +1729,22 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       return a.brakTCount-b.brakTCount;
     });
 
-    // Wyklucz wymiany które już są w planie (ten dawca już wysyła tę kartę do tej osoby)
+    // Wyklucz wymiany które już są w planie
     const juzWysylane=new Set(wynik.planoweWymiany.filter(w=>w.od===dawcaNazwa).map(w=>`${w.do}_${w.karta}`));
-    return kandydaci.filter(k=>!juzWysylane.has(`${k.do}_${k.karta}`));
+    return kandydaci
+      .filter(k=>!juzWysylane.has(`${k.do}_${k.karta}`))
+      .filter(k=>k.faza<=20) // max faza 20 — wyżej nie ma sensu
+      .sort((a,b)=>{
+        // 1. Talie do zamknięcia (faza 1 + kompletOpp) pierwsze
+        const aZamknie = a.faza===1 && a.brakOCount===0;
+        const bZamknie = b.faza===1 && b.brakOCount===0;
+        if(aZamknie!==bZamknie) return aZamknie?-1:1;
+        // 2. Faza rosnąco
+        if(a.faza!==b.faza) return a.faza-b.faza;
+        // 3. Nagroda malejąco
+        if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
+        return 0;
+      });
   };
 
   const podmienWymiane=(idx,nowaWymiana)=>{
