@@ -887,7 +887,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
   // Oblicz efektywną nagrodę: nagroda talii + ewentualna nagroda za próg
   const obliczEfektywnaНagrode=(osobaId, taliaId, brakujaceKarty)=>{
     const prog=progiOsob[osobaId];
-    const nagrodaTalii=talie.find(t=>t.id===taliaId); const nagroda=nagrodaTalii?pobierzNagrode(nagrodaTalii,osoba?.krag||1):0;
+    const nagrodaTalii=talie.find(t=>t.id===taliaId); const _osobaObj=czlonkowie.find(c=>c.id===osobaId); const nagroda=nagrodaTalii?pobierzNagrode(nagrodaTalii,_osobaObj?.krag||1):0;
     // Czy ta wymiana (dostając brakujace karty) przekroczy próg?
     let bonusProg=0;
     if(prog.nastepnyProg && prog.brakujeDoProg<=brakujaceKarty){
@@ -1135,7 +1135,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
             brakujeDoProg: progInfo.brakujeDoProg,
             ammoProg: progInfo.ammoProg,
             nastepnyProg: progInfo.nastepnyProg,
-            nagroda: pobierzNagrode(talia, s.osoba?.krag || 1),
+            nagroda: pobierzNagrode(talia, osoba?.krag || 1),
             trudna: TRUDNE_NUMERY.includes(talia.numer),
           });
         });
@@ -1646,7 +1646,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           kandydaci.push({
             od:dawcaNazwa, do:odbiorca.nazwa,
             karta:karta.nazwa, talia:talia.nazwa,
-            nagroda:pobierzNagrode(talia, osoba?.krag||1), faza,
+            nagroda:pobierzNagrode(talia, odbiorca?.krag||1), faza,
             brakTCount:brakT.length, brakOCount:brakO.length,
             trudna:TRUDNE_NUMERY.includes(talia.numer),
           });
@@ -2725,7 +2725,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           const nastepnyProg=progInfo.nastepnyProg;
           kandydaci.push({
             od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,
-            nagroda:pobierzNagrode(talia,osoba?.krag||1),faza,brakTCount:brakT.length,
+            nagroda:pobierzNagrode(talia,odbiorca?.krag||1),faza,brakTCount:brakT.length,
             brakOCount:brakO.length,trudna:TRUDNE_NUMERY.includes(talia.numer),
             zamknieTalie,progBonus,brakujeDoProg,nastepnyProg,
           });
