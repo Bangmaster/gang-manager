@@ -1105,13 +1105,39 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
       if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
       return a.brakT.length - b.brakT.length;
     });
+
+    // Zbuduj mapę: dawca → jakie talie może zamknąć i za ile nagrody
+    // Używamy do sprawdzenia czy dawca jest "rezerwowany" dla cenniejszej wymiany
+    const dawcaRezerwowany = (dawcaId, nagroda) => {
+      // Sprawdź czy ten dawca jest potrzebny do zamknięcia talii z wyższą nagrodą
+      return staneTalii.some(st => {
+        if (!st.kompletOpp) return false; // tylko talie do zamknięcia
+        if (st.nagroda <= nagroda) return false; // tylko cenniejsze
+        // Czy dawca ma duplikat karty potrzebnej do tej talii?
+        return st.brakT.some(k =>
+          duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`] &&
+          !wysylajacy.has(dawcaId)
+        );
+      });
+    };
+
     for (const s of reszta) {
       for (const karta of s.brakT) {
         let dawca = null;
         for (const o2 of dawcy) {
           if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
-          if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) {
-            dawca = o2; break;
+          if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
+          // Nie używaj dawcy jeśli jest rezerwowany dla cenniejszej wymiany
+          if (dawcaRezerwowany(o2.id, s.nagroda)) continue;
+          dawca = o2; break;
+        }
+        // Jeśli nie znaleziono niezarezerwowanego — użyj dowolnego
+        if (!dawca) {
+          for (const o2 of dawcy) {
+            if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
+            if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) {
+              dawca = o2; break;
+            }
           }
         }
         if (dawca && czyMozeDostac(s.osoba.id)) {
