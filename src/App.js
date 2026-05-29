@@ -1066,46 +1066,53 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
         return ignorujTrudne ? 0 : aT - bT;
       });
 
-    // Próbuj zamknąć talie po kolei
+    // DWUPRZEBIEGOWY algorytm dla dozamkniecia:
+    // Przebieg 1: znajdź optymalne przypisanie dawców (nie blokuj)
+    // Przebieg 2: zatwierdź przypisania
+
+    // Krok 1: dla każdej karty w dozamkniecia znajdź najlepszego wolnego dawcę
+    // Sortujemy globalnie po nagrodzie — najcenniejsze pierwsze
+    const przypisania = []; // { dawca, odbiorca: s.osoba, karta, talia, nagroda, trudna, brakT }
+    const zajenciDawcy = new Set();
+
     for (const s of dozamkniecia) {
-      const potrzebne = [...s.brakT]; // kopia
-      const wymianyDlaTejTalii = [];
-      for (const karta of potrzebne) {
-        // Znajdź dawcę dla tej karty
+      if (!czyMozeDostac(s.osoba.id)) continue;
+      for (const karta of s.brakT) {
+        // Znajdź wolnego dawcę który nie jest już zaplanowany dla tej rundy
         let dawca = null;
+        let dawcaFallback = null;
         for (const o2 of dawcy) {
-          if (o2.id === s.osoba.id || wysylajacy.has(o2.id)) continue;
-          if (duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) {
-            dawca = o2; break;
+          if (o2.id === s.osoba.id || wysylajacy.has(o2.id) || zajenciDawcy.has(o2.id)) continue;
+          if (!duplikaty[`${o2.id}_${s.talia.id}_${karta.nazwa}`]) continue;
+          // Preferuj dawcę który NIE jest potrzebny dla cenniejszej wymiany
+          if (dawcaRezerwowanyDozamkniecia(o2.id, s.nagroda)) {
+            if (!dawcaFallback) dawcaFallback = o2;
+            continue;
           }
+          dawca = o2; break;
         }
+        if (!dawca) dawca = dawcaFallback;
         if (dawca) {
-          if (czyMozeDostac(s.osoba.id)) wymianyDlaTejTalii.push({ dawca, karta });
+          zajenciDawcy.add(dawca.id);
+          przypisania.push({ dawca, odbiorca: s.osoba, karta, s });
         } else {
-          // Brak dawcy dla tej karty — talia nie zostanie zamknięta tą wymianą
-          // (i tak dodaj resztę kart które mają dawców)
-        }
-      }
-      // Zatwierdź wszystkie znalezione wymiany dla tej talii
-      // (nawet jeśli nie zamkniemy 100%, dajemy ile się da)
-      wymianyDlaTejTalii.forEach(({ dawca, karta }) => {
-        wysylajacy.add(dawca.id);
-        zaznaczDostala(s.osoba.id);
-        planoweWymiany.push({
-          od: dawca.nazwa, do: s.osoba.nazwa,
-          karta: karta.nazwa, talia: s.talia.nazwa,
-          nagroda: s.nagroda, faza: 100,
-          brakTCount: s.brakT.length, brakOCount: s.brakO.length,
-          trudna: s.trudna,
-        });
-      });
-      // Brakujące potrzeby (kart bez dawcy)
-      s.brakT.forEach(karta => {
-        if (!wymianyDlaTejTalii.find(w => w.karta.nazwa === karta.nazwa)) {
           nieobsluzone.push({ osoba: s.osoba, talia: s.talia, karta, brakTCount: s.brakT.length });
         }
-      });
+      }
     }
+
+    // Krok 2: zatwierdź wszystkie przypisania
+    przypisania.forEach(({ dawca, odbiorca, karta, s }) => {
+      wysylajacy.add(dawca.id);
+      zaznaczDostala(odbiorca.id);
+      planoweWymiany.push({
+        od: dawca.nazwa, do: odbiorca.nazwa,
+        karta: karta.nazwa, talia: s.talia.nazwa,
+        nagroda: s.nagroda, faza: 100,
+        brakTCount: s.brakT.length, brakOCount: s.brakO.length,
+        trudna: s.trudna,
+      });
+    });
 
     // POTEM też talie z brakiem opp (nie da się domknąć, ale gracz może być blisko)
     const reszta = staneTalii.filter(s => !s.kompletOpp).sort((a, b) => {
@@ -1114,13 +1121,22 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
     });
 
     // Zbuduj mapę: dawca → jakie talie może zamknąć i za ile nagrody
-    // Używamy do sprawdzenia czy dawca jest "rezerwowany" dla cenniejszej wymiany
+    // Sprawdza czy dawca jest potrzebny dla cenniejszej wymiany gdziekolwiek
     const dawcaRezerwowany = (dawcaId, nagroda) => {
-      // Sprawdź czy ten dawca jest potrzebny do zamknięcia talii z wyższą nagrodą
       return staneTalii.some(st => {
-        if (!st.kompletOpp) return false; // tylko talie do zamknięcia
         if (st.nagroda <= nagroda) return false; // tylko cenniejsze
+        if (wysylajacy.has(dawcaId)) return false; // już zajęty
         // Czy dawca ma duplikat karty potrzebnej do tej talii?
+        return st.brakT.some(k =>
+          duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`]
+        );
+      });
+    };
+
+    // Sprawdź też w dozamkniecia — dawca rezerwowany dla cenniejszej talii dozamkniecia
+    const dawcaRezerwowanyDozamkniecia = (dawcaId, nagroda) => {
+      return dozamkniecia.some(st => {
+        if (st.nagroda <= nagroda) return false;
         return st.brakT.some(k =>
           duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`] &&
           !wysylajacy.has(dawcaId)
