@@ -2189,7 +2189,6 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                           ):alternatywy.map((alt,ai)=>{
                             const zamknieTalie = alt.faza===1 && alt.brakOCount===0;
                             const brakuje = alt.brakTCount || 1;
-                            const brakujeTekst = brakuje===1?"brakuje 1 karty":brakuje===2?"brakuje 2 kart":brakuje===3?"brakuje 3 kart":`brakuje ${brakuje} kart`;
                             const progInfo = alt.nastepnyProg ? ` 🎯+${alt.ammoProg?.toLocaleString()} próg!` : "";
                             return (
                             <div key={ai} style={{
