@@ -1711,15 +1711,19 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           // Dawca musi mieć duplikat tej karty
           if(!duplikaty[`${dawca.id}_${talia.id}_${karta.nazwa}`]) return;
           const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
-          const progInfoAlt = progiOsob?.[odbiorca.id];
+          // Oblicz czy ta wymiana daje próg amunicji odbiorcy
+          const kartyOdbiorcyLacznie = talie.reduce((s,t)=>
+            s+t.karty.filter(k=>posiadane[`${odbiorca.id}_${t.id}_${k.nazwa}`]).length, 0
+          );
+          const progPoWymianie = PROGI.find(p=>p.prog>kartyOdbiorcyLacznie && p.prog<=kartyOdbiorcyLacznie+1);
           kandydaci.push({
             od:dawcaNazwa, do:odbiorca.nazwa,
             karta:karta.nazwa, talia:talia.nazwa,
             nagroda:pobierzNagrode(talia, odbiorca?.krag||1), faza,
             brakTCount:brakT.length, brakOCount:brakO.length,
             trudna:TRUDNE_NUMERY.includes(talia.numer),
-            nastepnyProg: progInfoAlt?.nastepnyProg || null,
-            ammoProg: progInfoAlt?.ammoProg || 0,
+            nastepnyProg: progPoWymianie || null,
+            ammoProg: progPoWymianie?.ammo || 0,
           });
         });
       });
