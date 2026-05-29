@@ -203,6 +203,7 @@ export default function App() {
     setOnline(login);
     const interval = setInterval(() => setOnline(login), 30000);
     const unsub = subscribeOnline(setStatusOnline);
+    const unsubArchiwum = subscribeArchiwumWalk(setArchiwumWalk);
     const handleUnload = () => setOffline(login);
     window.addEventListener("beforeunload", handleUnload);
 
@@ -244,6 +245,7 @@ export default function App() {
     return () => {
       clearInterval(interval);
       unsub();
+      unsubArchiwum();
       if (unsubLogi) unsubLogi();
       window.removeEventListener("beforeunload", handleUnload);
       setOffline(login);
