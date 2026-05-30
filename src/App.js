@@ -712,6 +712,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
   const [wybranaOsoba,setWybranaOsoba]=useState(startIdx);
   const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
+  const [tooltip,setTooltip]=useState(null); // {kartaNazwa, taliaId, x, y}
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
@@ -794,14 +795,25 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                   const ma=posiadane[key]; const dup=duplikaty[key];
                   return (
                     <div key={karta.nazwa} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                      <button disabled={!mozeEdytowac} onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane")} style={{
-                        padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
-                        maxWidth:90,textAlign:"center",lineHeight:1.2,
-                        background:ma?(karta.typ==="złota"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)"):"rgba(255,255,255,0.04)",
-                        border:ma?"none":"1px solid #2a2a3a",
-                        color:ma?(karta.typ==="złota"?"#000":"#fff"):"#444",
-                        fontWeight:ma?"bold":"normal",opacity:mozeEdytowac?1:0.7,
-                      }}>{karta.nazwa}</button>
+                      <button
+                        disabled={!mozeEdytowac}
+                        onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane")}
+                        onMouseEnter={!ma?(e)=>{
+                          const dawcy=czlonkowie.filter(c=>
+                            c.id!==osoba.id &&
+                            duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]
+                          ).map(c=>c.nazwa);
+                          setTooltip({kartaNazwa:karta.nazwa,taliaId:talia.id,dawcy,x:e.clientX,y:e.clientY});
+                        }:null}
+                        onMouseLeave={!ma?()=>setTooltip(null):null}
+                        style={{
+                          padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
+                          maxWidth:90,textAlign:"center",lineHeight:1.2,
+                          background:ma?(karta.typ==="złota"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)"):"rgba(255,255,255,0.04)",
+                          border:ma?"none":(!ma&&czlonkowie.some(c=>c.id!==osoba.id&&duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]))?"1px solid #0c633":"1px solid #2a2a3a",
+                          color:ma?(karta.typ==="złota"?"#000":"#fff"):"#444",
+                          fontWeight:ma?"bold":"normal",opacity:mozeEdytowac?1:0.7,
+                        }}>{karta.nazwa}</button>
                       {ma&&<button disabled={!mozeEdytowac} onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"duplikat")} style={{
                         padding:"1px 6px",fontSize:9,borderRadius:4,cursor:mozeEdytowac?"pointer":"not-allowed",
                         background:dup?"linear-gradient(135deg,#4169E1,#87CEEB)":"rgba(65,105,225,0.1)",
