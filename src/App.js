@@ -920,6 +920,20 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
 
   // TRYB VIP — kolejka priorytetów
   // ============================================================
+  // HELPER: sprawdza czy dawca jest potrzebny do zamknięcia cenniejszej talii
+  // Zdefiniowany wcześniej bo używany w trybie celowanym i reszcie algorytmu
+  const staneTaliiRef = { list: [] };
+  const dawcaRezerwowany = (dawcaId, nagroda) => {
+    return staneTaliiRef.list.some(st => {
+      if (st.nagroda <= nagroda) return false;
+      if (wysylajacy.has(dawcaId)) return false;
+      return st.brakT.some(k =>
+        duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`]
+      );
+    });
+  };
+
+  // ============================================================
   // TRYB CELOWANY — wybrane osoby dostają priorytetowo X kart
   // ============================================================
   if(tryb==="celowany" && Object.keys(celowaKolejka).some(k=>celowaKolejka[k]>0)) {
@@ -1134,6 +1148,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
 
     // Sprawdź czy dawca jest potrzebny dla cenniejszej talii w dozamkniecia
     // Definiujemy jako funkcję lazy — dozamkniecia obliczane poniżej
+    staneTaliiRef.list = staneTalii;
     const dozamknieciaRef = { list: [] };
     const dawcaRezerwowanyDozamkniecia = (dawcaId, nagroda) => {
       return dozamknieciaRef.list.some(st => {
@@ -1212,19 +1227,6 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
       if (b.nagroda !== a.nagroda) return b.nagroda - a.nagroda;
       return a.brakT.length - b.brakT.length;
     });
-
-    // Zbuduj mapę: dawca → jakie talie może zamknąć i za ile nagrody
-    // Sprawdza czy dawca jest potrzebny dla cenniejszej wymiany gdziekolwiek
-    const dawcaRezerwowany = (dawcaId, nagroda) => {
-      return staneTalii.some(st => {
-        if (st.nagroda <= nagroda) return false; // tylko cenniejsze
-        if (wysylajacy.has(dawcaId)) return false; // już zajęty
-        // Czy dawca ma duplikat karty potrzebnej do tej talii?
-        return st.brakT.some(k =>
-          duplikaty[`${dawcaId}_${st.talia.id}_${k.nazwa}`]
-        );
-      });
-    };
 
     for (const s of reszta) {
       for (const karta of s.brakT) {
