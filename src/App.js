@@ -874,6 +874,33 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
           })}
         </div>
       )}
+      {/* Tooltip — kto ma duplikat tej karty */}
+      {tooltip&&(
+        <div style={{
+          position:"fixed",
+          left:Math.min(tooltip.x+10, window.innerWidth-220),
+          top:Math.min(tooltip.y-10, window.innerHeight-120),
+          zIndex:9999,
+          background:"rgba(10,5,25,0.97)",
+          border:"1px solid #ffd70055",
+          borderRadius:8,padding:"8px 12px",
+          boxShadow:"0 4px 20px rgba(0,0,0,0.8)",
+          pointerEvents:"none",
+          minWidth:160,maxWidth:220,
+        }}>
+          <div style={{fontSize:11,color:"#ffd700",fontWeight:"bold",marginBottom:4}}>
+            💎 Kto ma duplikat:
+          </div>
+          <div style={{fontSize:11,color:"#888",marginBottom:4,fontStyle:"italic"}}>
+            {tooltip.kartaNazwa}
+          </div>
+          {tooltip.dawcy.length===0?(
+            <div style={{fontSize:11,color:"#555"}}>Nikt nie ma duplikatu</div>
+          ):tooltip.dawcy.map(d=>(
+            <div key={d} style={{fontSize:12,color:"#0c6",padding:"1px 0"}}>✓ {d}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
