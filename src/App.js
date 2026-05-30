@@ -1742,7 +1742,6 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     // 2. Odbiorca już dostaje tę kartę od kogokolwiek w rozpisce
     const juzOtrzymuje=new Set(wynik.planoweWymiany.map(w=>`${w.do}_${w.karta}`));
     // 3. Ten dawca już jest zajęty (wysyła coś innemu)
-    const dawcaJuzWysyla=wynik.planoweWymiany.some(w=>w.od===dawcaNazwa);
     return kandydaci
       .filter(k=>!juzWysylane.has(`${k.do}_${k.karta}`))
       .filter(k=>!juzOtrzymuje.has(`${k.do}_${k.karta}`))
