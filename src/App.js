@@ -933,84 +933,6 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
     });
   };
 
-  // ============================================================
-  // TRYB CELOWANY — wybrane osoby dostają priorytetowo X kart
-  // ============================================================
-  if(tryb==="celowany" && Object.keys(celowaKolejka).some(k=>celowaKolejka[k]>0)) {
-    // Sortuj celowane osoby po sumie nagród (najcenniejsze pierwsze)
-    const celowani = Object.entries(celowaKolejka)
-      .filter(([,ile])=>ile>0)
-      .map(([osobaId,ile])=>({
-        osoba: czlonkowie.find(c=>c.id===parseInt(osobaId)||c.id===osobaId),
-        ile,
-      }))
-      .filter(x=>x.osoba);
-
-    for(const {osoba,ile} of celowani) {
-      // Zbierz wszystkie możliwe karty dla tej osoby posortowane jak normalny algorytm
-      const kandydaci=[];
-      talie.forEach(talia=>{
-        const kartyT=talia.karty.filter(k=>k.typ===typ);
-        const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
-        const brakT=kartyT.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-        const brakO=kartyO.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-        if(!brakT.length) return;
-        const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
-        const kompletOpp=brakO.length===0;
-        brakT.forEach(karta=>{
-          kandydaci.push({
-            talia,karta,faza,kompletOpp,
-            nagroda:pobierzNagrode(talia,osoba.krag),
-            trudna:TRUDNE_NUMERY.includes(talia.numer),
-            brakTCount:brakT.length,brakOCount:brakO.length,
-          });
-        });
-      });
-
-      // Sortuj: zamknięcia pierwsze, potem faza, potem nagroda
-      kandydaci.sort((a,b)=>{
-        if(a.kompletOpp!==b.kompletOpp) return a.kompletOpp?-1:1;
-        if(a.faza!==b.faza) return a.faza-b.faza;
-        if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
-        return ignorujTrudne?0:(a.trudna?1:0)-(b.trudna?1:0);
-      });
-
-      // Przydziel do `ile` kart
-      let przydzielono=0;
-      for(const k of kandydaci) {
-        if(przydzielono>=ile) break;
-        if(!czyMozeDostac(osoba.id)) break;
-        // Szukaj wolnego dawcy — preferuj niezarezerwowanych dla zamknięć talii
-        let dawca=null;
-        let dawcaFallback=null;
-        for(const o2 of dawcy){
-          if(o2.id===osoba.id||wysylajacy.has(o2.id)) continue;
-          if(!duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) continue;
-          // Nie bierz dawcy który jest potrzebny do zamknięcia talii komuś innemu
-          if(dawcaRezerwowany(o2.id, k.nagroda)){
-            if(!dawcaFallback) dawcaFallback=o2;
-            continue;
-          }
-          dawca=o2; break;
-        }
-        // Fallback — użyj zarezerwowanego gdy nie ma innego
-        if(!dawca) dawca=dawcaFallback;
-        if(!dawca) continue;
-        wysylajacy.add(dawca.id);
-        zaznaczDostala(osoba.id);
-        przydzielono++;
-        planoweWymiany.push({
-          od:dawca.nazwa,do:osoba.nazwa,
-          karta:k.karta.nazwa,talia:k.talia.nazwa,
-          nagroda:k.nagroda,faza:k.faza,
-          brakTCount:k.brakTCount,brakOCount:k.brakOCount,
-          trudna:k.trudna,
-        });
-      }
-    }
-    // Po obsłużeniu celowanych — reszta gangu normalnie (tryb priorytet)
-  }
-
   if(tryb==="vip" && vipKolejka.length>0) {
     const planoweWymiany=[];
     const nieobsluzone=[];
@@ -1138,6 +1060,88 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
 
   const wysylajacy = new Set();
   const planoweWymiany = [];
+
+  staneTaliiRef.list = staneTalii; // Wypełnij przed trybem celowanym
+
+  // ============================================================
+  // TRYB CELOWANY — wybrane osoby dostają priorytetowo X kart
+  // ============================================================
+  if(tryb==="celowany" && Object.keys(celowaKolejka).some(k=>celowaKolejka[k]>0)) {
+    // Sortuj celowane osoby po sumie nagród (najcenniejsze pierwsze)
+    const celowani = Object.entries(celowaKolejka)
+      .filter(([,ile])=>ile>0)
+      .map(([osobaId,ile])=>({
+        osoba: czlonkowie.find(c=>c.id===parseInt(osobaId)||c.id===osobaId),
+        ile,
+      }))
+      .filter(x=>x.osoba);
+
+    for(const {osoba,ile} of celowani) {
+      // Zbierz wszystkie możliwe karty dla tej osoby posortowane jak normalny algorytm
+      const kandydaci=[];
+      talie.forEach(talia=>{
+        const kartyT=talia.karty.filter(k=>k.typ===typ);
+        const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
+        const brakT=kartyT.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        const brakO=kartyO.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        if(!brakT.length) return;
+        const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
+        const kompletOpp=brakO.length===0;
+        brakT.forEach(karta=>{
+          kandydaci.push({
+            talia,karta,faza,kompletOpp,
+            nagroda:pobierzNagrode(talia,osoba.krag),
+            trudna:TRUDNE_NUMERY.includes(talia.numer),
+            brakTCount:brakT.length,brakOCount:brakO.length,
+          });
+        });
+      });
+
+      // Sortuj: zamknięcia pierwsze, potem faza, potem nagroda
+      kandydaci.sort((a,b)=>{
+        if(a.kompletOpp!==b.kompletOpp) return a.kompletOpp?-1:1;
+        if(a.faza!==b.faza) return a.faza-b.faza;
+        if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
+        return ignorujTrudne?0:(a.trudna?1:0)-(b.trudna?1:0);
+      });
+
+      // Przydziel do `ile` kart
+      let przydzielono=0;
+      for(const k of kandydaci) {
+        if(przydzielono>=ile) break;
+        if(!czyMozeDostac(osoba.id)) break;
+        // Szukaj wolnego dawcy — preferuj niezarezerwowanych dla zamknięć talii
+        let dawca=null;
+        let dawcaFallback=null;
+        for(const o2 of dawcy){
+          if(o2.id===osoba.id||wysylajacy.has(o2.id)) continue;
+          if(!duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) continue;
+          // Nie bierz dawcy który jest potrzebny do zamknięcia talii komuś innemu
+          if(dawcaRezerwowany(o2.id, k.nagroda)){
+            if(!dawcaFallback) dawcaFallback=o2;
+            continue;
+          }
+          dawca=o2; break;
+        }
+        // Fallback — użyj zarezerwowanego gdy nie ma innego
+        if(!dawca) dawca=dawcaFallback;
+        if(!dawca) continue;
+        wysylajacy.add(dawca.id);
+        zaznaczDostala(osoba.id);
+        przydzielono++;
+        planoweWymiany.push({
+          od:dawca.nazwa,do:osoba.nazwa,
+          karta:k.karta.nazwa,talia:k.talia.nazwa,
+          nagroda:k.nagroda,faza:k.faza,
+          brakTCount:k.brakTCount,brakOCount:k.brakOCount,
+          trudna:k.trudna,
+        });
+      }
+    }
+    // Po obsłużeniu celowanych — reszta gangu normalnie (tryb priorytet)
+  }
+
+
   const nieobsluzone = [];
 
   if (tryb === "zamknij") {
@@ -1148,7 +1152,6 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
 
     // Sprawdź czy dawca jest potrzebny dla cenniejszej talii w dozamkniecia
     // Definiujemy jako funkcję lazy — dozamkniecia obliczane poniżej
-    staneTaliiRef.list = staneTalii;
     const dozamknieciaRef = { list: [] };
     const dawcaRezerwowanyDozamkniecia = (dawcaId, nagroda) => {
       return dozamknieciaRef.list.some(st => {
