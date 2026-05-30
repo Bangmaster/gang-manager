@@ -1736,10 +1736,16 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       return a.brakTCount-b.brakTCount;
     });
 
-    // Wyklucz wymiany które już są w planie
+    // Wyklucz wymiany które już są w planie:
+    // 1. Ten dawca już wysyła tę kartę do tej osoby
     const juzWysylane=new Set(wynik.planoweWymiany.filter(w=>w.od===dawcaNazwa).map(w=>`${w.do}_${w.karta}`));
+    // 2. Odbiorca już dostaje tę kartę od kogokolwiek w rozpisce
+    const juzOtrzymuje=new Set(wynik.planoweWymiany.map(w=>`${w.do}_${w.karta}`));
+    // 3. Ten dawca już jest zajęty (wysyła coś innemu)
+    const dawcaJuzWysyla=wynik.planoweWymiany.some(w=>w.od===dawcaNazwa);
     return kandydaci
       .filter(k=>!juzWysylane.has(`${k.do}_${k.karta}`))
+      .filter(k=>!juzOtrzymuje.has(`${k.do}_${k.karta}`))
       .filter(k=>k.faza<=20) // max faza 20 — wyżej nie ma sensu
       .sort((a,b)=>{
         // 1. Talie do zamknięcia (faza 1 + kompletOpp) pierwsze
@@ -2101,7 +2107,16 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
               Łącznie z talii: +{wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0).toLocaleString()} 💰
               {wynik.zamknieciaInfo.some(z=>z.nowyProg)&&(
                 <span style={{color:"#fa0",marginLeft:8}}>
-                  + progi: +{wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>s+z.nowyProg.ammo,0).toLocaleString()} 💰
+                  + progi: +{(()=>{
+                // Deduplikuj — każda osoba może zaliczyć dany próg tylko raz
+                const zaliczone=new Set();
+                return wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>{
+                  const key=`${z.osoba}_${z.nowyProg.prog}`;
+                  if(zaliczone.has(key)) return s;
+                  zaliczone.add(key);
+                  return s+z.nowyProg.ammo;
+                },0);
+              })().toLocaleString()} 💰
                 </span>
               )}
             </div>
