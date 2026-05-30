@@ -866,7 +866,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0}) {
+function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0}) {
   // czlonkowie = odbiorcy (aktywni), wszyscyCzlonkowie = dawcy (wszyscy łącznie z wyłączonymi)
   const dawcy = wszyscyCzlonkowie || czlonkowie;
   // Licznik kart przydzielonych per odbiorca (do limitu maxKartNaOsobe)
@@ -919,6 +919,84 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
   };
 
   // TRYB VIP — kolejka priorytetów
+  // ============================================================
+  // TRYB CELOWANY — wybrane osoby dostają priorytetowo X kart
+  // ============================================================
+  if(tryb==="celowany" && Object.keys(celowaKolejka).some(k=>celowaKolejka[k]>0)) {
+    // Sortuj celowane osoby po sumie nagród (najcenniejsze pierwsze)
+    const celowani = Object.entries(celowaKolejka)
+      .filter(([,ile])=>ile>0)
+      .map(([osobaId,ile])=>({
+        osoba: czlonkowie.find(c=>c.id===parseInt(osobaId)||c.id===osobaId),
+        ile,
+      }))
+      .filter(x=>x.osoba);
+
+    for(const {osoba,ile} of celowani) {
+      // Zbierz wszystkie możliwe karty dla tej osoby posortowane jak normalny algorytm
+      const kandydaci=[];
+      talie.forEach(talia=>{
+        const kartyT=talia.karty.filter(k=>k.typ===typ);
+        const kartyO=talia.karty.filter(k=>k.typ===oppTyp);
+        const brakT=kartyT.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        const brakO=kartyO.filter(k=>!posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        if(!brakT.length) return;
+        const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
+        const kompletOpp=brakO.length===0;
+        brakT.forEach(karta=>{
+          kandydaci.push({
+            talia,karta,faza,kompletOpp,
+            nagroda:pobierzNagrode(talia,osoba.krag),
+            trudna:TRUDNE_NUMERY.includes(talia.numer),
+            brakTCount:brakT.length,brakOCount:brakO.length,
+          });
+        });
+      });
+
+      // Sortuj: zamknięcia pierwsze, potem faza, potem nagroda
+      kandydaci.sort((a,b)=>{
+        if(a.kompletOpp!==b.kompletOpp) return a.kompletOpp?-1:1;
+        if(a.faza!==b.faza) return a.faza-b.faza;
+        if(b.nagroda!==a.nagroda) return b.nagroda-a.nagroda;
+        return ignorujTrudne?0:(a.trudna?1:0)-(b.trudna?1:0);
+      });
+
+      // Przydziel do `ile` kart
+      let przydzielono=0;
+      for(const k of kandydaci) {
+        if(przydzielono>=ile) break;
+        if(!czyMozeDostac(osoba.id)) break;
+        // Szukaj wolnego dawcy — preferuj niezarezerwowanych dla zamknięć talii
+        let dawca=null;
+        let dawcaFallback=null;
+        for(const o2 of dawcy){
+          if(o2.id===osoba.id||wysylajacy.has(o2.id)) continue;
+          if(!duplikaty[`${o2.id}_${k.talia.id}_${k.karta.nazwa}`]) continue;
+          // Nie bierz dawcy który jest potrzebny do zamknięcia talii komuś innemu
+          if(dawcaRezerwowany(o2.id, k.nagroda)){
+            if(!dawcaFallback) dawcaFallback=o2;
+            continue;
+          }
+          dawca=o2; break;
+        }
+        // Fallback — użyj zarezerwowanego gdy nie ma innego
+        if(!dawca) dawca=dawcaFallback;
+        if(!dawca) continue;
+        wysylajacy.add(dawca.id);
+        zaznaczDostala(osoba.id);
+        przydzielono++;
+        planoweWymiany.push({
+          od:dawca.nazwa,do:osoba.nazwa,
+          karta:k.karta.nazwa,talia:k.talia.nazwa,
+          nagroda:k.nagroda,faza:k.faza,
+          brakTCount:k.brakTCount,brakOCount:k.brakOCount,
+          trudna:k.trudna,
+        });
+      }
+    }
+    // Po obsłużeniu celowanych — reszta gangu normalnie (tryb priorytet)
+  }
+
   if(tryb==="vip" && vipKolejka.length>0) {
     const planoweWymiany=[];
     const nieobsluzone=[];
@@ -1664,6 +1742,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [maxKartNaOsobe,setMaxKartNaOsobe]=useState(0); // 0 = bez limitu
   const [sprawiedliwe,setSprawiedliwe]=useState(false);
   const [vipKolejka,setVipKolejka]=useState([]); // lista id osób w kolejności priorytetu
+  const [celowaKolejka,setCelowaKolejka]=useState({}); // {osobaId: liczbaKart} — tryb celowany
 
 
 
@@ -1776,9 +1855,20 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
 
   const generuj=()=>{
     const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
-    const aktywniCzlonkowie=czlonkowie.filter(c=>!wylaczoneOsoby.has(c.id)); // odbiorcy
+    // Oblicz łączną liczbę kart per osoba do filtrowania trybu wylacz110
+    const kartyLaczniePer = (osobaId) => talie.reduce((s,t)=>
+      s+t.karty.filter(k=>posiadane[`${osobaId}_${t.id}_${k.nazwa}`]).length, 0
+    );
+    const aktywniCzlonkowie=czlonkowie.filter(c=>{
+      if(wylaczoneOsoby.has(c.id)) return false;
+      if(trybWymiany==="wylacz110"){
+        const karty=kartyLaczniePer(c.id);
+        if(karty>=110 && karty<=120) return false; // wyklucz 110-120
+      }
+      return true;
+    }); // odbiorcy
     // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -1811,6 +1901,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           {id:"zamknij",label:"🔓 Zamknij cokolwiek"},
           {id:"progi",label:"📈 Dobij progi"},
           {id:"vip",label:"👑 VIP — dobij jedną osobę"},
+          {id:"celowany",label:"🎯 Celowany — wybierz osoby"},
+          {id:"wylacz110",label:"🚫 Wyłącz 110-120"},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTrybWymiany(t.id)} style={{
             padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
@@ -1874,6 +1966,58 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           </div>
         )}
       </div>
+      {trybWymiany==="wylacz110"&&(
+        <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:11,color:"#aaa"}}>
+          🚫 <strong style={{color:"#f55"}}>Tryb Wyłącz 110-120</strong> — osoby które mają od 110 do 120 kart nie dostają kart w tej wymianie. Reszta gangu dostaje normalnie według faz.
+          <div style={{marginTop:4,fontSize:10,color:"#555"}}>
+            Wykluczone: {czlonkowie.filter(c=>{const k=talie.reduce((s,t)=>s+t.karty.filter(kk=>posiadane[`${c.id}_${t.id}_${kk.nazwa}`]).length,0); return k>=110&&k<=120;}).map(c=>c.nazwa).join(", ")||"(brak osób w tym zakresie)"}
+          </div>
+        </div>
+      )}
+
+      {trybWymiany==="celowany"&&(
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
+            🎯 Celowany — wybierz osoby i ile kart mają dostać
+          </div>
+          <div style={{fontSize:11,color:"#888",marginBottom:10}}>
+            Zaznaczone osoby dostaną priorytetowo podaną liczbę kart. Reszta gangu dostaje normalnie według faz.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {czlonkowie.filter(c=>!wylaczoneOsoby.has(c.id)).map(c=>{
+              const ile = celowaKolejka[c.id] || 0;
+              const zaznaczona = ile > 0;
+              return (
+                <div key={c.id} style={{
+                  display:"flex",alignItems:"center",gap:8,padding:"6px 10px",
+                  background:zaznaczona?"rgba(255,215,0,0.06)":"rgba(255,255,255,0.02)",
+                  border:zaznaczona?"1px solid #ffd70033":"1px solid #1a1a2e",
+                  borderRadius:6,
+                }}>
+                  <span style={{flex:1,fontSize:12,color:zaznaczona?"#ddd":"#666"}}>{c.nazwa}</span>
+                  {[0,1,2,3].map(n=>(
+                    <button key={n} onClick={()=>setCelowaKolejka(prev=>({...prev,[c.id]:n}))} style={{
+                      padding:"3px 10px",borderRadius:5,cursor:"pointer",fontSize:12,
+                      background:ile===n
+                        ? n===0?"rgba(255,255,255,0.05)":"linear-gradient(135deg,#b8860b,#ffd700)"
+                        : "rgba(255,255,255,0.04)",
+                      border:ile===n&&n>0?"none":"1px solid #2a2a3a",
+                      color:ile===n&&n>0?"#000":ile===n?"#555":"#555",
+                      fontWeight:ile===n&&n>0?"bold":"normal",
+                    }}>{n===0?"✕":n}</button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+          {Object.values(celowaKolejka).some(v=>v>0)&&(
+            <div style={{marginTop:8,fontSize:11,color:"#0c6"}}>
+              ✓ {Object.entries(celowaKolejka).filter(([,v])=>v>0).length} osób w kolejce celowanej
+            </div>
+          )}
+        </div>
+      )}
+
       {trybWymiany==="vip"&&(
         <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70044",borderRadius:10,padding:12,marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
