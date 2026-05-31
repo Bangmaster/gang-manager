@@ -427,26 +427,17 @@ export default function App() {
   return (
     <div style={{minHeight:"100vh",background:"#0a0a12",fontFamily:"'Georgia',serif",color:"#f0e6d3",position:"relative",overflow:"hidden"}}>
 
-      {/* Tło — graffiti/street art efekt */}
+      {/* Tło — scalony w jeden element dla lepszej wydajności */}
       <div style={{
         position:"fixed",top:0,left:0,right:0,bottom:0,
         background:`
-          radial-gradient(ellipse at 20% 20%, rgba(138,43,226,0.08) 0%, transparent 50%),
-          radial-gradient(ellipse at 80% 80%, rgba(184,134,11,0.06) 0%, transparent 50%),
-          radial-gradient(ellipse at 50% 50%, rgba(255,50,50,0.03) 0%, transparent 70%),
+          radial-gradient(ellipse at 20% 20%, rgba(138,43,226,0.07) 0%, transparent 50%),
+          radial-gradient(ellipse at 80% 80%, rgba(184,134,11,0.05) 0%, transparent 50%),
           linear-gradient(180deg, #0a0a18 0%, #0d0d1a 50%, #0a0a14 100%)
         `,
         zIndex:0,pointerEvents:"none",
-      }}/>
-
-      {/* Dekoracyjne linie jak w grze — ramy */}
-      <div style={{
-        position:"fixed",top:0,left:0,right:0,bottom:0,
-        backgroundImage:`
-          repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,215,0,0.015) 60px),
-          repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(138,43,226,0.015) 60px)
-        `,
-        zIndex:0,pointerEvents:"none",
+        willChange:"transform",
+        transform:"translateZ(0)",
       }}/>
 
 
@@ -3384,7 +3375,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                 background:"linear-gradient(135deg,#0c6,#0fa)",
                 border:"none",borderRadius:8,color:"#000",fontSize:14,fontWeight:"bold",
                 cursor:"pointer",
-                animation:"pulseGreen 1.5s ease-in-out infinite",
+                animation:"pulseGreen 1.5s ease-in-out 5",
                 boxShadow:"0 0 20px rgba(0,200,100,0.4)",
               }}>
                 ✅ Potwierdzam — wysłałem kartę!
