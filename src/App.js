@@ -430,19 +430,22 @@ export default function App() {
     } catch {}
   }, [zalogowany]);
 
+  // Memoizuj przed early return (reguły hooków)
+  const talieSorted = useMemo(
+    () => dane ? [...dane.talie].sort((a,b)=>(a.numer||99)-(b.numer||99)) : [],
+    [dane]
+  );
+  const posiadaneMemo = useMemo(() => dane?.posiadane || {}, [dane]);
+  const duplikatyMemo = useMemo(() => dane?.duplikaty || {}, [dane]);
+  const czlonkowieMemo = useMemo(() => dane?.czlonkowie || [], [dane]);
+
   if (!zalogowany) return <LoginScreen onLogin={setZalogowany} czlonkowie={dane?.czlonkowie||[]}/>;  
   if (!dane) return <LoadingScreen/>;
 
   const isAdmin = zalogowany.rola === "admin" || zalogowany.rola === "zastepca";
 
-  // Memoizuj duże obiekty żeby DaneView nie rerenderowało przy zmianach statusu online
-  const posiadaneMemo = useMemo(() => dane.posiadane || {}, [dane.posiadane]);
-  const duplikatyMemo = useMemo(() => dane.duplikaty || {}, [dane.duplikaty]);
-  const czlonkowieMemo = useMemo(() => dane.czlonkowie || [], [dane.czlonkowie]);
-  const talieSorted = useMemo(
-    () => [...dane.talie].sort((a,b)=>(a.numer||99)-(b.numer||99)),
-    [dane.talie]
-  );
+
+
 
   const tabs = [
     {id:"dane",label:"📋 Dane gangu"},
