@@ -717,60 +717,77 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     ciekawostki.push({ ikona: "💤", tytul: "Mało zaangażowani", opis: `${malo.map(g => `${g.nazwa} (${formatLiczby(g.obrazeniaLacznie)})`).slice(0, 3).join(", ")}` });
   }
 
-  // 8. Śmieszne ciekawostki — więcej i bardziej czarne 😄
+  // 8. CZARNY HUMOR — ostro po bandzie
   const ostatniaWalka = [...walki].sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+  const lacznie = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0);
+  const srWalka = lacznaWalka > 0 ? Math.round(lacznie / lacznaWalka) : 0;
+  const srednieObr = wszyscy.length > 0 ? lacznie / wszyscy.length : 0;
+
   if (ostatniaWalka) {
     const ostatniRanking = [...ostatniaWalka.gracze].sort((a, b) => b.obrazenia - a.obrazenia);
     const ostatniMiejsce = ostatniRanking[ostatniRanking.length - 1];
-    const pierwszeMiejsce = ostatniRanking[0];
 
-    if (ostatniMiejsce && pierwszeMiejsce && ostatniMiejsce.obrazenia < 10000) {
-      ciekawostki.push({ ikona: "🥄", tytul: "Złota łyżka", opis: `${ostatniMiejsce.nazwa} zdobył tylko ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeń w ostatniej walce. Telefon się rozładował? Pies zjadł ładowarkę? 📱` });
+    if (ostatniMiejsce && ostatniMiejsce.obrazenia < 10000) {
+      const zlosliwe = [
+        `${ostatniMiejsce.nazwa} skończył ostatni z ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeniami. Twój telefon walczył dzielniej niż Ty.`,
+        `${ostatniMiejsce.nazwa} — ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeń. Nawet autokliker by się wstydził.`,
+        `${ostatniMiejsce.nazwa} zarobił ostatnie miejsce z ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeniami. Gratulacje, to wymaga talentu.`,
+        `${ostatniMiejsce.nazwa} i jego ${formatLiczby(ostatniMiejsce.obrazenia)} obrażeń. Czy to celowe? Bo jeśli tak, to szczyt kunsztu.`,
+      ];
+      ciekawostki.push({ ikona: "🥄", tytul: "Złota łyżka — ostatnie miejsce", opis: zlosliwe[lacznaWalka % zlosliwe.length] });
     }
 
-    // Ktoś zrobił 0 obrażeń
     const zerObr = ostatniRanking.filter(g => g.obrazenia === 0);
     if (zerObr.length > 0) {
-      ciekawostki.push({ ikona: "👁️", tytul: "Świadek walki", opis: `${zerObr.map(g=>g.nazwa).join(", ")} ${zerObr.length===1?"obserwował":"obserwowali"} walkę z boku z 0 obrażeniami. Może następnym razem weźcie udział? 😂` });
+      const zeroTeksty = [
+        `${zerObr.map(g=>g.nazwa).join(", ")} zrobiło 0 obrażeń. Zero. Null. Void. Nie wiadomo czy grał czy tylko patrzył.`,
+        `${zerObr.map(g=>g.nazwa).join(", ")} — 0 obrażeń w walce. Spektakularne osiągnięcie w złym kierunku.`,
+        `${zerObr.map(g=>g.nazwa).join(", ")} osiągnął matematyczne minimum możliwego wkładu. Brawo.`,
+      ];
+      ciekawostki.push({ ikona: "👻", tytul: "Duch gangu", opis: zeroTeksty[lacznaWalka % zeroTeksty.length] });
     }
   }
 
-  // Ktoś nigdy nie zdjął tarcz
+  // Tarcze zamiast obrażeń
   const zerTarcz = wszyscy.filter(g => g.tarczeLacznie === 0 && g.uczestnictwa >= 3);
   if (zerTarcz.length > 0) {
-    ciekawostki.push({ ikona: "🫧", tytul: "Tarcze? Co to jest?", opis: `${zerTarcz.map(g => g.nazwa).join(", ")} przez cały sezon nie zdjął ani jednej tarczy. Czy w ogóle walczysz, czy tylko pozujesz? 😂` });
+    ciekawostki.push({ ikona: "🫧", tytul: "Co to są tarcze?", opis: `${zerTarcz.map(g => g.nazwa).join(", ")} przez cały sezon nie zdjął ani jednej tarczy. Może myślisz że tarcze to dekoracje? 🎨` });
   }
 
-  // Największa różnica między najlepszym a najgorszym
+  // Ogromna przepaść lider vs ostatni
   if (wszyscy.length > 2) {
     const ostatni = wszyscy[wszyscy.length - 1];
     const najlepszy = wszyscy[0];
     if (ostatni.obrazeniaLacznie > 0) {
       const stosunek = Math.round(najlepszy.obrazeniaLacznie / Math.max(1, ostatni.obrazeniaLacznie));
-      if (stosunek >= 10) {
-        ciekawostki.push({ ikona: "🐢", tytul: "Żółwik sezonu", opis: `${ostatni.nazwa} robi ${stosunek}× mniej obrażeń niż lider ${najlepszy.nazwa}. Może zamiast grać w The Gang, grasz w The Nap? 😴` });
+      if (stosunek >= 5) {
+        const przepasc = [
+          `${najlepszy.nazwa} robi ${stosunek}× więcej niż ${ostatni.nazwa}. Grają w tę samą grę? Dowody sugerują inaczej.`,
+          `${stosunek}× — taka różnica między ${najlepszy.nazwa} a ${ostatni.nazwa}. Jeden z nich gra, drugi udaje.`,
+          `${ostatni.nazwa} kontra ${najlepszy.nazwa}: stosunek ${stosunek}:1. W sporcie to się nazywa walkowerem.`,
+        ];
+        ciekawostki.push({ ikona: "🐢", tytul: "Żółwik sezonu", opis: przepasc[lacznaWalka % przepasc.length] });
       }
     }
   }
 
-  // Ktoś jest zawsze w top 3
+  // Zawsze w top 3
   if (lacznaWalka >= 3) {
     const zawszeTop3 = wszyscy.filter(g =>
       g.uczestnictwa >= Math.ceil(lacznaWalka * 0.7) &&
       g.historiaObr.filter(h => {
-        const walka = walki.find(w => w.data === h.data || w.gracze.some(gr => gr.nazwa === g.nazwa && gr.obrazenia === h.obr));
+        const walka = walki.find(w => w.gracze.some(gr => gr.nazwa === g.nazwa && gr.obrazenia === h.obr));
         if (!walka) return false;
         const ranking = [...walka.gracze].sort((a,b) => b.obrazenia - a.obrazenia);
-        const pozycja = ranking.findIndex(gr => gr.nazwa === g.nazwa);
-        return pozycja <= 2;
+        return ranking.findIndex(gr => gr.nazwa === g.nazwa) <= 2;
       }).length >= Math.ceil(g.uczestnictwa * 0.6)
     );
     if (zawszeTop3.length > 0) {
-      ciekawostki.push({ ikona: "🦁", tytul: "Niezniszczalny", opis: `${zawszeTop3[0].nazwa} regularnie kończy w TOP 3. Reszta gangu zastanawia się czy grasz fair czy po prostu masz lepszy telefon 📱` });
+      ciekawostki.push({ ikona: "🦁", tytul: "Niezniszczalny", opis: `${zawszeTop3[0].nazwa} regularnie w TOP 3. Reszta gangu już przestała się zastanawiać dlaczego — po prostu to akceptuje.` });
     }
   }
 
-  // Ktoś zrobił dokładnie tyle samo obrażeń w każdej walce (konsekwentny)
+  // Robot — stałe wyniki
   if (lacznaWalka >= 3) {
     const konsekwentny = wszyscy.filter(g => {
       if (g.uczestnictwa < 3) return false;
@@ -780,31 +797,31 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
       return odchylenie < srednia * 0.1 && srednia > 5000;
     });
     if (konsekwentny.length > 0) {
-      ciekawostki.push({ ikona: "🤖", tytul: "Robot sezonu", opis: `${konsekwentny[0].nazwa} robi prawie identyczne obrażenia w każdej walce. Bot? Autokliker? A może po prostu masz to perfekcyjnie opanowane 🤔` });
+      ciekawostki.push({ ikona: "🤖", tytul: "Bot sezonu", opis: `${konsekwentny[0].nazwa} robi identyczne wyniki w każdej walce. Albo to talent, albo autokliker. Nie osądzamy. Naprawdę.` });
     }
   }
 
-  // Ktoś poprawił się najbardziej w ciągu sezonu
+  // Glow up
   if (lacznaWalka >= 4) {
     const poprawil = wszyscy.filter(g => {
       if (g.historiaObr.length < 4) return false;
       const polowa = Math.floor(g.historiaObr.length / 2);
-      const pierwszaPolowa = g.historiaObr.slice(0, polowa).reduce((s,h)=>s+h.obr,0)/polowa;
-      const drugaPolowa = g.historiaObr.slice(polowa).reduce((s,h)=>s+h.obr,0)/(g.historiaObr.length-polowa);
-      return drugaPolowa > pierwszaPolowa * 1.5;
+      const sr1 = g.historiaObr.slice(0, polowa).reduce((s,h)=>s+h.obr,0)/polowa;
+      const sr2 = g.historiaObr.slice(polowa).reduce((s,h)=>s+h.obr,0)/(g.historiaObr.length-polowa);
+      return sr2 > sr1 * 1.5;
     });
     if (poprawil.length > 0) {
-      ciekawostki.push({ ikona: "📈", tytul: "Glow up sezonu", opis: `${poprawil[0].nazwa} zaczął sezon słabo ale teraz miażdży. Może w końcu przeczytał tutorial? 😄` });
+      ciekawostki.push({ ikona: "📈", tytul: "Glow up sezonu", opis: `${poprawil[0].nazwa} zaczął jak praktykant, skończył jak CEO. Może w końcu odczytał powiadomienia z apki?` });
     }
   }
 
-  // Ktoś zrobił więcej tarcz niż obrażeń
+  // Pacyfista
   const tarczo_maniacy = wszyscy.filter(g => g.tarczeLacznie > 0 && g.obrazeniaLacznie > 0 && g.tarczeLacznie * 50000 > g.obrazeniaLacznie);
   if (tarczo_maniacy.length > 0) {
-    ciekawostki.push({ ikona: "🛡️", tytul: "Pacyfista gangu", opis: `${tarczo_maniacy[0].nazwa} zdejmuje tarcze zamiast zadawać obrażenia. Może zmień grę na Candy Crush? 🍬` });
+    ciekawostki.push({ ikona: "🌸", tytul: "Pacyfista gangu", opis: `${tarczo_maniacy[0].nazwa} zdejmuje tarcze zamiast zadawać obrażenia. Piękna dusza. Kompletnie bezużyteczna w walce, ale piękna.` });
   }
 
-  // Najbardziej nieregularny gracz
+  // Chaos
   if (lacznaWalka >= 5) {
     const nieregularny = wszyscy.find(g => {
       if (g.uczestnictwa < 2) return false;
@@ -813,35 +830,64 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
       return max > min * 10;
     });
     if (nieregularny) {
-      ciekawostki.push({ ikona: "🎲", tytul: "Chaos wcielony", opis: `${nieregularny.nazwa} raz jest bogiem walki, raz robi 0 obrażeń. Losuje wyniki kością? Może zależy od pogody? ⛈️` });
+      const chaosOpisy = [
+        `${nieregularny.nazwa} — raz bóg, raz złom. Nikt nie wie która wersja przyjdzie na walkę. Łącznie z nim.`,
+        `${nieregularny.nazwa} ma styl "albo wszystko, albo nic". Statystycznie częściej nic.`,
+        `${nieregularny.nazwa} robi wyniki od zera do bohatera. Szkoda że "bohater" zdarza się raz na 5 walk.`,
+      ];
+      ciekawostki.push({ ikona: "🎲", tytul: "Szaman chaosu", opis: chaosOpisy[lacznaWalka % chaosOpisy.length] });
     }
   }
 
-  // Ktoś zawsze ostatni potwierdza wymiany (jeśli mamy dane)
-  const srednieObr = wszyscy.length > 0 ? wszyscy.reduce((s,g)=>s+g.obrazeniaLacznie,0)/wszyscy.length : 0;
+  // Poniżej średniej
   const ponizejSredniej = wszyscy.filter(g => g.uczestnictwa >= 3 && g.obrazeniaLacznie < srednieObr * 0.5);
   if (ponizejSredniej.length > 0) {
-    ciekawostki.push({ ikona: "💤", tytul: "Drużyna B", opis: `${ponizejSredniej.map(g=>g.nazwa).join(", ")} ${ponizejSredniej.length===1?"robi":"robią"} mniej niż połowę średniej gangu. Wiemy że grasz, ale czy TY wiesz że grasz? 🤷` });
+    const druzyna = ponizejSredniej.map(g=>g.nazwa).join(", ");
+    const lajtOpisy = [
+      `${druzyna} robi mniej niż połowę średniej gangu. Obecność odnotowana, wkład — mniej.`,
+      `${druzyna} gra, ale gang tego prawie nie widzi. Jak drzewo w lesie które pada bez świadków.`,
+      `${druzyna} poniżej 50% średniej. W szkole to byłaby dwója. Tutaj to "pełnoprawny uczestnik".`,
+    ];
+    ciekawostki.push({ ikona: "💤", tytul: "Drużyna Widmo", opis: lajtOpisy[lacznaWalka % lajtOpisy.length] });
   }
 
-  // Ktoś bił rekordy
+  // Rekord absolutny
   if (lacznaWalka >= 2) {
     const rekordzista = wszyscy[0];
-    const maxWalka = rekordzista?.historiaObr.reduce((max,h)=>h.obr>max?h.obr:max, 0);
-    if (maxWalka > 200000) {
-      ciekawostki.push({ ikona: "💥", tytul: "Absolutny władca", opis: `${rekordzista.nazwa} zadał aż ${formatLiczby(maxWalka)} obrażeń w jednej walce. Czy to w ogóle legalne? 😱` });
+    const maxWalka = rekordzista?.historiaObr.reduce((max,h)=>h.obr>max?h.obr:max, 0) || 0;
+    if (maxWalka > 100000) {
+      ciekawostki.push({ ikona: "💥", tytul: "Absolutny psychopata walki", opis: `${rekordzista.nazwa} zadał ${formatLiczby(maxWalka)} obrażeń w jednej walce. Nielegalne? Prawdopodobnie. Imponujące? Bezspornie.` });
     }
   }
 
-  // Suchy żart o całym gangu
-  const lacznie = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0);
-  const srWalka = lacznaWalka > 0 ? Math.round(lacznie / lacznaWalka) : 0;
+  // Maruder — gra najrzadziej
+  const maruder = [...wszyscy].sort((a,b)=>a.uczestnictwa-b.uczestnictwa)[0];
+  if (maruder && maruder.uczestnictwa < lacznaWalka * 0.5 && lacznaWalka >= 4) {
+    ciekawostki.push({ ikona: "🏖️", tytul: "Urlopowicz sezonu", opis: `${maruder.nazwa} był na ${maruder.uczestnictwa} z ${lacznaWalka} walk. Odpoczynek jest ważny. Ale chyba nie AŻ TAK ważny.` });
+  }
+
+  // Ktoś pogorszył się spektakularnie
+  if (lacznaWalka >= 4) {
+    const pogorszyl = wszyscy.filter(g => {
+      if (g.historiaObr.length < 4) return false;
+      const polowa = Math.floor(g.historiaObr.length / 2);
+      const sr1 = g.historiaObr.slice(0, polowa).reduce((s,h)=>s+h.obr,0)/polowa;
+      const sr2 = g.historiaObr.slice(polowa).reduce((s,h)=>s+h.obr,0)/(g.historiaObr.length-polowa);
+      return sr1 > sr2 * 1.5 && sr1 > 10000;
+    });
+    if (pogorszyl.length > 0) {
+      ciekawostki.push({ ikona: "📉", tytul: "Reverse glow up", opis: `${pogorszyl[0].nazwa} zaczął sezon jak rakieta, skończył jak mokra zapałka. Co się stało? Gang chce wiedzieć.` });
+    }
+  }
+
+  // Żart o całym gangu
   const zartySezonu = [
-    `Gang zadał łącznie ${formatLiczby(lacznie)} obrażeń w ${lacznaWalka} walkach. To jak ${Math.round(lacznie/1000000)} razy uderzyć mokrą gazetą 🗞️`,
-    `${formatLiczby(lacznie)} obrażeń łącznie. Dla porównania: mały palec u nogi wytrzymuje ~${Math.round(lacznie/200)} razy tyle siły. Wnioski: nieznane 🦶`,
-    `Średnio ${formatLiczby(srWalka)} obrażeń na walkę. Statystycznie co najmniej 1 osoba w gangu nie wie jak się gra. Statystyki nie kłamią 📊`,
+    `Gang zadał łącznie ${formatLiczby(lacznie)} obrażeń w ${lacznaWalka} walkach. ${Math.round(lacznie/1000000)}M obrażeń. Jakby ktoś pytał. Nikt nie pyta, ale mamy liczby.`,
+    `${formatLiczby(lacznie)} obrażeń łącznie. Średnio ${formatLiczby(srWalka)} na walkę. ${lacznie > 50000000 ? "Imponujące. Naprawdę." : "Mogło być gorzej. Ale mogło być dużo lepiej."}`,
+    `${lacznaWalka} walk, ${formatLiczby(lacznie)} obrażeń. Statystycznie każdy w gangu ma swój wkład. Niektórzy mają go więcej. Dużo więcej.`,
+    `Sezon w liczbach: ${lacznaWalka} walk, ${formatLiczby(lacznie)} obrażeń, ${wszyscy.length} graczy. Część z nich to aktywni wojownicy. Część to ambasadorzy dobrej woli. Wiadomo kto jest kim.`,
   ];
-  ciekawostki.push({ ikona: "📊", tytul: "Statystyka sezonu", opis: zartySezonu[lacznaWalka % zartySezonu.length] });
+  ciekawostki.push({ ikona: "📊", tytul: "Raport końcowy", opis: zartySezonu[lacznaWalka % zartySezonu.length] });
 
   return { wszyscy, ciekawostki, lacznaWalka };
 }
@@ -898,21 +944,36 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
 
       {/* Ciekawostki */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 8 }}>✨ Najciekawsze</div>
-        {ciekawostki.map((c, i) => (
-          <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 10, marginBottom: 6, display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <div style={{ fontSize: 20 }}>{c.ikona}</div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: "bold", color: "#ffd700" }}>{c.tytul}</div>
-              <div style={{ fontSize: 11, color: "#ccc", marginTop: 2 }}>{c.opis}</div>
+        <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>🎭 Wyróżnienia sezonu</div>
+        {ciekawostki.map((c, i) => {
+          // Kolory zależne od charakteru nagrody
+          const ikonyZlote = ["👑","💥","🦁","🤖","📈","🎯","🛡️","🎮"];
+          const ikonyRed = ["🥄","👻","🐢","💤","📉","🏖️","🌸","🎲","🫧"];
+          const isGold = ikonyZlote.includes(c.ikona);
+          const isRed = ikonyRed.includes(c.ikona);
+          const borderColor = isGold ? "#ffd70033" : isRed ? "#f5544422" : "#2a2a3a";
+          const bgColor = isGold ? "rgba(255,215,0,0.05)" : isRed ? "rgba(255,50,50,0.04)" : "rgba(255,255,255,0.03)";
+          const titleColor = isGold ? "#ffd700" : isRed ? "#f88" : "#aaa";
+          return (
+            <div key={i} style={{
+              background: bgColor, border: `1px solid ${borderColor}`,
+              borderRadius: 8, padding: "10px 12px", marginBottom: 6,
+              display: "flex", gap: 10, alignItems: "flex-start",
+              animation: `slideInLeft 0.3s ${i * 0.04}s both`,
+            }}>
+              <div style={{ fontSize: 22, flexShrink: 0, width: 28, textAlign: "center" }}>{c.ikona}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: "bold", color: titleColor, marginBottom: 3 }}>{c.tytul}</div>
+                <div style={{ fontSize: 11, color: "#bbb", lineHeight: 1.5 }}>{c.opis}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pełny ranking z edycją */}
       <div>
-        <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 8 }}>📊 Łączny ranking sezonu</div>
+        <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 8 }}>⚔️ Końcowy ranking sezonu</div>
         {wszyscy.map((g, i) => {
           const kolor = i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#888";
           const sredniaObr = Math.round(g.obrazeniaLacznie / g.uczestnictwa);
