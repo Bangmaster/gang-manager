@@ -6,6 +6,102 @@ import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
 
 
+// ============================================================
+// EFEKTY — dźwięki, animacje, konfetti
+// ============================================================
+
+// Dźwięk syntetyczny przez Web Audio API
+function playSound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (type === "ding") {
+      osc.frequency.value = 880;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.start(); osc.stop(ctx.currentTime + 0.6);
+    } else if (type === "success") {
+      osc.frequency.setValueAtTime(523, ctx.currentTime);
+      osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2);
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.start(); osc.stop(ctx.currentTime + 0.8);
+    } else if (type === "gold") {
+      // Złoty fanfar
+      osc.frequency.setValueAtTime(659, ctx.currentTime);
+      osc.frequency.setValueAtTime(784, ctx.currentTime + 0.08);
+      osc.frequency.setValueAtTime(1047, ctx.currentTime + 0.16);
+      osc.type = "triangle";
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+      osc.start(); osc.stop(ctx.currentTime + 1.0);
+    } else if (type === "click") {
+      osc.frequency.value = 440;
+      osc.type = "square";
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+      osc.start(); osc.stop(ctx.currentTime + 0.08);
+    }
+  } catch(e) {}
+}
+
+// Konfetti — złote cząsteczki
+function launchConfetti(duration = 2500) {
+  const colors = ["#ffd700","#ffaa00","#fff8dc","#b8860b","#0c6","#87CEEB","#da70d6"];
+  const container = document.createElement("div");
+  container.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:99999;overflow:hidden";
+  document.body.appendChild(container);
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement("div");
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const size = 6 + Math.random() * 8;
+    const x = Math.random() * 100;
+    const delay = Math.random() * 600;
+    const rot = Math.random() * 360;
+    const shape = Math.random() > 0.5 ? "50%" : "2px";
+    el.style.cssText = `
+      position:absolute;top:-20px;left:${x}%;
+      width:${size}px;height:${size}px;
+      background:${color};border-radius:${shape};
+      animation:confettiFall ${1200 + Math.random() * 1000}ms ${delay}ms ease-in forwards;
+      transform:rotate(${rot}deg);
+    `;
+    container.appendChild(el);
+  }
+  const style = document.createElement("style");
+  style.textContent = `@keyframes confettiFall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity:1; }
+    100% { transform: translateY(100vh) rotate(${Math.random()*720}deg); opacity:0; }
+  }`;
+  document.head.appendChild(style);
+  setTimeout(() => { container.remove(); style.remove(); }, duration + 800);
+}
+
+// Hook animacji licznika (0 → wartość)
+function useCountUp(target, duration = 800, active = true) {
+  const { useState, useEffect } = require("react");
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!active || !target) return;
+    let start = null;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      setVal(Math.round(target * eased));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target, active, duration]);
+  return val;
+}
+
 const ADMIN_CREDENTIALS = [
   { login: "admin", haslo: "Twojastara00", rola: "admin" },
   { login: "zastepca", haslo: "Twojastara00", rola: "zastepca" },
@@ -329,7 +425,9 @@ export default function App() {
     {id:"duplikaty",label:"🔄 Duplikaty"},
     {id:"aktywna",label:dane?.aktywnaWymiana?"📋 ROZPISKA ●":"📋 ROZPISKA"},
     {id:"walki",label:"🎯 Walki"},
+    {id:"chat",label:"💬 Chat"},
     ...(isAdmin?[
+      {id:"dashboard",label:"📊 Dashboard"},
       {id:"wynik",label:"⚡ Generuj"},
       {id:"ocr",label:"📸 OCR talii"},
       {id:"edycja",label:"⚙️ Talie"},
@@ -506,6 +604,13 @@ export default function App() {
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
           zapiszKarte={zapiszKarte}
         />}
+        {zakładka==="chat"&&<GangChat zalogowany={zalogowany} czlonkowie={dane.czlonkowie}/>}
+        {zakładka==="dashboard"&&isAdmin&&<AdminDashboard
+          dane={dane} talie={talieSorted}
+          historiaWymian={historiaWymian}
+          statusOnline={statusOnline}
+          zapiszStrukture={zapiszStrukture}
+        />}
         {zakładka==="walki"&&<WalkiView
           czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
           zapiszWalki={(now)=>zapiszStrukture("walki",now)}
@@ -534,6 +639,7 @@ export default function App() {
           czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszStrukture("czlonkowie",now)}
         />}
         {zakładka==="testy"&&isAdmin&&<TestyView
+          zalogowany={zalogowany}
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           zapiszKarte={zapiszKarte}
@@ -716,6 +822,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const [wybranaOsoba,setWybranaOsoba]=useState(startIdx);
   const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
   const [tooltip,setTooltip]=useState(null); // {kartaNazwa, taliaId, x, y}
+  const [pokazProfil,setPokazProfil]=useState(null); // id osoby której profil pokazujemy
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
@@ -759,7 +866,11 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
         {czlonkowie.map((c,i)=>{
           const swoja = swojaOsoba && c.id===swojaOsoba.id;
           return (
-            <button key={c.id} onClick={()=>setWybranaOsoba(i)} style={{
+            <button key={c.id}
+            onClick={()=>setWybranaOsoba(i)}
+            onDoubleClick={()=>setPokazProfil(c.id)}
+            title="Kliknij 2x żeby zobaczyć profil"
+            style={{
               padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:12,
               background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":swoja?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.07)",
               border:wybranaOsoba===i?"none":swoja?"1px solid #0c655":"1px solid #2a2a3a",
@@ -877,6 +988,96 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
           })}
         </div>
       )}
+      {/* Modal profilu gracza */}
+      {pokazProfil&&(()=>{
+        const os=czlonkowie.find(c=>c.id===pokazProfil);
+        if(!os) return null;
+        const zamkniete=talie.filter(t=>t.karty.length>0&&t.karty.every(k=>posiadane[`${os.id}_${t.id}_${k.nazwa}`]));
+        const totalKarty=talie.reduce((s,t)=>s+t.karty.length,0);
+        const posKarty=talie.reduce((s,t)=>s+t.karty.filter(k=>posiadane[`${os.id}_${t.id}_${k.nazwa}`]).length,0);
+        const dupCount=talie.reduce((s,t)=>s+t.karty.filter(k=>duplikaty[`${os.id}_${t.id}_${k.nazwa}`]).length,0);
+        const ammo=zamkniete.reduce((s,t)=>s+pobierzNagrode(t,os.krag||1),0);
+        const pct=totalKarty?Math.round((posKarty/totalKarty)*100):0;
+        const krag=os.krag||1;
+        return (
+          <div onClick={()=>setPokazProfil(null)} style={{
+            position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:9998,
+            display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)",
+          }}>
+            <div onClick={e=>e.stopPropagation()} style={{
+              background:"linear-gradient(160deg,#0a0518,#150a2e)",
+              border:"1px solid rgba(184,134,11,0.5)",borderRadius:16,padding:24,
+              width:"100%",maxWidth:360,
+              boxShadow:"0 0 60px rgba(184,134,11,0.2)",
+              animation:"bounceIn 0.3s ease",
+            }}>
+              {/* Nagłówek */}
+              <div style={{textAlign:"center",marginBottom:20}}>
+                <div style={{
+                  width:64,height:64,borderRadius:"50%",margin:"0 auto 10px",
+                  background:"linear-gradient(135deg,#b8860b,#ffd700)",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:28,fontWeight:"bold",color:"#000",
+                  boxShadow:"0 0 20px rgba(255,215,0,0.4)",
+                }}>
+                  {os.nazwa[0]?.toUpperCase()}
+                </div>
+                <div style={{fontSize:20,fontWeight:"bold",color:"#ffd700",letterSpacing:1}}>{os.nazwa}</div>
+                {krag>1&&<div style={{fontSize:11,color:"#da70d6",marginTop:2}}>💜 Krąg {krag}</div>}
+              </div>
+
+              {/* Pasek postępu */}
+              <div style={{marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#888",marginBottom:4}}>
+                  <span>Postęp kolekcji</span>
+                  <span style={{color:"#ffd700",fontWeight:"bold"}}>{pct}%</span>
+                </div>
+                <div style={{height:8,background:"#12122a",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{
+                    height:"100%",width:`${pct}%`,borderRadius:4,
+                    background:"linear-gradient(90deg,#b8860b,#ffd700)",
+                    transition:"width 1s ease",
+                  }}/>
+                </div>
+              </div>
+
+              {/* Statystyki */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+                {[
+                  {label:"Kart zebranych",val:`${posKarty}/${totalKarty}`,color:"#ffd700"},
+                  {label:"Talie zamknięte",val:`${zamkniete.length}/${talie.length}`,color:"#0c6"},
+                  {label:"Duplikaty",val:dupCount,color:"#87CEEB"},
+                  {label:"Amunicja zdobyta",val:ammo.toLocaleString()+" 💰",color:"#fa0"},
+                ].map(s=>(
+                  <div key={s.label} style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 12px",textAlign:"center"}}>
+                    <div style={{fontSize:16,fontWeight:"bold",color:s.color}}>{s.val}</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Osiągnięcia */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,color:"#888",marginBottom:6}}>🏆 Osiągnięcia:</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {zamkniete.length>=10&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b55",borderRadius:10,color:"#ffd700"}}>👑 Mega Kolekcjoner</span>}
+                  {zamkniete.length>=5&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b33",borderRadius:10,color:"#ffd700"}}>🏆 Kolekcjoner</span>}
+                  {dupCount>=10&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(135,206,235,0.1)",border:"1px solid #87CEEB33",borderRadius:10,color:"#87CEEB"}}>📦 Magazynier</span>}
+                  {pct>=90&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(0,200,100,0.1)",border:"1px solid #0c633",borderRadius:10,color:"#0c6"}}>💎 Perfekcjonista</span>}
+                  {zamkniete.length===0&&posKarty===0&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:10,color:"#f55"}}>🐣 Nowicjusz</span>}
+                </div>
+              </div>
+
+              <button onClick={()=>setPokazProfil(null)} style={{
+                width:"100%",padding:10,background:"rgba(255,215,0,0.1)",
+                border:"1px solid #b8860b55",borderRadius:8,color:"#ffd700",
+                cursor:"pointer",fontSize:12,
+              }}>Zamknij</button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tooltip — kto ma duplikat tej karty */}
       {tooltip&&(
         <div style={{
@@ -1901,6 +2102,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   };
 
   const generuj=()=>{
+    playSound("ding");
     const aktywne=talie.filter(t=>!wylaczoneTalie.has(t.id));
     // Oblicz łączną liczbę kart per osoba do filtrowania trybu wylacz110
     const kartyLaczniePer = (osobaId) => talie.reduce((s,t)=>
@@ -2280,12 +2482,12 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
 
       {wynik&&<>
         {wynik.zamknieciaInfo.length>0&&(
-          <div style={{background:"rgba(0,200,100,0.1)",border:"1px solid #0c6",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
+          <div style={{background:"rgba(0,200,100,0.1)",border:"1px solid #0c6",borderRadius:10,padding:"12px 16px",marginBottom:14,animation:"pulseGold 2s ease-in-out"}}>
             <div style={{fontWeight:"bold",color:"#0c6",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
             {wynik.zamknieciaInfo.map((z,i)=>(
-              <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #12122a"}}>
+              <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #12122a",animation:`slideInUp 0.3s ${i*0.05}s both`}}>
                 🎉 <strong style={{color:"#ffd700"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
-                <span style={{color:"#0c6",marginLeft:6}}>+{z.nagroda?.toLocaleString()} 💰</span>
+                <span style={{color:"#0c6",marginLeft:6,animation:"countUp 0.4s ease both"}}>+{z.nagroda?.toLocaleString()} 💰</span>
                 {z.nowyProg&&(
                   <span style={{marginLeft:8,background:"rgba(255,165,0,0.2)",border:"1px solid #fa0",borderRadius:6,padding:"1px 6px",fontSize:11,color:"#fa0"}}>
                     🎯 PRÓG {z.nowyProg.prog} kart! +{z.nowyProg.ammo.toLocaleString()} 💰
@@ -2340,6 +2542,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
             };
             await zapiszAktywna(aktywna);
             setPublikowanie(false);
+            playSound("gold");
+            launchConfetti(1500);
             przejdzDoAktywnej();
           }} style={{
             marginLeft:"auto",padding:"5px 14px",
@@ -2968,9 +3172,27 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
   });
   const mojePozycje = poNadawcach[mojNick];
   const potwierdzonychCount=Object.keys(potwierdzone).filter(k=>potwierdzone[k]).length;
+
+  // Streak — ile wymian z rzędu zalogowany potwierdził (z historii)
+  const [streak, setStreak] = useState(0);
+  useEffect(() => {
+    pobierzHistorieWymian().then(historia => {
+      let s = 0;
+      for (const w of historia) {
+        const potw = w.potwierdzone || {};
+        const kPotw = Object.keys(potw).find(k => normalizuj(k) === normalizuj(mojNick));
+        if (kPotw && potw[kPotw]) s++;
+        else break;
+      }
+      setStreak(s);
+    }).catch(()=>{});
+  }, [mojNick]);
   const wszystkichNadawcow=Object.keys(poNadawcach).length;
 
   const potwierdz=async()=>{
+    // Efekty
+    playSound("success");
+    launchConfetti(2000);
     // 1. Oznacz jako potwierdzone
     await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[mojNick]:true}});
 
@@ -3149,8 +3371,22 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
       {/* Moja wymiana */}
       {mojePozycje?(
         <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"#ffd700"}`,borderRadius:10,padding:14,marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:czyPotwierdzilem?"#0c6":"#ffd700",marginBottom:8}}>
-            {czyPotwierdzilem?"✅ Twoja wymiana — POTWIERDZONA":"👋 Twoja wymiana — wyślij kartę!"}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:czyPotwierdzilem?"#0c6":"#ffd700",flex:1}}>
+              {czyPotwierdzilem?"✅ Twoja wymiana — POTWIERDZONA":"👋 Twoja wymiana — wyślij kartę!"}
+            </div>
+            {streak>0&&(
+              <div style={{
+                fontSize:11,padding:"3px 10px",borderRadius:12,
+                background:streak>=5?"linear-gradient(135deg,#b8860b,#ffd700)":streak>=3?"rgba(255,165,0,0.2)":"rgba(255,255,255,0.08)",
+                border:streak>=5?"none":streak>=3?"1px solid #fa055":"1px solid #333",
+                color:streak>=5?"#000":streak>=3?"#fa0":"#888",
+                fontWeight:"bold",animation:streak>=5?"pulseGold 2s infinite":"none",
+              }}>
+                {streak>=10?"🔥":streak>=5?"⚡":streak>=3?"✨":""}
+                {streak} wymian z rzędu
+              </div>
+            )}
           </div>
           {mojePozycje.map((w,i)=>(
             <div key={i} style={{fontSize:13,color:"#ddd",padding:"5px 0",borderBottom:"1px solid #12122a"}}>
@@ -3160,7 +3396,14 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           ))}
           <div style={{marginTop:12}}>
             {!czyPotwierdzilem?(
-              <button onClick={potwierdz} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontSize:14,fontWeight:"bold",cursor:"pointer"}}>
+              <button onClick={potwierdz} style={{
+                width:"100%",padding:12,
+                background:"linear-gradient(135deg,#0c6,#0fa)",
+                border:"none",borderRadius:8,color:"#000",fontSize:14,fontWeight:"bold",
+                cursor:"pointer",
+                animation:"pulseGreen 1.5s ease-in-out infinite",
+                boxShadow:"0 0 20px rgba(0,200,100,0.4)",
+              }}>
                 ✅ Potwierdzam — wysłałem kartę!
               </button>
             ):(
@@ -3287,7 +3530,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 // ============================================================
 // TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj}) {
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={}}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaOsobaSkaner,setWybranaOsobaSkaner]=useState(0);
@@ -3306,6 +3549,8 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"ogloszenie",label:"📢 Ogłoszenie"},
     {id:"logi",label:"🔒 Logi logowań"},
     {id:"kalendarz",label:"📅 Kalendarz"},
+    {id:"taktyka",label:"⚔️ Taktyka"},
+    {id:"kalkulator_event",label:"🧮 Kalkulator eventu"},
   ];
 
   return (
@@ -3338,6 +3583,8 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
       {tryb==="logi"&&<LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={onZablokuj} onOdblokuj={onOdblokuj}/>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
+      {tryb==="taktyka"&&<TaktykaSezonu zapiszStrukture={zapiszStrukture}/>}
+      {tryb==="kalkulator_event"&&<KalkulatorEventu/>}
     </div>
   );
 }
@@ -5479,6 +5726,833 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ============================================================
+// ADMIN DASHBOARD
+// ============================================================
+function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukture}) {
+  const { useState, useEffect } = require("react");
+  const czlonkowie = dane?.czlonkowie || [];
+  const posiadane = dane?.posiadane || {};
+  const duplikaty = dane?.duplikaty || {};
+  const aktywnaWymiana = dane?.aktywnaWymiana;
+
+  const teraz = Date.now();
+  const ONLINE_PROG = 90000; // 90 sekund
+
+  // === ONLINE ===
+  const onlineNicki = Object.entries(statusOnline)
+    .filter(([,ts]) => teraz - ts < ONLINE_PROG)
+    .map(([nick]) => nick);
+
+  // === STATYSTYKI KART ===
+  const statKarty = czlonkowie.map(c => {
+    const karty = talie.reduce((s,t) => s + t.karty.filter(k => posiadane[`${c.id}_${t.id}_${k.nazwa}`]).length, 0);
+    const total = talie.reduce((s,t) => s + t.karty.length, 0);
+    const dup = talie.reduce((s,t) => s + t.karty.filter(k => duplikaty[`${c.id}_${t.id}_${k.nazwa}`]).length, 0);
+    const zamkniete = talie.filter(t => t.karty.length > 0 && t.karty.every(k => posiadane[`${c.id}_${t.id}_${k.nazwa}`])).length;
+    const ammo = talie.filter(t => t.karty.every(k => posiadane[`${c.id}_${t.id}_${k.nazwa}`]))
+      .reduce((s,t) => s + pobierzNagrode(t, c.krag||1), 0);
+    return { c, karty, total, dup, zamkniete, ammo, pct: total ? Math.round(karty/total*100) : 0 };
+  }).sort((a,b) => b.karty - a.karty);
+
+  // === AKTYWNOŚĆ Z HISTORII ===
+  const aktywnosc = {}; // nick → {potwierdzone, ostatnia}
+  historiaWymian.forEach(w => {
+    const potw = w.potwierdzone || {};
+    Object.entries(potw).forEach(([nick, val]) => {
+      if (!aktywnosc[nick]) aktywnosc[nick] = { potwierdzone: 0, ostatnia: null };
+      if (val) {
+        aktywnosc[nick].potwierdzone++;
+        const data = new Date(w.data);
+        if (!aktywnosc[nick].ostatnia || data > aktywnosc[nick].ostatnia)
+          aktywnosc[nick].ostatnia = data;
+      }
+    });
+  });
+
+  // Nieaktywni — brak potwierdzenia w ostatnich 2 wymianach
+  const ostatnie2 = historiaWymian.slice(0, 2);
+  const nieaktywni = czlonkowie.filter(c => {
+    return ostatnie2.some(w => {
+      const nadawcy = Object.keys(w.potwierdzone || {});
+      // Czy ten czlonek był w tej wymianie i nie potwierdził?
+      const byW = (w.wymiany||[]).some(x => normalizuj(x.od) === normalizuj(c.nazwa));
+      const potw = Object.entries(w.potwierdzone||{}).find(([k]) => normalizuj(k) === normalizuj(c.nazwa));
+      return byW && (!potw || !potw[1]);
+    });
+  });
+
+  // === AMMO GANGU ŁĄCZNIE ===
+  const ammoGangu = statKarty.reduce((s,x) => s + x.ammo, 0);
+  const kartyGangu = statKarty.reduce((s,x) => s + x.karty, 0);
+  const totalKartyMax = statKarty.reduce((s,x) => s + x.total, 0);
+
+  // Niepotwierdzona wymiana
+  const niepotwierdzonychCount = aktywnaWymiana
+    ? Object.keys(aktywnaWymiana.wymiany?.reduce((a,w)=>{a[w.od]=1;return a;},{})||{})
+        .filter(n => !(aktywnaWymiana.potwierdzone||{})[n]).length
+    : 0;
+
+  // Formatowanie daty
+  const dataTemu = (d) => {
+    if (!d) return "nigdy";
+    const diff = Math.floor((teraz - d.getTime()) / 86400000);
+    if (diff === 0) return "dzisiaj";
+    if (diff === 1) return "wczoraj";
+    return `${diff} dni temu`;
+  };
+
+  // Ranking aktywności
+  const rankingAktywnosci = czlonkowie.map(c => {
+    const a = aktywnosc[c.nazwa] || { potwierdzone: 0, ostatnia: null };
+    return { c, ...a };
+  }).sort((a,b) => b.potwierdzone - a.potwierdzone);
+
+  const maxPotw = Math.max(...rankingAktywnosci.map(r => r.potwierdzone), 1);
+
+  // Najlepsza/najgorsza talia gangu
+  const talieStats = talie.map(t => {
+    const zamkniete = czlonkowie.filter(c => t.karty.every(k => posiadane[`${c.id}_${t.id}_${k.nazwa}`])).length;
+    return { t, zamkniete, pct: Math.round(zamkniete/Math.max(1,czlonkowie.length)*100) };
+  }).sort((a,b) => b.pct - a.pct);
+
+  return (
+    <div style={{animation:"fadeIn 0.3s ease"}}>
+      <div style={{fontSize:16,fontWeight:"bold",color:"#ffd700",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+        📊 Dashboard admina
+        <span style={{fontSize:11,color:"#555",fontWeight:"normal"}}>— dane na żywo</span>
+      </div>
+
+      {/* === ROW 1: Kafelki główne === */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:12}}>
+        {/* Online */}
+        <div style={{background:"rgba(0,200,100,0.08)",border:"1px solid #0c644",borderRadius:10,padding:12}}>
+          <div style={{fontSize:11,color:"#0c6",marginBottom:4}}>🟢 Online teraz</div>
+          <div style={{fontSize:28,fontWeight:"bold",color:"#0c6"}}>{onlineNicki.length}</div>
+          <div style={{fontSize:10,color:"#555"}}>z {czlonkowie.length} członków</div>
+          <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:3}}>
+            {onlineNicki.map(n => (
+              <span key={n} style={{fontSize:9,padding:"1px 6px",background:"rgba(0,200,100,0.15)",borderRadius:8,color:"#0c6"}}>{n}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Aktywna wymiana */}
+        <div style={{
+          background: aktywnaWymiana ? "rgba(255,215,0,0.08)" : "rgba(255,255,255,0.03)",
+          border: aktywnaWymiana ? "1px solid #ffd70044" : "1px solid #1a1a2e",
+          borderRadius:10,padding:12,
+        }}>
+          <div style={{fontSize:11,color:"#ffd700",marginBottom:4}}>📋 Aktywna wymiana</div>
+          {aktywnaWymiana ? (
+            <>
+              <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700"}}>
+                {Object.values(aktywnaWymiana.potwierdzone||{}).filter(Boolean).length}
+                <span style={{fontSize:13,color:"#888",fontWeight:"normal"}}>/{Object.keys(aktywnaWymiana.wymiany?.reduce((a,w)=>{a[w.od]=1;return a;},{}) || {}).length}</span>
+              </div>
+              <div style={{fontSize:10,color:"#888"}}>potwierdzeń</div>
+              {niepotwierdzonychCount > 0 && (
+                <div style={{marginTop:4,fontSize:10,color:"#f55",background:"rgba(255,50,50,0.1)",padding:"2px 6px",borderRadius:4,display:"inline-block"}}>
+                  ⚠️ {niepotwierdzonychCount} nie potwierdziło
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{fontSize:12,color:"#555",marginTop:6}}>Brak aktywnej wymiany</div>
+          )}
+        </div>
+
+        {/* Ammo gangu */}
+        <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:10,padding:12}}>
+          <div style={{fontSize:11,color:"#fa0",marginBottom:4}}>💰 Ammo gangu (sezon)</div>
+          <div style={{fontSize:22,fontWeight:"bold",color:"#fa0"}}>{ammoGangu.toLocaleString()}</div>
+          <div style={{fontSize:10,color:"#555"}}>łącznie zdobyte</div>
+          <div style={{marginTop:4,fontSize:10,color:"#666"}}>{historiaWymian.length} wymian w historii</div>
+        </div>
+
+        {/* Postęp kart */}
+        <div style={{background:"rgba(135,206,235,0.06)",border:"1px solid #87CEEB33",borderRadius:10,padding:12}}>
+          <div style={{fontSize:11,color:"#87CEEB",marginBottom:4}}>🃏 Karty gangu</div>
+          <div style={{fontSize:22,fontWeight:"bold",color:"#87CEEB"}}>{Math.round(kartyGangu/Math.max(1,totalKartyMax/czlonkowie.length*czlonkowie.length)*100)}%</div>
+          <div style={{fontSize:10,color:"#555"}}>{kartyGangu.toLocaleString()} / {totalKartyMax.toLocaleString()} łącznie</div>
+          <div style={{height:4,background:"#12122a",borderRadius:2,marginTop:6,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${kartyGangu/Math.max(1,totalKartyMax)*100}%`,background:"linear-gradient(90deg,#4169E1,#87CEEB)",borderRadius:2}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* === NIEAKTYWNI ALERT === */}
+      {nieaktywni.length > 0 && (
+        <div style={{background:"rgba(255,50,50,0.08)",border:"1px solid #f5544433",borderRadius:10,padding:12,marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#f55",marginBottom:6}}>
+            ⚠️ Nie potwierdzili ostatnich wymian ({nieaktywni.length} osób)
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {nieaktywni.map(c => (
+              <span key={c.id} style={{fontSize:11,padding:"2px 8px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544433",borderRadius:6,color:"#f88"}}>{c.nazwa}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* === RANKING KART === */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>🏆 Ranking — postęp kolekcji</div>
+        {statKarty.map((s,i) => {
+          const isOnline = onlineNicki.some(n => normalizuj(n) === normalizuj(s.c.nazwa));
+          return (
+            <div key={s.c.id} style={{
+              display:"flex",alignItems:"center",gap:8,padding:"6px 8px",marginBottom:3,
+              background:i===0?"rgba(255,215,0,0.06)":"rgba(255,255,255,0.02)",
+              borderRadius:6,border:i===0?"1px solid #ffd70022":"1px solid transparent",
+            }}>
+              <span style={{fontSize:11,color:"#555",width:18,textAlign:"right"}}>{i+1}.</span>
+              <div style={{width:6,height:6,borderRadius:"50%",background:isOnline?"#0c6":"#333",flexShrink:0,boxShadow:isOnline?"0 0 4px #0c6":"none"}}/>
+              <span style={{flex:1,fontSize:12,color:i===0?"#ffd700":"#ddd"}}>{s.c.nazwa}</span>
+              {s.c.krag > 1 && <span style={{fontSize:9,color:"#da70d6"}}>K{s.c.krag}</span>}
+              <span style={{fontSize:10,color:"#555"}}>{s.zamkniete}/{talie.length} talii</span>
+              <div style={{width:60,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${s.pct}%`,background:s.pct===100?"#0c6":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
+              </div>
+              <span style={{fontSize:11,color:"#888",width:32,textAlign:"right"}}>{s.pct}%</span>
+              {s.dup > 0 && <span style={{fontSize:9,color:"#87CEEB88"}}>+{s.dup}dup</span>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* === AKTYWNOŚĆ WYMIAN === */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+          📈 Aktywność — potwierdzenia wymian
+          <span style={{fontSize:10,color:"#555",fontWeight:"normal",marginLeft:6}}>({historiaWymian.length} wymian w historii)</span>
+        </div>
+        {rankingAktywnosci.map((r,i) => {
+          const pct = Math.round(r.potwierdzone / maxPotw * 100);
+          const isOnline = onlineNicki.some(n => normalizuj(n) === normalizuj(r.c.nazwa));
+          const kolor = r.potwierdzone >= maxPotw * 0.8 ? "#0c6" : r.potwierdzone >= maxPotw * 0.4 ? "#fa0" : "#f55";
+          return (
+            <div key={r.c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",marginBottom:2,borderRadius:5}}>
+              <div style={{width:6,height:6,borderRadius:"50%",background:isOnline?"#0c6":"#333",flexShrink:0}}/>
+              <span style={{flex:1,fontSize:12,color:"#ddd"}}>{r.c.nazwa}</span>
+              <span style={{fontSize:10,color:"#555",width:60,textAlign:"right"}}>{r.ostatnia ? dataTemu(r.ostatnia) : "brak"}</span>
+              <div style={{width:80,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,background:kolor,borderRadius:3}}/>
+              </div>
+              <span style={{fontSize:11,fontWeight:"bold",color:kolor,width:28,textAlign:"right"}}>{r.potwierdzone}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* === TALIE GANGU === */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+        <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c633",borderRadius:10,padding:12}}>
+          <div style={{fontSize:11,color:"#0c6",fontWeight:"bold",marginBottom:6}}>✅ Najlepiej opanowane talie</div>
+          {talieStats.slice(0,3).map(s => (
+            <div key={s.t.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"3px 0",borderBottom:"1px solid #0c61122"}}>
+              <span style={{color:"#aaa",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.t.nazwa}</span>
+              <span style={{color:"#0c6",fontWeight:"bold",marginLeft:6}}>{s.pct}%</span>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:10,padding:12}}>
+          <div style={{fontSize:11,color:"#f55",fontWeight:"bold",marginBottom:6}}>❌ Najtrudniejsze talie</div>
+          {talieStats.slice(-3).reverse().map(s => (
+            <div key={s.t.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"3px 0",borderBottom:"1px solid #f5544411"}}>
+              <span style={{color:"#aaa",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.t.nazwa}</span>
+              <span style={{color:"#f55",fontWeight:"bold",marginLeft:6}}>{s.pct}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* === EFEKTYWNOŚĆ WYMIAN === */}
+      {historiaWymian.length > 0 && (
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📊 Efektywność wymian</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            {[
+              {
+                label:"Śr. potwierdzeń",
+                val: Math.round(historiaWymian.reduce((s,w) =>
+                  s + Object.values(w.potwierdzone||{}).filter(Boolean).length, 0
+                ) / historiaWymian.length) + "%",
+                color:"#0c6",
+              },
+              {
+                label:"Śr. wymian/sesja",
+                val: Math.round(historiaWymian.reduce((s,w) => s + (w.lacznieWymian||0), 0) / historiaWymian.length),
+                color:"#ffd700",
+              },
+              {
+                label:"Sesji łącznie",
+                val: historiaWymian.length,
+                color:"#87CEEB",
+              },
+            ].map(s => (
+              <div key={s.label} style={{textAlign:"center",background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"10px 6px"}}>
+                <div style={{fontSize:20,fontWeight:"bold",color:s.color}}>{s.val}</div>
+                <div style={{fontSize:9,color:"#555",marginTop:2}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ============================================================
+// TAKTYKA SEZONU — notatki, sojusze, plany
+// ============================================================
+function TaktykaSezonu({zapiszStrukture}) {
+  const { useState, useEffect } = require("react");
+  const [dane, setDane] = useState(null);
+  const [zapisywanie, setZapisywanie] = useState(false);
+
+  // Załaduj z Firebase (osobny dokument)
+  useEffect(() => {
+    const { getFirestore, doc, onSnapshot } = require("firebase/firestore");
+    const db = getFirestore();
+    const ref = doc(db, "gang_data", "taktyka");
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) setDane(snap.data());
+      else setDane({ notatki: "", sojusznicy: [], wrogowie: [], plany: [] });
+    });
+    return () => unsub();
+  }, []);
+
+  const zapisz = async (nowe) => {
+    setZapisywanie(true);
+    try {
+      const { getFirestore, doc, setDoc } = require("firebase/firestore");
+      const db = getFirestore();
+      await setDoc(doc(db, "gang_data", "taktyka"), nowe, { merge: true });
+    } catch(e) { console.error(e); }
+    setZapisywanie(false);
+  };
+
+  const [nowyS, setNowyS] = useState({ nazwa: "", typ: "sojusznik", notatka: "" });
+  const [nowyPlan, setNowyPlan] = useState({ tekst: "", priorytet: "medium" });
+  const [edytujNotatki, setEdytujNotatki] = useState(false);
+  const [tempNotatki, setTempNotatki] = useState("");
+
+  if (!dane) return <div style={{textAlign:"center",padding:30,color:"#555"}}>⏳ Ładowanie...</div>;
+
+  const dodajGang = () => {
+    if (!nowyS.nazwa.trim()) return;
+    const lista = nowyS.typ === "sojusznik" ? [...(dane.sojusznicy||[])] : [...(dane.wrogowie||[])];
+    lista.push({ id: Date.now(), nazwa: nowyS.nazwa.trim(), notatka: nowyS.notatka.trim() });
+    const nowe = nowyS.typ === "sojusznik" ? { ...dane, sojusznicy: lista } : { ...dane, wrogowie: lista };
+    setDane(nowe); zapisz(nowe);
+    setNowyS({ nazwa: "", typ: nowyS.typ, notatka: "" });
+  };
+
+  const usunGang = (typ, id) => {
+    const key = typ === "sojusznik" ? "sojusznicy" : "wrogowie";
+    const nowe = { ...dane, [key]: dane[key].filter(g => g.id !== id) };
+    setDane(nowe); zapisz(nowe);
+  };
+
+  const dodajPlan = () => {
+    if (!nowyPlan.tekst.trim()) return;
+    const plany = [...(dane.plany||[]), { id: Date.now(), tekst: nowyPlan.tekst.trim(), priorytet: nowyPlan.priorytet, gotowe: false }];
+    const nowe = { ...dane, plany };
+    setDane(nowe); zapisz(nowe);
+    setNowyPlan({ tekst: "", priorytet: "medium" });
+  };
+
+  const togglePlan = (id) => {
+    const plany = dane.plany.map(p => p.id === id ? { ...p, gotowe: !p.gotowe } : p);
+    const nowe = { ...dane, plany };
+    setDane(nowe); zapisz(nowe);
+  };
+
+  const usunPlan = (id) => {
+    const nowe = { ...dane, plany: dane.plany.filter(p => p.id !== id) };
+    setDane(nowe); zapisz(nowe);
+  };
+
+  const kolorPrio = { high: "#f55", medium: "#fa0", low: "#0c6" };
+  const labelPrio = { high: "🔴 Wysoki", medium: "🟡 Średni", low: "🟢 Niski" };
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,100,50,0.06)",border:"1px solid #fa055",borderRadius:10,padding:12,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:2}}>⚔️ Taktyka sezonu</div>
+        <div style={{fontSize:11,color:"#555"}}>Notatki taktyczne, sojusze i plany — widoczne dla całego admina w czasie rzeczywistym</div>
+      </div>
+
+      {/* NOTATKI TAKTYCZNE */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>📝 Notatki taktyczne sezonu</div>
+          <button onClick={() => { setEdytujNotatki(!edytujNotatki); setTempNotatki(dane.notatki||""); }}
+            style={{fontSize:11,padding:"3px 10px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b55",borderRadius:6,color:"#b8860b",cursor:"pointer"}}>
+            {edytujNotatki ? "✕ Anuluj" : "✏️ Edytuj"}
+          </button>
+        </div>
+        {edytujNotatki ? (
+          <div>
+            <textarea value={tempNotatki} onChange={e=>setTempNotatki(e.target.value)}
+              rows={6} placeholder="Wpisz strategię sezonu, co skupiamy, ważne info..."
+              style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #ffd70033",
+                borderRadius:8,color:"#fff",fontSize:12,lineHeight:1.6,resize:"vertical",
+                fontFamily:"inherit",boxSizing:"border-box"}}/>
+            <button onClick={() => {
+              const nowe = { ...dane, notatki: tempNotatki };
+              setDane(nowe); zapisz(nowe); setEdytujNotatki(false);
+            }} style={{marginTop:8,padding:"8px 16px",background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:6,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:12}}>
+              💾 Zapisz
+            </button>
+          </div>
+        ) : (
+          <div style={{fontSize:12,color:dane.notatki?"#ccc":"#444",lineHeight:1.7,whiteSpace:"pre-wrap",minHeight:40}}>
+            {dane.notatki || "Brak notatek — kliknij Edytuj żeby dodać strategię sezonu"}
+          </div>
+        )}
+      </div>
+
+      {/* PLAN DZIAŁAŃ */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>✅ Plan działań / TODO</div>
+        {(dane.plany||[]).length === 0 && (
+          <div style={{fontSize:11,color:"#444",marginBottom:10}}>Brak zadań — dodaj poniżej</div>
+        )}
+        {(dane.plany||[]).map(p => (
+          <div key={p.id} style={{
+            display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:4,
+            background:p.gotowe?"rgba(0,200,100,0.05)":"rgba(255,255,255,0.03)",
+            border:`1px solid ${p.gotowe?"#0c633":"#1a1a2e"}`,borderRadius:6,
+            opacity:p.gotowe?0.6:1,
+          }}>
+            <button onClick={()=>togglePlan(p.id)} style={{
+              width:18,height:18,borderRadius:4,border:`2px solid ${kolorPrio[p.priorytet]}`,
+              background:p.gotowe?kolorPrio[p.priorytet]:"transparent",
+              cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:10,color:"#000",
+            }}>{p.gotowe?"✓":""}</button>
+            <span style={{flex:1,fontSize:12,color:p.gotowe?"#555":"#ddd",textDecoration:p.gotowe?"line-through":"none"}}>{p.tekst}</span>
+            <span style={{fontSize:9,color:kolorPrio[p.priorytet]}}>{labelPrio[p.priorytet]}</span>
+            <button onClick={()=>usunPlan(p.id)} style={{background:"none",border:"none",color:"#f5544455",cursor:"pointer",fontSize:12}}>✕</button>
+          </div>
+        ))}
+        <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+          <input value={nowyPlan.tekst} onChange={e=>setNowyPlan(p=>({...p,tekst:e.target.value}))}
+            onKeyDown={e=>e.key==="Enter"&&dodajPlan()}
+            placeholder="Nowe zadanie..."
+            style={{flex:1,minWidth:120,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+          <select value={nowyPlan.priorytet} onChange={e=>setNowyPlan(p=>({...p,priorytet:e.target.value}))}
+            style={{padding:"7px 8px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:kolorPrio[nowyPlan.priorytet],fontSize:11,cursor:"pointer"}}>
+            <option value="high">🔴 Wysoki</option>
+            <option value="medium">🟡 Średni</option>
+            <option value="low">🟢 Niski</option>
+          </select>
+          <button onClick={dodajPlan} style={{padding:"7px 14px",background:"rgba(255,215,0,0.12)",border:"1px solid #b8860b55",borderRadius:6,color:"#ffd700",cursor:"pointer",fontWeight:"bold",fontSize:12}}>+ Dodaj</button>
+        </div>
+      </div>
+
+      {/* SOJUSZE I WROGOWIE */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+        {/* Sojusznicy */}
+        <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c633",borderRadius:10,padding:12}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#0c6",marginBottom:8}}>🤝 Sojusznicy</div>
+          {(dane.sojusznicy||[]).length === 0 && <div style={{fontSize:11,color:"#444",marginBottom:6}}>Brak</div>}
+          {(dane.sojusznicy||[]).map(g => (
+            <div key={g.id} style={{display:"flex",alignItems:"flex-start",gap:6,padding:"5px 0",borderBottom:"1px solid #0c6118"}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,color:"#0c6",fontWeight:"bold"}}>{g.nazwa}</div>
+                {g.notatka && <div style={{fontSize:10,color:"#555",marginTop:1}}>{g.notatka}</div>}
+              </div>
+              <button onClick={()=>usunGang("sojusznik",g.id)} style={{background:"none",border:"none",color:"#f5544455",cursor:"pointer",fontSize:11}}>✕</button>
+            </div>
+          ))}
+        </div>
+
+        {/* Wrogowie */}
+        <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:10,padding:12}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#f55",marginBottom:8}}>⚔️ Unikamy / Wrogowie</div>
+          {(dane.wrogowie||[]).length === 0 && <div style={{fontSize:11,color:"#444",marginBottom:6}}>Brak</div>}
+          {(dane.wrogowie||[]).map(g => (
+            <div key={g.id} style={{display:"flex",alignItems:"flex-start",gap:6,padding:"5px 0",borderBottom:"1px solid #f5544411"}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,color:"#f55",fontWeight:"bold"}}>{g.nazwa}</div>
+                {g.notatka && <div style={{fontSize:10,color:"#555",marginTop:1}}>{g.notatka}</div>}
+              </div>
+              <button onClick={()=>usunGang("wrog",g.id)} style={{background:"none",border:"none",color:"#f5544455",cursor:"pointer",fontSize:11}}>✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dodaj gang */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #1a1a2e",borderRadius:8,padding:12}}>
+        <div style={{fontSize:11,color:"#888",marginBottom:8}}>+ Dodaj gang:</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <select value={nowyS.typ} onChange={e=>setNowyS(s=>({...s,typ:e.target.value}))}
+            style={{padding:"7px 8px",background:"#12122a",border:"1px solid #333",borderRadius:6,
+              color:nowyS.typ==="sojusznik"?"#0c6":"#f55",fontSize:12,cursor:"pointer"}}>
+            <option value="sojusznik">🤝 Sojusznik</option>
+            <option value="wrog">⚔️ Wróg/Unikamy</option>
+          </select>
+          <input value={nowyS.nazwa} onChange={e=>setNowyS(s=>({...s,nazwa:e.target.value}))}
+            placeholder="Nazwa gangu" onKeyDown={e=>e.key==="Enter"&&dodajGang()}
+            style={{flex:1,minWidth:100,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+          <input value={nowyS.notatka} onChange={e=>setNowyS(s=>({...s,notatka:e.target.value}))}
+            placeholder="Notatka (opcjonalnie)"
+            style={{flex:1,minWidth:100,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+          <button onClick={dodajGang} style={{padding:"7px 14px",background:"rgba(255,215,0,0.12)",border:"1px solid #b8860b55",borderRadius:6,color:"#ffd700",cursor:"pointer",fontWeight:"bold",fontSize:12}}>+ Dodaj</button>
+        </div>
+      </div>
+      {zapisywanie && <div style={{textAlign:"center",fontSize:10,color:"#555",marginTop:8}}>⏳ Zapisywanie...</div>}
+    </div>
+  );
+}
+
+
+// ============================================================
+// KALKULATOR OPŁACALNOŚCI EVENTU
+// ============================================================
+function KalkulatorEventu() {
+  const { useState } = require("react");
+
+  const [progi, setProgi] = useState([
+    { id:1, punkty:"1000", nagroda:"2", typ:"paczki" },
+    { id:2, punkty:"3000", nagroda:"5", typ:"paczki" },
+    { id:3, punkty:"6000", nagroda:"10", typ:"paczki" },
+    { id:4, punkty:"10000", nagroda:"3", typ:"klucze" },
+    { id:5, punkty:"15000", nagroda:"20", typ:"paczki" },
+  ]);
+  const [wartPaczki, setWartPaczki] = useState("150"); // ammo za paczkę
+  const [wartKlucze, setWartKlucze] = useState("500"); // ammo za klucz
+  const [ammoNaPunkt, setAmmoNaPunkt] = useState("10"); // ile ammo daje 1 punkt
+  const [pokazDodaj, setPokazDodaj] = useState(false);
+  const [nowyProg, setNowyProg] = useState({ punkty:"", nagroda:"", typ:"paczki" });
+
+  const dodajProg = () => {
+    if (!nowyProg.punkty || !nowyProg.nagroda) return;
+    setProgi(prev => [...prev, { id: Date.now(), ...nowyProg }].sort((a,b)=>parseInt(a.punkty)-parseInt(b.punkty)));
+    setNowyProg({ punkty:"", nagroda:"", typ:"paczki" });
+    setPokazDodaj(false);
+  };
+
+  const usunProg = (id) => setProgi(prev => prev.filter(p => p.id !== id));
+
+  // Obliczenia
+  const wP = parseFloat(wartPaczki) || 150;
+  const wK = parseFloat(wartKlucze) || 500;
+  const aNaPkt = parseFloat(ammoNaPunkt) || 10;
+
+  const progsSorted = [...progi].sort((a,b) => parseInt(a.punkty)-parseInt(b.punkty));
+
+  // Dla każdego progu: łączna wartość nagrody od 0, koszt w ammo, opłacalność
+  const analiza = progsSorted.map((p, i) => {
+    const pkt = parseInt(p.punkty) || 0;
+    const nagroda = parseFloat(p.nagroda) || 0;
+    const wart = p.typ === "paczki" ? nagroda * wP : nagroda * wK;
+    const koszAmmo = pkt * aNaPkt; // ammo wydane na dojście do tego progu
+
+    // Łączna wartość od 0 do tego progu
+    const lacznaWart = progsSorted.slice(0, i+1).reduce((s,pp) => {
+      const n = parseFloat(pp.nagroda)||0;
+      return s + (pp.typ==="paczki" ? n*wP : n*wK);
+    }, 0);
+
+    // Opłacalność = łączna wartość / koszt ammo
+    const oplac = koszAmmo > 0 ? (lacznaWart / koszAmmo * 100).toFixed(1) : "∞";
+    const przyrost = i === 0 ? wart : wart / ((pkt - parseInt(progsSorted[i-1]?.punkty||0)) * aNaPkt) * 100;
+
+    return { ...p, pkt, nagroda, wart, koszAmmo, lacznaWart, oplac, przyrost };
+  });
+
+  // Optymalny próg = najwyższy przyrost wartości per ammo
+  const optymalny = analiza.reduce((best, a) => a.przyrost > (best?.przyrost||0) ? a : best, null);
+
+  const kolorOplac = (o) => {
+    const v = parseFloat(o);
+    if (v >= 100) return "#0c6";
+    if (v >= 60) return "#fa0";
+    return "#f55";
+  };
+
+  return (
+    <div>
+      <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#6496ff",marginBottom:2}}>🧮 Kalkulator opłacalności eventu</div>
+        <div style={{fontSize:11,color:"#555"}}>Wpisz progi eventu i nagrody — apka obliczy który próg opłaca się najbardziej względem wydanego ammo</div>
+      </div>
+
+      {/* Parametry */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#aaa",marginBottom:8}}>⚙️ Parametry</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {[
+            {label:"💰 Ammo za paczkę",val:wartPaczki,set:setWartPaczki},
+            {label:"🗝️ Ammo za klucz",val:wartKlucze,set:setWartKlucze},
+            {label:"⚡ Ammo / 1 punkt",val:ammoNaPunkt,set:setAmmoNaPunkt},
+          ].map(f => (
+            <div key={f.label}>
+              <div style={{fontSize:10,color:"#666",marginBottom:3}}>{f.label}</div>
+              <input type="number" value={f.val} onChange={e=>f.set(e.target.value)}
+                style={{width:"100%",padding:"6px 8px",background:"#12122a",border:"1px solid #333",
+                  borderRadius:5,color:"#ffd700",fontSize:13,fontWeight:"bold",boxSizing:"border-box"}}/>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabela progów */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#aaa"}}>📊 Progi eventu</div>
+          <button onClick={()=>setPokazDodaj(!pokazDodaj)} style={{fontSize:11,padding:"3px 10px",
+            background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b55",borderRadius:5,
+            color:"#ffd700",cursor:"pointer"}}>+ Dodaj próg</button>
+        </div>
+
+        {pokazDodaj && (
+          <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",background:"rgba(255,215,0,0.04)",padding:8,borderRadius:6,border:"1px solid #ffd70022"}}>
+            <input type="number" value={nowyProg.punkty} onChange={e=>setNowyProg(p=>({...p,punkty:e.target.value}))}
+              placeholder="Punkty" style={{width:90,padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#fff",fontSize:12}}/>
+            <input type="number" value={nowyProg.nagroda} onChange={e=>setNowyProg(p=>({...p,nagroda:e.target.value}))}
+              placeholder="Ilość" style={{width:70,padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#fff",fontSize:12}}/>
+            <select value={nowyProg.typ} onChange={e=>setNowyProg(p=>({...p,typ:e.target.value}))}
+              style={{padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#87CEEB",fontSize:12}}>
+              <option value="paczki">📦 Paczki</option>
+              <option value="klucze">🗝️ Klucze</option>
+            </select>
+            <button onClick={dodajProg} style={{padding:"6px 12px",background:"rgba(0,200,100,0.15)",border:"1px solid #0c633",borderRadius:5,color:"#0c6",cursor:"pointer",fontWeight:"bold",fontSize:12}}>✓</button>
+          </div>
+        )}
+
+        {/* Nagłówek tabeli */}
+        <div style={{display:"grid",gridTemplateColumns:"60px 60px 80px 70px 90px 70px 28px",gap:4,padding:"4px 6px",marginBottom:4}}>
+          {["Punkty","Nagroda","Typ","Koszt ammo","Łączna wart.","Opłacal.",""].map(h=>(
+            <div key={h} style={{fontSize:9,color:"#444",textAlign:"center"}}>{h}</div>
+          ))}
+        </div>
+
+        {analiza.map((a, i) => {
+          const isOpt = a.id === optymalny?.id;
+          return (
+            <div key={a.id} style={{
+              display:"grid",gridTemplateColumns:"60px 60px 80px 70px 90px 70px 28px",
+              gap:4,padding:"6px 6px",marginBottom:3,borderRadius:6,alignItems:"center",
+              background: isOpt ? "rgba(255,215,0,0.1)" : "rgba(255,255,255,0.02)",
+              border: isOpt ? "1px solid #ffd70055" : "1px solid transparent",
+            }}>
+              <div style={{fontSize:12,color:"#ddd",textAlign:"center",fontWeight:isOpt?"bold":"normal"}}>{a.pkt.toLocaleString()}</div>
+              <div style={{fontSize:12,color:"#ddd",textAlign:"center"}}>{a.nagroda}</div>
+              <div style={{fontSize:11,textAlign:"center",color:a.typ==="paczki"?"#87CEEB":"#ffd700"}}>
+                {a.typ==="paczki"?"📦 paczki":"🗝️ klucze"}
+              </div>
+              <div style={{fontSize:11,color:"#888",textAlign:"center"}}>{a.koszAmmo.toLocaleString()}</div>
+              <div style={{fontSize:12,fontWeight:"bold",color:"#fa0",textAlign:"center"}}>{a.lacznaWart.toLocaleString()}</div>
+              <div style={{fontSize:12,fontWeight:"bold",color:kolorOplac(a.oplac),textAlign:"center"}}>
+                {a.oplac}%
+                {isOpt && <span style={{fontSize:8,display:"block",color:"#ffd700"}}>OPTYMALNY</span>}
+              </div>
+              <button onClick={()=>usunProg(a.id)} style={{background:"none",border:"none",color:"#f5544444",cursor:"pointer",fontSize:11}}>✕</button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Rekomendacja */}
+      {optymalny && (
+        <div style={{background:"rgba(255,215,0,0.1)",border:"2px solid #ffd70055",borderRadius:10,padding:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
+            🎯 Rekomendacja
+          </div>
+          <div style={{fontSize:12,color:"#ddd",lineHeight:1.7}}>
+            Optymalny próg to <strong style={{color:"#ffd700"}}>{optymalny.pkt.toLocaleString()} punktów</strong> ({optymalny.nagroda} {optymalny.typ}).<br/>
+            Koszt: <strong style={{color:"#fa0"}}>{optymalny.koszAmmo.toLocaleString()} ammo</strong> →
+            łączna wartość nagród: <strong style={{color:"#0c6"}}>{optymalny.lacznaWart.toLocaleString()} ammo</strong>.<br/>
+            Opłacalność: <strong style={{color:kolorOplac(optymalny.oplac)}}>{optymalny.oplac}%</strong>
+            {parseFloat(optymalny.oplac) >= 100
+              ? " ✅ Zysk — nagrody warte więcej niż wydane ammo!"
+              : parseFloat(optymalny.oplac) >= 60
+              ? " 🟡 Akceptowalne — lekka strata ale warto dla paczek"
+              : " 🔴 Strata — zastanów się czy opłaca się grać powyżej tego progu"}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// GANG CHAT — live czat przez Firebase
+// ============================================================
+function GangChat({zalogowany, czlonkowie}) {
+  const { useState, useEffect, useRef } = require("react");
+  const [wiadomosci, setWiadomosci] = useState([]);
+  const [tekst, setTekst] = useState("");
+  const [wysylanie, setWysylanie] = useState(false);
+  const bottomRef = useRef(null);
+  const nick = zalogowany?.login || "?";
+
+  // Subskrybuj wiadomości z Firebase
+  useEffect(() => {
+    const { getFirestore, doc, onSnapshot, setDoc, getDoc } = require("firebase/firestore");
+    const db = getFirestore();
+    const chatDoc = doc(db, "gang_data", "chat");
+    const unsub = onSnapshot(chatDoc, (snap) => {
+      if (snap.exists()) {
+        const msgs = snap.data().wiadomosci || [];
+        setWiadomosci(msgs.slice(-100)); // max 100 wiadomości
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Auto-scroll na dół
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [wiadomosci]);
+
+  const wyslij = async () => {
+    if (!tekst.trim() || wysylanie) return;
+    setWysylanie(true);
+    playSound("click");
+    try {
+      const { getFirestore, doc, getDoc, setDoc } = require("firebase/firestore");
+      const db = getFirestore();
+      const chatDoc = doc(db, "gang_data", "chat");
+      const snap = await getDoc(chatDoc);
+      const stare = snap.exists() ? (snap.data().wiadomosci || []) : [];
+      const nowaWiad = {
+        id: Date.now(),
+        nick,
+        tekst: tekst.trim(),
+        czas: Date.now(),
+      };
+      const nowe = [...stare, nowaWiad].slice(-100);
+      await setDoc(chatDoc, { wiadomosci: nowe }, { merge: true });
+      setTekst("");
+    } catch(e) { console.error(e); }
+    setWysylanie(false);
+  };
+
+  const formatCzas = (ts) => {
+    const d = new Date(ts);
+    const teraz = new Date();
+    const sameDay = d.toDateString() === teraz.toDateString();
+    if (sameDay) return d.toLocaleTimeString("pl-PL", { hour:"2-digit", minute:"2-digit" });
+    return d.toLocaleDateString("pl-PL", { day:"numeric", month:"short" }) + " " + d.toLocaleTimeString("pl-PL", { hour:"2-digit", minute:"2-digit" });
+  };
+
+  // Kolory nicków
+  const nickColor = (n) => {
+    const colors = ["#ffd700","#0c6","#87CEEB","#da70d6","#fa0","#f55","#0ff","#ff69b4"];
+    let hash = 0;
+    for (let i = 0; i < n.length; i++) hash = n.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Grupuj kolejne wiadomości tego samego autora
+  const grouped = [];
+  wiadomosci.forEach((w, i) => {
+    const prev = wiadomosci[i-1];
+    const samaNick = prev?.nick === w.nick;
+    const blisko = prev && (w.czas - prev.czas) < 60000; // 1 minuta
+    grouped.push({ ...w, showNick: !samaNick || !blisko });
+  });
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"70vh",maxHeight:600}}>
+      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70033",borderRadius:10,padding:"10px 14px",marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>💬 Chat gangu — na żywo</div>
+        <div style={{fontSize:10,color:"#555"}}>Wiadomości widoczne dla wszystkich adminów • ostatnie 100</div>
+      </div>
+
+      {/* Lista wiadomości */}
+      <div style={{flex:1,overflowY:"auto",background:"rgba(0,0,0,0.2)",borderRadius:10,border:"1px solid #1a1a2e",padding:"10px 12px",marginBottom:10}}>
+        {wiadomosci.length === 0 && (
+          <div style={{textAlign:"center",padding:30,color:"#444",fontSize:12}}>
+            Brak wiadomości — napisz pierwszą! 👋
+          </div>
+        )}
+        {grouped.map((w, i) => {
+          const moja = normalizuj(w.nick) === normalizuj(nick);
+          const kolor = nickColor(w.nick);
+          return (
+            <div key={w.id} style={{
+              marginBottom: w.showNick ? 8 : 2,
+              display:"flex",
+              flexDirection: moja ? "row-reverse" : "row",
+              alignItems:"flex-end",gap:6,
+            }}>
+              {/* Avatar */}
+              {w.showNick && !moja && (
+                <div style={{
+                  width:28,height:28,borderRadius:"50%",flexShrink:0,
+                  background:`${kolor}22`,border:`1px solid ${kolor}55`,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:11,fontWeight:"bold",color:kolor,
+                }}>
+                  {w.nick[0]?.toUpperCase()}
+                </div>
+              )}
+              {!w.showNick && !moja && <div style={{width:28,flexShrink:0}}/>}
+
+              <div style={{maxWidth:"75%"}}>
+                {w.showNick && !moja && (
+                  <div style={{fontSize:10,color:kolor,fontWeight:"bold",marginBottom:2,marginLeft:4}}>
+                    {w.nick}
+                  </div>
+                )}
+                <div style={{
+                  padding:"7px 12px",borderRadius: moja ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+                  background: moja
+                    ? "linear-gradient(135deg,#b8860b,#ffd700)"
+                    : "rgba(255,255,255,0.07)",
+                  border: moja ? "none" : "1px solid #2a2a3a",
+                  color: moja ? "#000" : "#ddd",
+                  fontSize:13,lineHeight:1.4,wordBreak:"break-word",
+                }}>
+                  {w.tekst}
+                </div>
+                <div style={{fontSize:9,color:"#444",marginTop:2,textAlign:moja?"right":"left",marginLeft:moja?0:4}}>
+                  {formatCzas(w.czas)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef}/>
+      </div>
+
+      {/* Input */}
+      <div style={{display:"flex",gap:8}}>
+        <input
+          value={tekst}
+          onChange={e=>setTekst(e.target.value)}
+          onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();wyslij();}}}
+          placeholder="Napisz wiadomość..."
+          maxLength={500}
+          style={{
+            flex:1,padding:"10px 14px",background:"rgba(0,0,0,0.4)",
+            border:"1px solid #2a2a3a",borderRadius:24,color:"#fff",fontSize:13,
+            outline:"none",
+          }}
+        />
+        <button onClick={wyslij} disabled={wysylanie||!tekst.trim()} style={{
+          padding:"10px 18px",borderRadius:24,border:"none",cursor:"pointer",
+          background:tekst.trim()?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
+          color:tekst.trim()?"#000":"#444",fontWeight:"bold",fontSize:13,
+          transition:"all 0.15s",
+        }}>
+          {wysylanie?"⏳":"➤"}
+        </button>
+      </div>
     </div>
   );
 }
