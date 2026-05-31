@@ -229,3 +229,20 @@ button {
   transition-duration: 0.01ms !important;
   animation-duration: 0.01ms !important;
 }
+
+/* content-visibility — przeglądarka pomija rendering elementów poza ekranem */
+/* Największy zysk wydajności dla długich list */
+.gang-talia-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 200px;
+}
+
+/* Izoluj warstwy — zapobiega repaintowi całej strony przy scrollu */
+.gang-header-sticky {
+  contain: layout style;
+  transform: translateZ(0);
+}
+
+.gang-main-content {
+  contain: layout;
+}
