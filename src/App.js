@@ -83,24 +83,6 @@ function launchConfetti(duration = 2500) {
   setTimeout(() => { container.remove(); style.remove(); }, duration + 800);
 }
 
-// Hook animacji licznika (0 → wartość)
-function useCountUp(target, duration = 800, active = true) {
-  const { useState, useEffect } = require("react");
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!active || !target) return;
-    let start = null;
-    const step = (ts) => {
-      if (!start) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-      setVal(Math.round(target * eased));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [target, active, duration]);
-  return val;
-}
 
 const ADMIN_CREDENTIALS = [
   { login: "admin", haslo: "Twojastara00", rola: "admin" },
@@ -3160,7 +3142,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
       }
       setStreak(s);
     }).catch(()=>{});
-  }, [aktywnaWymiana, loginLowerHook]);
+  }, [aktywnaWymiana, loginLowerHook, zalogowany.login]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if(!aktywnaWymiana) return (
     <div style={{textAlign:"center",padding:50,color:"#555"}}>
@@ -5740,7 +5722,6 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
 // ADMIN DASHBOARD
 // ============================================================
 function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukture}) {
-  const { useState, useEffect } = require("react");
   const czlonkowie = dane?.czlonkowie || [];
   const posiadane = dane?.posiadane || {};
   const duplikaty = dane?.duplikaty || {};
@@ -6018,7 +5999,6 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
 // TAKTYKA SEZONU — notatki, sojusze, plany
 // ============================================================
 function TaktykaSezonu({zapiszStrukture}) {
-  const { useState, useEffect } = require("react");
   const [dane, setDane] = useState(null);
   const [zapisywanie, setZapisywanie] = useState(false);
 
@@ -6226,7 +6206,6 @@ function TaktykaSezonu({zapiszStrukture}) {
 // KALKULATOR OPŁACALNOŚCI EVENTU
 // ============================================================
 function KalkulatorEventu() {
-  const { useState } = require("react");
 
   const [progi, setProgi] = useState([
     { id:1, punkty:"1000", nagroda:"2", typ:"paczki" },
@@ -6397,7 +6376,6 @@ function KalkulatorEventu() {
 // GANG CHAT — live czat przez Firebase
 // ============================================================
 function GangChat({zalogowany, czlonkowie}) {
-  const { useState, useEffect, useRef } = require("react");
   const [wiadomosci, setWiadomosci] = useState([]);
   const [tekst, setTekst] = useState("");
   const [wysylanie, setWysylanie] = useState(false);
@@ -6406,7 +6384,7 @@ function GangChat({zalogowany, czlonkowie}) {
 
   // Subskrybuj wiadomości z Firebase
   useEffect(() => {
-    const { getFirestore, doc, onSnapshot, setDoc, getDoc } = require("firebase/firestore");
+    const { getFirestore, doc, onSnapshot } = require("firebase/firestore");
     const db = getFirestore();
     const chatDoc = doc(db, "gang_data", "chat");
     const unsub = onSnapshot(chatDoc, (snap) => {
@@ -6428,7 +6406,7 @@ function GangChat({zalogowany, czlonkowie}) {
     setWysylanie(true);
     playSound("click");
     try {
-      const { getFirestore, doc, getDoc, setDoc } = require("firebase/firestore");
+      const { getFirestore, doc, getDoc, setDoc: setDocFn } = require("firebase/firestore");
       const db = getFirestore();
       const chatDoc = doc(db, "gang_data", "chat");
       const snap = await getDoc(chatDoc);
@@ -6440,7 +6418,7 @@ function GangChat({zalogowany, czlonkowie}) {
         czas: Date.now(),
       };
       const nowe = [...stare, nowaWiad].slice(-100);
-      await setDoc(chatDoc, { wiadomosci: nowe }, { merge: true });
+      await setDocFn(chatDoc, { wiadomosci: nowe }, { merge: true });
       setTekst("");
     } catch(e) { console.error(e); }
     setWysylanie(false);
