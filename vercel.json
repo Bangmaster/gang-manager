@@ -1,8 +1,8 @@
 {
-  "functions": {
-    "api/gemini.js": {
-      "maxDuration": 60,
-      "memory": 1024
+  "rewrites": [
+    {
+      "source": "/((?!api|logo192.png|logo512.png|manifest.json|service-worker.js|favicon.ico).*)",
+      "destination": "/index.html"
     }
-  }
+  ]
 }
