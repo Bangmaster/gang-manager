@@ -3142,7 +3142,25 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
 
 function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszKarte}) {
   const [zamykanie,setZamykanie]=useState(false);
-  const [podmienIdx,setPodmienIdx]=useState(null); // indeks wymiany do podmiany
+  const [podmienIdx,setPodmienIdx]=useState(null);
+  const [streak, setStreak] = useState(0);
+
+  const loginLowerHook = normalizuj(zalogowany.login);
+  useEffect(() => {
+    if (!aktywnaWymiana) return;
+    const wymianyNick = Object.keys(
+      (aktywnaWymiana.wymiany||[]).reduce((acc,w)=>{acc[w.od]=1;return acc;},{})
+    ).find(nick => normalizuj(nick) === loginLowerHook) || zalogowany.login;
+    pobierzHistorieWymian().then(historia => {
+      let s = 0;
+      for (const w of historia) {
+        const kPotw = Object.keys(w.potwierdzone||{}).find(k => normalizuj(k) === normalizuj(wymianyNick));
+        if (kPotw && w.potwierdzone[kPotw]) s++;
+        else break;
+      }
+      setStreak(s);
+    }).catch(()=>{});
+  }, [aktywnaWymiana, loginLowerHook]);
 
   if(!aktywnaWymiana) return (
     <div style={{textAlign:"center",padding:50,color:"#555"}}>
@@ -3173,20 +3191,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
   const mojePozycje = poNadawcach[mojNick];
   const potwierdzonychCount=Object.keys(potwierdzone).filter(k=>potwierdzone[k]).length;
 
-  // Streak — ile wymian z rzędu zalogowany potwierdził (z historii)
-  const [streak, setStreak] = useState(0);
-  useEffect(() => {
-    pobierzHistorieWymian().then(historia => {
-      let s = 0;
-      for (const w of historia) {
-        const potw = w.potwierdzone || {};
-        const kPotw = Object.keys(potw).find(k => normalizuj(k) === normalizuj(mojNick));
-        if (kPotw && potw[kPotw]) s++;
-        else break;
-      }
-      setStreak(s);
-    }).catch(()=>{});
-  }, [mojNick]);
+
   const wszystkichNadawcow=Object.keys(poNadawcach).length;
 
   const potwierdz=async()=>{
