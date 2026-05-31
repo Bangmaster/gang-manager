@@ -6224,13 +6224,11 @@ function KalkulatorEventu() {
   ]);
   const [nowyProg, setNowyProg] = useState({ punkty:"", nagroda:"", typ:"paczki" });
   const [pokazDodaj, setPokazDodaj] = useState(false);
-  const [aktywneProgi, setAktywneProgi] = useState(new Set());
 
   const m = parseFloat(mnoznik) || 1;
   const p1 = parseFloat(szansa1) / 100 || 0.4;
   const p2 = parseFloat(szansa2) / 100 || 0.15;
   const p3 = parseFloat(szansa3) / 100 || 0.05;
-  const p0 = Math.max(0, 1 - p1 - p2 - p3); // nic nie wypada
   const wP = parseFloat(wartPaczki) || 150;
   const ammo = parseFloat(ammoMam) || 0;
 
