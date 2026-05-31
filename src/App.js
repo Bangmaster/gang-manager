@@ -1,5 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import "./gangStyles.css";
+
+// Page Visibility API — zapobiega lagowi przy powrocie do karty
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      // Karta nieaktywna — pauzuj animacje
+      document.body.style.animationPlayState = "paused";
+    } else {
+      // Powrót do karty — przez 400ms wyłącz transitions żeby nie było skoku
+      document.body.classList.add("reducing-motion");
+      document.body.style.animationPlayState = "running";
+      setTimeout(() => {
+        document.body.classList.remove("reducing-motion");
+      }, 400);
+    }
+  });
+}
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
@@ -280,7 +297,9 @@ export default function App() {
     if (!zalogowany) return;
     const login = zalogowany.login;
     setOnline(login);
-    const interval = setInterval(() => setOnline(login), 30000);
+    const interval = setInterval(() => {
+      if (!document.hidden) setOnline(login); // tylko gdy karta aktywna
+    }, 30000);
     const unsub = subscribeOnline(setStatusOnline);
     const unsubArchiwum = subscribeArchiwumWalk(setArchiwumWalk);
     const handleUnload = () => setOffline(login);
