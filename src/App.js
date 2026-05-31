@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, startTransition } from "react";
 import "./gangStyles.css";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke } from "./firebase";
 import OcrView from "./OcrView";
@@ -280,7 +280,7 @@ export default function App() {
   const [historiaWymian, setHistoriaWymian] = useState([]);
 
   useEffect(() => {
-    const unsub = subscribeHistoria(setHistoriaWymian);
+    const unsub = subscribeHistoria(d => startTransition(() => setHistoriaWymian(d)));
     return () => unsub();
   }, []);
   const [wynik, setWynik] = useState(null);
@@ -303,12 +303,12 @@ export default function App() {
     let lastOnlineUpdate = 0;
     const unsub = subscribeOnline((newStatus) => {
       const now = Date.now();
-      if (now - lastOnlineUpdate > 10000) { // max raz na 10s
+      if (now - lastOnlineUpdate > 10000) {
         lastOnlineUpdate = now;
-        setStatusOnline(newStatus);
+        startTransition(() => setStatusOnline(newStatus));
       }
     });
-    const unsubArchiwum = subscribeArchiwumWalk(setArchiwumWalk);
+    const unsubArchiwum = subscribeArchiwumWalk(d => startTransition(() => setArchiwumWalk(d)));
     const handleUnload = () => setOffline(login);
     window.addEventListener("beforeunload", handleUnload);
 
@@ -344,7 +344,7 @@ export default function App() {
         poprzednieLogi = logi;
       });
       // Subskrybuj czarną listę
-      subscribeZablokowane(setZablokowane);
+      subscribeZablokowane(d => startTransition(() => setZablokowane(d)));
     }
 
     return () => {
@@ -398,7 +398,7 @@ export default function App() {
         // Debounce — aktualizuj state max raz na 500ms
         if (daneTimer) clearTimeout(daneTimer);
         daneTimer = setTimeout(() => {
-          if (pendingDane) setDane(pendingDane);
+          if (pendingDane) startTransition(() => setDane(pendingDane));
           pendingDane = null;
         }, 300);
       });
@@ -4274,7 +4274,7 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
         }
       } catch {}
     }
-    const unsub = subscribeHistoria(setHistoria);
+    const unsub = subscribeHistoria(d => startTransition(() => setHistoria(d)));
     return () => unsub();
   }, []);
 
@@ -4643,7 +4643,7 @@ function KalendarzEventow() {
 
   // Subskrypcja osobnego dokumentu kalendarza
   useEffect(() => {
-    const unsub = subscribeKalendarz(setEventy);
+    const unsub = subscribeKalendarz(d => startTransition(() => setEventy(d)));
     return () => unsub();
   }, []);
 
@@ -5624,7 +5624,7 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
   const [pokazTylkoNowe, setPokazTylkoNowe] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeLogi(setLogi);
+    const unsub = subscribeLogi(d => startTransition(() => setLogi(d)));
     return () => unsub();
   }, []);
 
@@ -6040,7 +6040,7 @@ function TaktykaSezonu({zapiszStrukture}) {
   const [tempNotatki, setTempNotatki] = useState("");
 
   useEffect(() => {
-    const unsub = subscribeTaktyka(setDane);
+    const unsub = subscribeTaktyka(d => startTransition(() => setDane(d)));
     return () => unsub();
   }, []);
 
@@ -6580,7 +6580,7 @@ function GangChat({zalogowany, czlonkowie}) {
   const nick = zalogowany?.login || "?";
 
   useEffect(() => {
-    const unsub = subscribeChat(msgs => setWiadomosci(msgs.slice(-100)));
+    const unsub = subscribeChat(msgs => startTransition(() => setWiadomosci(msgs.slice(-100))));
     return () => unsub();
   }, []);
 
