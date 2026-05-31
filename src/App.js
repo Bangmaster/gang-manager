@@ -449,19 +449,14 @@ export default function App() {
       {/* Tło — scalony w jeden element dla lepszej wydajności */}
       <div style={{
         position:"fixed",top:0,left:0,right:0,bottom:0,
-        background:`
-          radial-gradient(ellipse at 20% 20%, rgba(138,43,226,0.07) 0%, transparent 50%),
-          radial-gradient(ellipse at 80% 80%, rgba(184,134,11,0.05) 0%, transparent 50%),
-          linear-gradient(180deg, #0a0a18 0%, #0d0d1a 50%, #0a0a14 100%)
-        `,
+        background:"#0a0a16",
         zIndex:0,pointerEvents:"none",
-        willChange:"transform",
         transform:"translateZ(0)",
       }}/>
 
 
 
-      <div style={{position:"relative",zIndex:1}}>
+      <div style={{position:"relative",zIndex:1,isolation:"isolate"}}>
 
       {/* Alert nowego urządzenia — tylko dla admina */}
       {alertNoweUrzadzenie && zalogowany?.rola === "admin" && (
@@ -495,13 +490,13 @@ export default function App() {
       )}
 
       <div style={{
-        background:"linear-gradient(180deg,rgba(0,0,0,0.92) 0%,rgba(10,5,25,0.95) 100%)",
+        background:"rgba(0,0,0,0.95)",
         padding:"12px 16px",
-        borderBottom:"2px solid transparent",
-        backgroundClip:"padding-box",
-        boxShadow:"0 2px 0 #b8860b, 0 3px 0 #7a4a00, 0 0 30px rgba(184,134,11,0.15)",
+        borderBottom:"2px solid #b8860b",
         display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,
         position:"sticky",top:0,zIndex:100,
+        transform:"translateZ(0)",
+        willChange:"transform",
       }}>
         <div>
           <div style={{
@@ -573,7 +568,7 @@ export default function App() {
         ))}
       </div>
 
-      <div style={{padding:14,maxWidth:900,margin:"0 auto"}}>
+      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
@@ -928,7 +923,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
             );
 
             return (
-              <div key={talia.id} style={{
+              <div key={talia.id} className="gang-talia-card" style={{
                 marginBottom:10,borderRadius:8,padding:"10px 12px",
                 background:brak===0?"rgba(0,200,100,0.1)":brak<=2?"rgba(255,165,0,0.09)":"rgba(255,255,255,0.02)",
                 border:brak===0?"1px solid #0c655":brak<=2?"1px solid #fa050":"1px solid #202035",
