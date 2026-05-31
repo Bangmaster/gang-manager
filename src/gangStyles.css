@@ -211,3 +211,21 @@ button {
   will-change: transform;
   transform: translateZ(0);
 }
+
+/* Dziedzicz stan pauzy animacji od body (Page Visibility API) */
+*, *::before, *::after {
+  animation-play-state: inherit;
+}
+
+/* Scroll performance — warstwa kompozytowania dla głównej treści */
+.gang-scroll-container {
+  transform: translateZ(0);
+  will-change: scroll-position;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Wyłącz transitions przy pierwszym renderze po powrocie */
+.reducing-motion * {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+}
