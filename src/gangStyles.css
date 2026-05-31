@@ -168,3 +168,46 @@ button:active {
 .gold-glow {
   animation: pulseGold 3s ease-in-out infinite;
 }
+
+/* ============================================================
+   OPTYMALIZACJA WYDAJNOŚCI
+   ============================================================ */
+
+/* GPU acceleration dla głównej zawartości */
+#root {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Wyłącz ciężkie animacje podczas scrollowania */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Ogranicz backdrop-filter do miejsc gdzie naprawdę potrzebny */
+/* Zamiast blur na wielu elementach - tylko modalne */
+.gang-modal-backdrop {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Scroll performance - zawartość nie repaintuje tła */
+.gang-content {
+  contain: layout style;
+  will-change: scroll-position;
+}
+
+/* Animacje tylko na elementach które są widoczne */
+.wymiana-card,
+.badge-new {
+  contain: layout;
+}
+
+/* Przyciski — lżejsze przejścia */
+button {
+  will-change: transform;
+  transform: translateZ(0);
+}
