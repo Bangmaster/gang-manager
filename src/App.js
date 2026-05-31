@@ -6187,168 +6187,398 @@ function TaktykaSezonu({zapiszStrukture}) {
 // KALKULATOR OPŁACALNOŚCI EVENTU
 // ============================================================
 function KalkulatorEventu() {
+  // =====================================================
+  // MECHANIKA SLOTA:
+  // - Kręcisz i losowo wypada 1, 2 lub 3 symbole eventu
+  // - 1 symbol = mnożnik × 1 pkt
+  // - 2 symbole = mnożnik × 2 pkt (NIE podwójne — tylko 2)
+  // - 3 symbole = mnożnik × 10 pkt (JACKPOT — 10x nie 3x!)
+  // - Koszt 1 kręcenia = mnożnik × 1 ammo
+  // =====================================================
 
+  const [mnoznik, setMnoznik] = useState("10");
+  const [szansa1, setSzansa1] = useState("40");   // % szansa na 1 symbol
+  const [szansa2, setSzansa2] = useState("15");   // % szansa na 2 symbole
+  const [szansa3, setSzansa3] = useState("5");    // % szansa na 3 symbole (jackpot)
+  // Licznik obserwacji
+  const [licz0, setLicz0] = useState(0);
+  const [licz1, setLicz1] = useState(0);
+  const [licz2, setLicz2] = useState(0);
+  const [licz3, setLicz3] = useState(0);
+  const [pokazLicznik, setPokazLicznik] = useState(false);
+  const lacznieObs = licz0 + licz1 + licz2 + licz3;
+  const aktualizujSzanse = () => {
+    if (!lacznieObs) return;
+    setSzansa1(((licz1/lacznieObs)*100).toFixed(1));
+    setSzansa2(((licz2/lacznieObs)*100).toFixed(1));
+    setSzansa3(((licz3/lacznieObs)*100).toFixed(1));
+  };
+  const [ammoMam, setAmmoMam] = useState("5000"); // ile ammo posiadasz
+  const [wartPaczki, setWartPaczki] = useState("150"); // wartość paczki w ammo
   const [progi, setProgi] = useState([
-    { id:1, punkty:"1000", nagroda:"2", typ:"paczki" },
-    { id:2, punkty:"3000", nagroda:"5", typ:"paczki" },
-    { id:3, punkty:"6000", nagroda:"10", typ:"paczki" },
-    { id:4, punkty:"10000", nagroda:"3", typ:"klucze" },
-    { id:5, punkty:"15000", nagroda:"20", typ:"paczki" },
+    { id:1, punkty:500,   nagroda:1,  typ:"paczki" },
+    { id:2, punkty:1500,  nagroda:2,  typ:"paczki" },
+    { id:3, punkty:3000,  nagroda:4,  typ:"paczki" },
+    { id:4, punkty:6000,  nagroda:8,  typ:"paczki" },
+    { id:5, punkty:10000, nagroda:15, typ:"paczki" },
   ]);
-  const [wartPaczki, setWartPaczki] = useState("150"); // ammo za paczkę
-  const [wartKlucze, setWartKlucze] = useState("500"); // ammo za klucz
-  const [ammoNaPunkt, setAmmoNaPunkt] = useState("10"); // ile ammo daje 1 punkt
-  const [pokazDodaj, setPokazDodaj] = useState(false);
   const [nowyProg, setNowyProg] = useState({ punkty:"", nagroda:"", typ:"paczki" });
+  const [pokazDodaj, setPokazDodaj] = useState(false);
+  const [aktywneProgi, setAktywneProgi] = useState(new Set());
+
+  const m = parseFloat(mnoznik) || 1;
+  const p1 = parseFloat(szansa1) / 100 || 0.4;
+  const p2 = parseFloat(szansa2) / 100 || 0.15;
+  const p3 = parseFloat(szansa3) / 100 || 0.05;
+  const p0 = Math.max(0, 1 - p1 - p2 - p3); // nic nie wypada
+  const wP = parseFloat(wartPaczki) || 150;
+  const ammo = parseFloat(ammoMam) || 0;
+
+  // Oczekiwana liczba punktów na 1 kręcenie przy mnożniku 1
+  // E[pkt/krecenie] = p1*1 + p2*2 + p3*10
+  const ePktNa1 = p1 * 1 + p2 * 2 + p3 * 10;
+  // Przy mnożniku m: każde kręcenie kosztuje m ammo i daje E[pkt] = ePktNa1 * m
+  const ePktNaKrecenie = ePktNa1 * m;
+  const koszt1krecenia = m; // ammo
+  // Oczekiwana liczba punktów na 1 ammo (niezależna od mnożnika!)
+  const ePktNaAmmo = ePktNa1; // mnożnik się skraca!
+
+  // Ile kręceń i ammo potrzeba na każdy próg
+  const progsSorted = [...progi].sort((a,b) => a.punkty - b.punkty);
+
+  const analiza = progsSorted.map((p, i) => {
+    const pktDoProgu = p.punkty;
+    // Oczekiwana liczba kręceń do zebrania pktDoProgu punktów
+    const krecenDoProg = ePktNaKrecenie > 0 ? Math.ceil(pktDoProgu / ePktNaKrecenie) : 999999;
+    const ammoDoProg = krecenDoProg * koszt1krecenia;
+
+    // Łączna wartość nagród od 0 do tego progu
+    const lacznaWart = progsSorted.slice(0, i+1).reduce((s, pp) => {
+      return s + (pp.typ === "paczki" ? (parseFloat(pp.nagroda)||0) * wP : (parseFloat(pp.nagroda)||0) * 500);
+    }, 0);
+
+    // Wartość przyrostu (nagroda za TEN próg vs ammo od poprzedniego do tego)
+    const prevPkt = i > 0 ? progsSorted[i-1].punkty : 0;
+    const pktPrzyrost = p.punkty - prevPkt;
+    const ammoPrzyrost = ePktNaAmmo > 0 ? Math.ceil(pktPrzyrost / ePktNaAmmo) : 999999;
+    const wartNagrody = p.typ === "paczki" ? (parseFloat(p.nagroda)||0) * wP : (parseFloat(p.nagroda)||0) * 500;
+    const oplac = ammoPrzyrost > 0 ? (wartNagrody / ammoPrzyrost * 100).toFixed(0) : "∞";
+    const mozemyDojsc = ammo >= ammoDoProg;
+
+    return { ...p, pktDoProgu, krecenDoProg, ammoDoProg, lacznaWart, oplac: parseFloat(oplac), wartNagrody, mozemyDojsc };
+  });
+
+  // Optymalny próg = najwyższa opłacalność którą możemy osiągnąć
+  const osiagalne = analiza.filter(a => a.mozemyDojsc);
+  const optymalny = osiagalne.reduce((best, a) => a.oplac > (best?.oplac||0) ? a : best, null) || analiza[0];
+
+  // Symulacja: ile paczek zdobędziemy wydając całe ammo do konkretnego progu
+  const maxProg = optymalny;
+  const paczkiLacznie = maxProg ? progsSorted.slice(0, progsSorted.indexOf(maxProg)+1)
+    .reduce((s,p) => s + (p.typ==="paczki" ? parseFloat(p.nagroda)||0 : 0), 0) : 0;
+
+  // Szanse na jackpot w serii kręceń
+  const krecenDoMax = maxProg?.krecenDoProg || 0;
+  const expectedJackpoty = Math.round(krecenDoMax * p3 * 10) / 10;
 
   const dodajProg = () => {
     if (!nowyProg.punkty || !nowyProg.nagroda) return;
-    setProgi(prev => [...prev, { id: Date.now(), ...nowyProg }].sort((a,b)=>parseInt(a.punkty)-parseInt(b.punkty)));
+    setProgi(prev => [...prev, { id: Date.now(), punkty: parseInt(nowyProg.punkty), nagroda: parseFloat(nowyProg.nagroda), typ: nowyProg.typ }]
+      .sort((a,b) => a.punkty - b.punkty));
     setNowyProg({ punkty:"", nagroda:"", typ:"paczki" });
     setPokazDodaj(false);
   };
 
-  const usunProg = (id) => setProgi(prev => prev.filter(p => p.id !== id));
-
-  // Obliczenia
-  const wP = parseFloat(wartPaczki) || 150;
-  const wK = parseFloat(wartKlucze) || 500;
-  const aNaPkt = parseFloat(ammoNaPunkt) || 10;
-
-  const progsSorted = [...progi].sort((a,b) => parseInt(a.punkty)-parseInt(b.punkty));
-
-  // Dla każdego progu: łączna wartość nagrody od 0, koszt w ammo, opłacalność
-  const analiza = progsSorted.map((p, i) => {
-    const pkt = parseInt(p.punkty) || 0;
-    const nagroda = parseFloat(p.nagroda) || 0;
-    const wart = p.typ === "paczki" ? nagroda * wP : nagroda * wK;
-    const koszAmmo = pkt * aNaPkt; // ammo wydane na dojście do tego progu
-
-    // Łączna wartość od 0 do tego progu
-    const lacznaWart = progsSorted.slice(0, i+1).reduce((s,pp) => {
-      const n = parseFloat(pp.nagroda)||0;
-      return s + (pp.typ==="paczki" ? n*wP : n*wK);
-    }, 0);
-
-    // Opłacalność = łączna wartość / koszt ammo
-    const oplac = koszAmmo > 0 ? (lacznaWart / koszAmmo * 100).toFixed(1) : "∞";
-    const przyrost = i === 0 ? wart : wart / ((pkt - parseInt(progsSorted[i-1]?.punkty||0)) * aNaPkt) * 100;
-
-    return { ...p, pkt, nagroda, wart, koszAmmo, lacznaWart, oplac, przyrost };
-  });
-
-  // Optymalny próg = najwyższy przyrost wartości per ammo
-  const optymalny = analiza.reduce((best, a) => a.przyrost > (best?.przyrost||0) ? a : best, null);
-
-  const kolorOplac = (o) => {
-    const v = parseFloat(o);
-    if (v >= 100) return "#0c6";
-    if (v >= 60) return "#fa0";
-    return "#f55";
-  };
+  const kolorOplac = (v) => v >= 100 ? "#0c6" : v >= 60 ? "#fa0" : "#f55";
+  const MNOZNIKI = [1,2,3,5,10,15,25,30,50];
 
   return (
     <div>
       <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:"bold",color:"#6496ff",marginBottom:2}}>🧮 Kalkulator opłacalności eventu</div>
-        <div style={{fontSize:11,color:"#555"}}>Wpisz progi eventu i nagrody — apka obliczy który próg opłaca się najbardziej względem wydanego ammo</div>
-      </div>
-
-      {/* Parametry */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontSize:12,fontWeight:"bold",color:"#aaa",marginBottom:8}}>⚙️ Parametry</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-          {[
-            {label:"💰 Ammo za paczkę",val:wartPaczki,set:setWartPaczki},
-            {label:"🗝️ Ammo za klucz",val:wartKlucze,set:setWartKlucze},
-            {label:"⚡ Ammo / 1 punkt",val:ammoNaPunkt,set:setAmmoNaPunkt},
-          ].map(f => (
-            <div key={f.label}>
-              <div style={{fontSize:10,color:"#666",marginBottom:3}}>{f.label}</div>
-              <input type="number" value={f.val} onChange={e=>f.set(e.target.value)}
-                style={{width:"100%",padding:"6px 8px",background:"#12122a",border:"1px solid #333",
-                  borderRadius:5,color:"#ffd700",fontSize:13,fontWeight:"bold",boxSizing:"border-box"}}/>
-            </div>
-          ))}
+        <div style={{fontSize:14,fontWeight:"bold",color:"#6496ff",marginBottom:4}}>🎰 Kalkulator eventu — slot</div>
+        <div style={{fontSize:11,color:"#555",lineHeight:1.6}}>
+          Oblicza oczekiwaną liczbę punktów i ammo na podstawie szans losowania.
+          Szanse możesz szacować z obserwacji — ile razy na 100 kręceń wypada 1/2/3 symbole.
         </div>
       </div>
 
-      {/* Tabela progów */}
+      {/* Mnożnik */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>⚡ Mnożnik kręcenia</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+          {MNOZNIKI.map(n => (
+            <button key={n} onClick={()=>setMnoznik(String(n))} style={{
+              padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:"bold",
+              background: parseFloat(mnoznik)===n ? "linear-gradient(135deg,#b8860b,#ffd700)" : "rgba(255,255,255,0.05)",
+              border: parseFloat(mnoznik)===n ? "none" : "1px solid #2a2a3a",
+              color: parseFloat(mnoznik)===n ? "#000" : "#666",
+            }}>×{n}</button>
+          ))}
+        </div>
+        <div style={{fontSize:11,color:"#555"}}>
+          Koszt 1 kręcenia: <strong style={{color:"#fa0"}}>×{m} ammo</strong> •
+          Punkty za 3 symbole: <strong style={{color:"#0c6"}}>×{m*10} pkt</strong>
+        </div>
+      </div>
+
+      {/* Licznik obserwacji */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:pokazLicznik?10:0}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#aaa"}}>
+            📋 Licznik kręceń
+            {lacznieObs>0&&<span style={{fontSize:10,color:"#0c6",marginLeft:6}}>{lacznieObs} obserwacji</span>}
+          </div>
+          <button onClick={()=>setPokazLicznik(p=>!p)} style={{
+            fontSize:11,padding:"3px 10px",borderRadius:5,cursor:"pointer",
+            background:pokazLicznik?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
+            border:pokazLicznik?"1px solid #ffd700":"1px solid #333",
+            color:pokazLicznik?"#ffd700":"#666",
+          }}>{pokazLicznik?"▼ Schowaj":"▶ Otwórz"}</button>
+        </div>
+        {pokazLicznik&&(
+          <div>
+            <div style={{fontSize:10,color:"#555",marginBottom:8,lineHeight:1.5}}>
+              Kręć na ×1 i klikaj przycisk po każdym wyniku. Po 30-50 kręceniach kliknij "Zastosuj" — apka wyliczy szanse.
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:10}}>
+              {[
+                {label:"💨 Nic",count:licz0,set:setLicz0,color:"#555"},
+                {label:"🍋 1 symbol",count:licz1,set:setLicz1,color:"#fa0"},
+                {label:"🍋🍋 Dwa",count:licz2,set:setLicz2,color:"#ffd700"},
+                {label:"🍋🍋🍋 Jackpot",count:licz3,set:setLicz3,color:"#0c6"},
+              ].map(b=>(
+                <div key={b.label} style={{textAlign:"center"}}>
+                  <button onClick={()=>b.set(p=>p+1)} style={{
+                    width:"100%",padding:"12px 4px",borderRadius:8,cursor:"pointer",
+                    background:`${b.color}22`,border:`2px solid ${b.color}55`,
+                    color:b.color,fontSize:11,fontWeight:"bold",
+                    display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+                  }}>
+                    <span style={{fontSize:9}}>{b.label}</span>
+                    <span style={{fontSize:22}}>{b.count}</span>
+                  </button>
+                  <button onClick={()=>b.set(p=>Math.max(0,p-1))}
+                    style={{marginTop:2,fontSize:9,padding:"1px 8px",background:"rgba(255,50,50,0.1)",
+                      border:"none",borderRadius:3,color:"#f5544488",cursor:"pointer"}}>−1</button>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <div style={{flex:1,fontSize:11,color:"#555"}}>
+                Łącznie: <strong style={{color:"#ddd"}}>{lacznieObs}</strong> kręceń
+                {lacznieObs>0&&<span style={{color:"#888",marginLeft:6}}>
+                  ({((licz1+licz2+licz3)/Math.max(1,lacznieObs)*100).toFixed(0)}% trafiło symbol)
+                </span>}
+              </div>
+              <button onClick={()=>{setLicz0(0);setLicz1(0);setLicz2(0);setLicz3(0);}}
+                style={{padding:"5px 10px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",
+                  borderRadius:5,color:"#f55",cursor:"pointer",fontSize:11}}>Resetuj</button>
+              <button onClick={aktualizujSzanse} disabled={!lacznieObs}
+                style={{padding:"5px 14px",background:lacznieObs?"linear-gradient(135deg,#0c6,#0fa)":"rgba(255,255,255,0.05)",
+                  border:"none",borderRadius:5,color:lacznieObs?"#000":"#444",
+                  cursor:lacznieObs?"pointer":"default",fontWeight:"bold",fontSize:11}}>
+                ✓ Zastosuj szanse
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Szanse losowania */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#aaa",marginBottom:8}}>
+          🎲 Szanse losowania (szacunkowe)
+          <span style={{fontSize:10,color:"#555",fontWeight:"normal",marginLeft:6}}>— obserwuj i wpisuj swoje dane</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
+          {[
+            {label:"🍋 1 symbol",val:szansa1,set:setSzansa1,color:"#fa0",pkt:`${m} pkt`},
+            {label:"🍋🍋 2 symbole",val:szansa2,set:setSzansa2,color:"#ffd700",pkt:`${m*2} pkt`},
+            {label:"🍋🍋🍋 JACKPOT",val:szansa3,set:setSzansa3,color:"#0c6",pkt:`${m*10} pkt`},
+            {label:"💨 Nic",val:String(Math.max(0,100-parseFloat(szansa1||0)-parseFloat(szansa2||0)-parseFloat(szansa3||0)).toFixed(0)),
+             set:null,color:"#555",pkt:"0 pkt"},
+          ].map(f => (
+            <div key={f.label} style={{background:"rgba(0,0,0,0.2)",borderRadius:6,padding:"8px 6px",textAlign:"center"}}>
+              <div style={{fontSize:9,color:f.color,marginBottom:4,lineHeight:1.3}}>{f.label}</div>
+              {f.set ? (
+                <div style={{display:"flex",alignItems:"center",gap:2}}>
+                  <input type="number" value={f.val} onChange={e=>f.set(e.target.value)} min="0" max="100"
+                    style={{width:"100%",padding:"4px 4px",background:"#12122a",border:`1px solid ${f.color}44`,
+                      borderRadius:4,color:f.color,fontSize:14,fontWeight:"bold",textAlign:"center"}}/>
+                  <span style={{fontSize:10,color:"#555"}}>%</span>
+                </div>
+              ) : (
+                <div style={{fontSize:16,fontWeight:"bold",color:f.color}}>{f.val}%</div>
+              )}
+              <div style={{fontSize:9,color:"#444",marginTop:3}}>{f.pkt}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:8,padding:"6px 10px",background:"rgba(255,215,0,0.05)",borderRadius:6,border:"1px solid #ffd70022"}}>
+          <span style={{fontSize:11,color:"#888"}}>Oczekiwane pkt / ammo: </span>
+          <strong style={{color:"#ffd700",fontSize:13}}>{ePktNaAmmo.toFixed(2)}</strong>
+          <span style={{fontSize:10,color:"#555",marginLeft:6}}>— niezależnie od mnożnika!</span>
+        </div>
+      </div>
+
+      {/* Posiadane ammo */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#aaa",marginBottom:8}}>💰 Twoje zasoby</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div>
+            <div style={{fontSize:10,color:"#555",marginBottom:3}}>🔫 Posiadane ammo</div>
+            <input type="number" value={ammoMam} onChange={e=>setAmmoMam(e.target.value)}
+              style={{width:"100%",padding:"8px 10px",background:"#12122a",border:"1px solid #fa033",
+                borderRadius:6,color:"#fa0",fontSize:15,fontWeight:"bold",boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#555",marginBottom:3}}>📦 Wartość paczki (w ammo)</div>
+            <input type="number" value={wartPaczki} onChange={e=>setWartPaczki(e.target.value)}
+              style={{width:"100%",padding:"8px 10px",background:"#12122a",border:"1px solid #87CEEB33",
+                borderRadius:6,color:"#87CEEB",fontSize:15,fontWeight:"bold",boxSizing:"border-box"}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Progi eventu */}
       <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{fontSize:12,fontWeight:"bold",color:"#aaa"}}>📊 Progi eventu</div>
           <button onClick={()=>setPokazDodaj(!pokazDodaj)} style={{fontSize:11,padding:"3px 10px",
             background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b55",borderRadius:5,
-            color:"#ffd700",cursor:"pointer"}}>+ Dodaj próg</button>
+            color:"#ffd700",cursor:"pointer"}}>+ Dodaj</button>
         </div>
 
         {pokazDodaj && (
-          <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",background:"rgba(255,215,0,0.04)",padding:8,borderRadius:6,border:"1px solid #ffd70022"}}>
+          <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",padding:8,borderRadius:6,background:"rgba(255,215,0,0.04)",border:"1px solid #ffd70022"}}>
             <input type="number" value={nowyProg.punkty} onChange={e=>setNowyProg(p=>({...p,punkty:e.target.value}))}
-              placeholder="Punkty" style={{width:90,padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#fff",fontSize:12}}/>
+              placeholder="Wymagane pkt" style={{flex:1,minWidth:80,padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#fff",fontSize:12}}/>
             <input type="number" value={nowyProg.nagroda} onChange={e=>setNowyProg(p=>({...p,nagroda:e.target.value}))}
-              placeholder="Ilość" style={{width:70,padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#fff",fontSize:12}}/>
+              placeholder="Ilość" style={{width:60,padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#fff",fontSize:12}}/>
             <select value={nowyProg.typ} onChange={e=>setNowyProg(p=>({...p,typ:e.target.value}))}
               style={{padding:"6px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#87CEEB",fontSize:12}}>
               <option value="paczki">📦 Paczki</option>
               <option value="klucze">🗝️ Klucze</option>
+              <option value="ammo">🔫 Ammo</option>
             </select>
-            <button onClick={dodajProg} style={{padding:"6px 12px",background:"rgba(0,200,100,0.15)",border:"1px solid #0c633",borderRadius:5,color:"#0c6",cursor:"pointer",fontWeight:"bold",fontSize:12}}>✓</button>
+            <button onClick={dodajProg} style={{padding:"6px 12px",background:"rgba(0,200,100,0.15)",border:"1px solid #0c633",borderRadius:5,color:"#0c6",cursor:"pointer",fontWeight:"bold"}}>✓</button>
           </div>
         )}
 
-        {/* Nagłówek tabeli */}
-        <div style={{display:"grid",gridTemplateColumns:"60px 60px 80px 70px 90px 70px 28px",gap:4,padding:"4px 6px",marginBottom:4}}>
-          {["Punkty","Nagroda","Typ","Koszt ammo","Łączna wart.","Opłacal.",""].map(h=>(
-            <div key={h} style={{fontSize:9,color:"#444",textAlign:"center"}}>{h}</div>
-          ))}
-        </div>
-
+        {/* Lista progów z analizą */}
         {analiza.map((a, i) => {
           const isOpt = a.id === optymalny?.id;
+          const mozna = a.mozemyDojsc;
           return (
             <div key={a.id} style={{
-              display:"grid",gridTemplateColumns:"60px 60px 80px 70px 90px 70px 28px",
-              gap:4,padding:"6px 6px",marginBottom:3,borderRadius:6,alignItems:"center",
-              background: isOpt ? "rgba(255,215,0,0.1)" : "rgba(255,255,255,0.02)",
-              border: isOpt ? "1px solid #ffd70055" : "1px solid transparent",
+              display:"flex",alignItems:"center",gap:6,padding:"8px 10px",marginBottom:4,borderRadius:8,
+              background: isOpt ? "rgba(255,215,0,0.08)" : mozna ? "rgba(0,200,100,0.03)" : "rgba(255,50,50,0.03)",
+              border: isOpt ? "1px solid #ffd70055" : mozna ? "1px solid #0c6118" : "1px solid #f5544422",
             }}>
-              <div style={{fontSize:12,color:"#ddd",textAlign:"center",fontWeight:isOpt?"bold":"normal"}}>{a.pkt.toLocaleString()}</div>
-              <div style={{fontSize:12,color:"#ddd",textAlign:"center"}}>{a.nagroda}</div>
-              <div style={{fontSize:11,textAlign:"center",color:a.typ==="paczki"?"#87CEEB":"#ffd700"}}>
-                {a.typ==="paczki"?"📦 paczki":"🗝️ klucze"}
+              {/* Próg */}
+              <div style={{width:55,flexShrink:0}}>
+                <div style={{fontSize:11,fontWeight:"bold",color: mozna?"#ddd":"#555"}}>{a.pktDoProgu.toLocaleString()}</div>
+                <div style={{fontSize:9,color:"#444"}}>pkt</div>
               </div>
-              <div style={{fontSize:11,color:"#888",textAlign:"center"}}>{a.koszAmmo.toLocaleString()}</div>
-              <div style={{fontSize:12,fontWeight:"bold",color:"#fa0",textAlign:"center"}}>{a.lacznaWart.toLocaleString()}</div>
-              <div style={{fontSize:12,fontWeight:"bold",color:kolorOplac(a.oplac),textAlign:"center"}}>
-                {a.oplac}%
-                {isOpt && <span style={{fontSize:8,display:"block",color:"#ffd700"}}>OPTYMALNY</span>}
+              {/* Nagroda */}
+              <div style={{width:60,flexShrink:0,textAlign:"center"}}>
+                <div style={{fontSize:11,color:"#87CEEB",fontWeight:"bold"}}>{a.nagroda} {a.typ==="paczki"?"📦":a.typ==="klucze"?"🗝️":"🔫"}</div>
+                <div style={{fontSize:9,color:"#555"}}>{(a.wartNagrody).toLocaleString()} ammo</div>
               </div>
-              <button onClick={()=>usunProg(a.id)} style={{background:"none",border:"none",color:"#f5544444",cursor:"pointer",fontSize:11}}>✕</button>
+              {/* Koszt ammo */}
+              <div style={{width:65,flexShrink:0,textAlign:"center"}}>
+                <div style={{fontSize:11,color: mozna?"#fa0":"#555",fontWeight:"bold"}}>{a.ammoDoProg.toLocaleString()}</div>
+                <div style={{fontSize:9,color:"#444"}}>ammo łącznie</div>
+              </div>
+              {/* Kręceń */}
+              <div style={{width:55,flexShrink:0,textAlign:"center"}}>
+                <div style={{fontSize:11,color:"#888"}}>{a.krecenDoProg.toLocaleString()}</div>
+                <div style={{fontSize:9,color:"#444"}}>kręceń</div>
+              </div>
+              {/* Opłacalność */}
+              <div style={{flex:1,textAlign:"center"}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:kolorOplac(a.oplac)}}>{a.oplac}%</div>
+                {isOpt && <div style={{fontSize:8,color:"#ffd700"}}>★ OPTYMALNY</div>}
+              </div>
+              {/* Dostępność */}
+              <div style={{width:18,textAlign:"center",fontSize:13}}>
+                {mozna ? "✅" : "🔒"}
+              </div>
+              <button onClick={()=>setProgi(p=>p.filter(x=>x.id!==a.id))}
+                style={{background:"none",border:"none",color:"#f5544433",cursor:"pointer",fontSize:11,flexShrink:0}}>✕</button>
             </div>
           );
         })}
+        <div style={{display:"grid",gridTemplateColumns:"55px 60px 65px 55px 1fr 18px 18px",gap:6,padding:"3px 10px",marginBottom:4}}>
+          {["Próg (pkt)","Nagroda","Ammo łącznie","Kręceń","Opłac.","",""].map(h=>(
+            <div key={h} style={{fontSize:8,color:"#333",textAlign:"center"}}>{h}</div>
+          ))}
+        </div>
       </div>
 
-      {/* Rekomendacja */}
-      {optymalny && (
-        <div style={{background:"rgba(255,215,0,0.1)",border:"2px solid #ffd70055",borderRadius:10,padding:14}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
-            🎯 Rekomendacja
+      {/* REKOMENDACJA */}
+      <div style={{background:"rgba(255,215,0,0.08)",border:"2px solid #ffd70044",borderRadius:12,padding:16}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:12}}>🎯 Plan działania</div>
+
+        {optymalny ? (
+          <div>
+            {/* Główna rekomendacja */}
+            <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:12,marginBottom:10}}>
+              <div style={{fontSize:12,color:"#ddd",lineHeight:1.8}}>
+                <div>Mnożnik: <strong style={{color:"#ffd700"}}>×{m}</strong> — koszt kręcenia <strong style={{color:"#fa0"}}>{m} ammo</strong></div>
+                <div>Cel: próg <strong style={{color:"#ffd700"}}>{optymalny.pktDoProgu.toLocaleString()} pkt</strong> ({optymalny.nagroda} {optymalny.typ==="paczki"?"📦 paczek":"🗝️ kluczy"})</div>
+                <div>Potrzebujesz: <strong style={{color:optymalny.mozemyDojsc?"#0c6":"#f55"}}>{optymalny.ammoDoProg.toLocaleString()} ammo</strong>
+                  {optymalny.mozemyDojsc
+                    ? <span style={{color:"#0c6"}}> ✅ stać Cię!</span>
+                    : <span style={{color:"#f55"}}> ❌ brakuje {(optymalny.ammoDoProg-ammo).toLocaleString()} ammo</span>
+                  }
+                </div>
+                <div>Oczekiwane kręcenia: <strong style={{color:"#87CEEB"}}>{optymalny.krecenDoProg.toLocaleString()}</strong></div>
+                <div>Oczekiwane jackpoty (×3): <strong style={{color:"#0c6"}}>~{expectedJackpoty}</strong></div>
+              </div>
+            </div>
+
+            {/* Nagrody łącznie */}
+            <div style={{background:"rgba(0,0,0,0.2)",borderRadius:8,padding:10,marginBottom:10}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:6}}>📦 Nagrody do zebrania (od 1 do optymalnego progu):</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {progsSorted.slice(0, progsSorted.indexOf(optymalny)+1).map(p => (
+                  <span key={p.id} style={{fontSize:11,padding:"2px 8px",background:"rgba(135,206,235,0.1)",border:"1px solid #87CEEB22",borderRadius:6,color:"#87CEEB"}}>
+                    {p.nagroda} {p.typ==="paczki"?"📦":p.typ==="klucze"?"🗝️":"🔫"}
+                  </span>
+                ))}
+              </div>
+              <div style={{marginTop:6,fontSize:12,fontWeight:"bold",color:"#0c6"}}>
+                Łącznie: {paczkiLacznie} 📦 paczek ({(paczkiLacznie * wP).toLocaleString()} ammo wartości)
+              </div>
+            </div>
+
+            {/* Opłacalność końcowa */}
+            <div style={{
+              padding:"10px 14px",borderRadius:8,
+              background:optymalny.oplac>=100?"rgba(0,200,100,0.1)":optymalny.oplac>=60?"rgba(255,165,0,0.1)":"rgba(255,50,50,0.1)",
+              border:`1px solid ${optymalny.oplac>=100?"#0c633":optymalny.oplac>=60?"#fa055":"#f5544433"}`,
+            }}>
+              <div style={{fontSize:12,color:"#ddd",lineHeight:1.7}}>
+                Opłacalność optymalnego progu: <strong style={{color:kolorOplac(optymalny.oplac),fontSize:15}}>{optymalny.oplac}%</strong><br/>
+                {optymalny.oplac >= 100
+                  ? "✅ Zysk — nagrody warte więcej niż wydane ammo. WARTO grać do tego progu!"
+                  : optymalny.oplac >= 60
+                  ? "🟡 Akceptowalne — lekka strata ammo, ale zdobywasz paczki z kartami."
+                  : "🔴 Strata — tracisz więcej ammo niż zyskujesz. Rozważ czy warto."}
+              </div>
+            </div>
+
+            {/* Wskazówka o mnożniku */}
+            <div style={{marginTop:10,padding:"8px 12px",background:"rgba(255,255,255,0.03)",borderRadius:6,border:"1px solid #1a1a2e",fontSize:11,color:"#666",lineHeight:1.6}}>
+              💡 <strong style={{color:"#888"}}>Ważne:</strong> Mnożnik NIE zmienia opłacalności — przy każdym mnożniku dostajesz tyle samo punktów na ammo.
+              Wyższy mnożnik tylko przyspiesza farmienie. Wybierz taki który masz dość ammo żeby dokończyć event.
+            </div>
           </div>
-          <div style={{fontSize:12,color:"#ddd",lineHeight:1.7}}>
-            Optymalny próg to <strong style={{color:"#ffd700"}}>{optymalny.pkt.toLocaleString()} punktów</strong> ({optymalny.nagroda} {optymalny.typ}).<br/>
-            Koszt: <strong style={{color:"#fa0"}}>{optymalny.koszAmmo.toLocaleString()} ammo</strong> →
-            łączna wartość nagród: <strong style={{color:"#0c6"}}>{optymalny.lacznaWart.toLocaleString()} ammo</strong>.<br/>
-            Opłacalność: <strong style={{color:kolorOplac(optymalny.oplac)}}>{optymalny.oplac}%</strong>
-            {parseFloat(optymalny.oplac) >= 100
-              ? " ✅ Zysk — nagrody warte więcej niż wydane ammo!"
-              : parseFloat(optymalny.oplac) >= 60
-              ? " 🟡 Akceptowalne — lekka strata ale warto dla paczek"
-              : " 🔴 Strata — zastanów się czy opłaca się grać powyżej tego progu"}
-          </div>
-        </div>
-      )}
+        ) : (
+          <div style={{color:"#555",fontSize:12}}>Dodaj progi eventu żeby zobaczyć rekomendację.</div>
+        )}
+      </div>
     </div>
   );
 }
