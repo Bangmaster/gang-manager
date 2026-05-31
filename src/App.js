@@ -5765,7 +5765,6 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
   const ostatnie2 = historiaWymian.slice(0, 2);
   const nieaktywni = czlonkowie.filter(c => {
     return ostatnie2.some(w => {
-      const nadawcy = Object.keys(w.potwierdzone || {});
       // Czy ten czlonek był w tej wymianie i nie potwierdził?
       const byW = (w.wymiany||[]).some(x => normalizuj(x.od) === normalizuj(c.nazwa));
       const potw = Object.entries(w.potwierdzone||{}).find(([k]) => normalizuj(k) === normalizuj(c.nazwa));
