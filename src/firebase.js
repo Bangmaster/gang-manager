@@ -271,3 +271,38 @@ export function obliczLicznikOtrzymanych(historia) {
   });
   return licznik;
 }
+
+// === CHAT ===
+const CHAT_DOC = doc(db, "gang_data", "chat");
+
+export async function zapiszWiadomosc(wiadomosc) {
+  try {
+    const snap = await getDoc(CHAT_DOC);
+    const stare = snap.exists() ? (snap.data().wiadomosci || []) : [];
+    const nowe = [...stare, wiadomosc].slice(-100);
+    await setDoc(CHAT_DOC, { wiadomosci: nowe }, { merge: true });
+    return true;
+  } catch(e) { console.error(e); return false; }
+}
+
+export function subscribeChat(callback) {
+  return onSnapshot(CHAT_DOC, (snap) => {
+    callback(snap.exists() ? (snap.data().wiadomosci || []) : []);
+  });
+}
+
+// === TAKTYKA ===
+const TAKTYKA_DOC = doc(db, "gang_data", "taktyka");
+
+export function subscribeTaktyka(callback) {
+  return onSnapshot(TAKTYKA_DOC, (snap) => {
+    callback(snap.exists() ? snap.data() : { notatki: "", sojusznicy: [], wrogowie: [], plany: [] });
+  });
+}
+
+export async function zapiszTaktyke(dane) {
+  try {
+    await setDoc(TAKTYKA_DOC, dane, { merge: true });
+    return true;
+  } catch(e) { console.error(e); return false; }
+}
