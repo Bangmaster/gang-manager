@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -409,7 +409,6 @@ export default function App() {
     {id:"walki",label:"🎯 Walki"},
     {id:"chat",label:"💬 Chat"},
     ...(isAdmin?[
-      {id:"dashboard",label:"📊 Dashboard"},
       {id:"wynik",label:"⚡ Generuj"},
       {id:"ocr",label:"📸 OCR talii"},
       {id:"edycja",label:"⚙️ Talie"},
@@ -587,12 +586,7 @@ export default function App() {
           zapiszKarte={zapiszKarte}
         />}
         {zakładka==="chat"&&<GangChat zalogowany={zalogowany} czlonkowie={dane.czlonkowie}/>}
-        {zakładka==="dashboard"&&isAdmin&&<AdminDashboard
-          dane={dane} talie={talieSorted}
-          historiaWymian={historiaWymian}
-          statusOnline={statusOnline}
-          zapiszStrukture={zapiszStrukture}
-        />}
+
         {zakładka==="walki"&&<WalkiView
           czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
           zapiszWalki={(now)=>zapiszStrukture("walki",now)}
@@ -622,6 +616,8 @@ export default function App() {
         />}
         {zakładka==="testy"&&isAdmin&&<TestyView
           zalogowany={zalogowany}
+          historiaWymian={historiaWymian}
+          statusOnline={statusOnline}
           talie={talieSorted} czlonkowie={dane.czlonkowie}
           posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
           zapiszKarte={zapiszKarte}
@@ -3517,7 +3513,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 // ============================================================
 // TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={}}) {
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={}}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaOsobaSkaner,setWybranaOsobaSkaner]=useState(0);
@@ -3536,6 +3532,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"ogloszenie",label:"📢 Ogłoszenie"},
     {id:"logi",label:"🔒 Logi logowań"},
     {id:"kalendarz",label:"📅 Kalendarz"},
+    {id:"dashboard",label:"📊 Dashboard"},
     {id:"taktyka",label:"⚔️ Taktyka"},
     {id:"kalkulator_event",label:"🧮 Kalkulator eventu"},
   ];
@@ -3570,6 +3567,12 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
       {tryb==="logi"&&<LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={onZablokuj} onOdblokuj={onOdblokuj}/>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
+      {tryb==="dashboard"&&<AdminDashboard
+        dane={dane} talie={talie}
+        historiaWymian={historiaWymian}
+        statusOnline={statusOnline}
+        zapiszStrukture={zapiszStrukture}
+      />}
       {tryb==="taktyka"&&<TaktykaSezonu zapiszStrukture={zapiszStrukture}/>}
       {tryb==="kalkulator_event"&&<KalkulatorEventu/>}
     </div>
@@ -6000,33 +6003,21 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
 function TaktykaSezonu({zapiszStrukture}) {
   const [dane, setDane] = useState(null);
   const [zapisywanie, setZapisywanie] = useState(false);
+  const [nowyS, setNowyS] = useState({ nazwa: "", typ: "sojusznik", notatka: "" });
+  const [nowyPlan, setNowyPlan] = useState({ tekst: "", priorytet: "medium" });
+  const [edytujNotatki, setEdytujNotatki] = useState(false);
+  const [tempNotatki, setTempNotatki] = useState("");
 
-  // Załaduj z Firebase (osobny dokument)
   useEffect(() => {
-    const { getFirestore, doc, onSnapshot } = require("firebase/firestore");
-    const db = getFirestore();
-    const ref = doc(db, "gang_data", "taktyka");
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists()) setDane(snap.data());
-      else setDane({ notatki: "", sojusznicy: [], wrogowie: [], plany: [] });
-    });
+    const unsub = subscribeTaktyka(setDane);
     return () => unsub();
   }, []);
 
   const zapisz = async (nowe) => {
     setZapisywanie(true);
-    try {
-      const { getFirestore, doc, setDoc } = require("firebase/firestore");
-      const db = getFirestore();
-      await setDoc(doc(db, "gang_data", "taktyka"), nowe, { merge: true });
-    } catch(e) { console.error(e); }
+    await zapiszTaktyke(nowe);
     setZapisywanie(false);
   };
-
-  const [nowyS, setNowyS] = useState({ nazwa: "", typ: "sojusznik", notatka: "" });
-  const [nowyPlan, setNowyPlan] = useState({ tekst: "", priorytet: "medium" });
-  const [edytujNotatki, setEdytujNotatki] = useState(false);
-  const [tempNotatki, setTempNotatki] = useState("");
 
   if (!dane) return <div style={{textAlign:"center",padding:30,color:"#555"}}>⏳ Ładowanie...</div>;
 
@@ -6381,21 +6372,11 @@ function GangChat({zalogowany, czlonkowie}) {
   const bottomRef = useRef(null);
   const nick = zalogowany?.login || "?";
 
-  // Subskrybuj wiadomości z Firebase
   useEffect(() => {
-    const { getFirestore, doc, onSnapshot } = require("firebase/firestore");
-    const db = getFirestore();
-    const chatDoc = doc(db, "gang_data", "chat");
-    const unsub = onSnapshot(chatDoc, (snap) => {
-      if (snap.exists()) {
-        const msgs = snap.data().wiadomosci || [];
-        setWiadomosci(msgs.slice(-100)); // max 100 wiadomości
-      }
-    });
+    const unsub = subscribeChat(msgs => setWiadomosci(msgs.slice(-100)));
     return () => unsub();
   }, []);
 
-  // Auto-scroll na dół
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [wiadomosci]);
@@ -6404,22 +6385,9 @@ function GangChat({zalogowany, czlonkowie}) {
     if (!tekst.trim() || wysylanie) return;
     setWysylanie(true);
     playSound("click");
-    try {
-      const { getFirestore, doc, getDoc, setDoc: setDocFn } = require("firebase/firestore");
-      const db = getFirestore();
-      const chatDoc = doc(db, "gang_data", "chat");
-      const snap = await getDoc(chatDoc);
-      const stare = snap.exists() ? (snap.data().wiadomosci || []) : [];
-      const nowaWiad = {
-        id: Date.now(),
-        nick,
-        tekst: tekst.trim(),
-        czas: Date.now(),
-      };
-      const nowe = [...stare, nowaWiad].slice(-100);
-      await setDocFn(chatDoc, { wiadomosci: nowe }, { merge: true });
-      setTekst("");
-    } catch(e) { console.error(e); }
+    const nowaWiad = { id: Date.now(), nick, tekst: tekst.trim(), czas: Date.now() };
+    await zapiszWiadomosc(nowaWiad);
+    setTekst("");
     setWysylanie(false);
   };
 
