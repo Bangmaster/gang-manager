@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import "./gangStyles.css";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke } from "./firebase";
+import OcrView from "./OcrView";
+import WalkiView from "./WalkiView";
+import { analyzeDeckStructure } from "./gemini";
 
 // Page Visibility API — zapobiega lagowi przy powrocie do karty
 if (typeof document !== "undefined") {
@@ -17,10 +21,6 @@ if (typeof document !== "undefined") {
     }
   });
 }
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke } from "./firebase";
-import OcrView from "./OcrView";
-import WalkiView from "./WalkiView";
-import { analyzeDeckStructure } from "./gemini";
 
 
 // ============================================================
