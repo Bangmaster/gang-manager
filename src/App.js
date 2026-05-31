@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import "./gangStyles.css";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke } from "./firebase";
 import OcrView from "./OcrView";
@@ -300,7 +300,14 @@ export default function App() {
     const interval = setInterval(() => {
       if (!document.hidden) setOnline(login); // tylko gdy karta aktywna
     }, 30000);
-    const unsub = subscribeOnline(setStatusOnline);
+    let lastOnlineUpdate = 0;
+    const unsub = subscribeOnline((newStatus) => {
+      const now = Date.now();
+      if (now - lastOnlineUpdate > 10000) { // max raz na 10s
+        lastOnlineUpdate = now;
+        setStatusOnline(newStatus);
+      }
+    });
     const unsubArchiwum = subscribeArchiwumWalk(setArchiwumWalk);
     const handleUnload = () => setOffline(login);
     window.addEventListener("beforeunload", handleUnload);
@@ -377,15 +384,23 @@ export default function App() {
       }
 
       // Subskrypcja real-time — niezależna od błędu inicjalizacji
+      let pendingDane = null;
+      let daneTimer = null;
       unsub = subscribeGangData((d) => {
-        setDane({
+        pendingDane = {
           talie: uzupelnijTalie(d.talie) || DOMYSLNE_DANE.talie,
           czlonkowie: d.czlonkowie || DOMYSLNE_DANE.czlonkowie,
           posiadane: d.posiadane || {},
           duplikaty: d.duplikaty || {},
           walki: d.walki || [],
           aktywnaWymiana: d.aktywnaWymiana || null,
-        });
+        };
+        // Debounce — aktualizuj state max raz na 500ms
+        if (daneTimer) clearTimeout(daneTimer);
+        daneTimer = setTimeout(() => {
+          if (pendingDane) setDane(pendingDane);
+          pendingDane = null;
+        }, 300);
       });
     })();
     return () => { if (unsub) unsub(); };
@@ -419,7 +434,15 @@ export default function App() {
   if (!dane) return <LoadingScreen/>;
 
   const isAdmin = zalogowany.rola === "admin" || zalogowany.rola === "zastepca";
-  const talieSorted = [...dane.talie].sort((a,b)=>(a.numer||99)-(b.numer||99));
+
+  // Memoizuj duże obiekty żeby DaneView nie rerenderowało przy zmianach statusu online
+  const posiadaneMemo = useMemo(() => dane.posiadane || {}, [dane.posiadane]);
+  const duplikatyMemo = useMemo(() => dane.duplikaty || {}, [dane.duplikaty]);
+  const czlonkowieMemo = useMemo(() => dane.czlonkowie || [], [dane.czlonkowie]);
+  const talieSorted = useMemo(
+    () => [...dane.talie].sort((a,b)=>(a.numer||99)-(b.numer||99)),
+    [dane.talie]
+  );
 
   const tabs = [
     {id:"dane",label:"📋 Dane gangu"},
@@ -570,8 +593,8 @@ export default function App() {
 
       <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="dane"&&<DaneView
-          talie={talieSorted} czlonkowie={dane.czlonkowie}
-          posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
+          talie={talieSorted} czlonkowie={czlonkowieMemo}
+          posiadane={posiadaneMemo} duplikaty={duplikatyMemo}
           zalogowany={zalogowany} zapiszKarte={zapiszKarte}
         />}
         {zakładka==="duplikaty"&&<DuplikatyView
