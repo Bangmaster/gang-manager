@@ -3621,6 +3621,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"kalkulator",label:"🧮 Kalkulator"},
     {id:"historia",label:"📜 Historia"},
     {id:"reset",label:"🔄 Reset"},
+    {id:"backup",label:"💾 Backup"},
     {id:"push",label:"🔔 Powiadomienia"},
     {id:"duple",label:"🃏 Duple"},
     {id:"ogloszenie",label:"📢 Ogłoszenie"},
@@ -3656,6 +3657,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="kalkulator"&&<KalkulatorSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} typWymiany={typWymiany}/>}
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana} czlonkowie={czlonkowie}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture} walki={dane.walki||[]}/>}
+      {tryb==="backup"&&<BackupDanych dane={dane} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
@@ -4460,6 +4462,133 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ============================================================
+// BACKUP DANYCH
+// ============================================================
+function BackupDanych({dane, zapiszStrukture}) {
+  const [ostatniBackup, setOstatniBackup] = useState(() => {
+    return localStorage.getItem("gang_ostatni_backup") || null;
+  });
+
+  const eksportuj = () => {
+    const backup = {
+      wersja: "1.0",
+      data: new Date().toISOString(),
+      dane: {
+        talie: dane.talie,
+        czlonkowie: dane.czlonkowie,
+        posiadane: dane.posiadane,
+        duplikaty: dane.duplikaty,
+        walki: dane.walki,
+      }
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gang-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    const teraz = new Date().toLocaleString("pl-PL");
+    localStorage.setItem("gang_ostatni_backup", teraz);
+    setOstatniBackup(teraz);
+  };
+
+  const importuj = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const backup = JSON.parse(ev.target.result);
+        if (!backup.dane) { alert("Nieprawidłowy plik backup!"); return; }
+        if (!window.confirm(`Przywrócić dane z ${backup.data}?
+
+To NADPISZE wszystkie obecne dane gangu!`)) return;
+        // Zapisz do Firebase przez zapiszStrukture
+        alert("⚠️ Funkcja przywracania wymaga ręcznego wklejenia danych do Firebase Console.
+
+Plik backup zawiera wszystkie dane — skontaktuj się z adminem apki.");
+      } catch { alert("Błąd odczytu pliku!"); }
+    };
+    reader.readAsText(file);
+  };
+
+  const kartyCount = dane.posiadane ? Object.keys(dane.posiadane).length : 0;
+  const dupCount = dane.duplikaty ? Object.keys(dane.duplikaty).length : 0;
+
+  return (
+    <div>
+      <div style={{background:"rgba(0,200,100,0.06)",border:"1px solid #0c633",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#0c6",marginBottom:4}}>💾 Backup danych gangu</div>
+        <div style={{fontSize:11,color:"#555",lineHeight:1.6}}>
+          Eksportuj dane do pliku JSON na dysk. Rób backup regularnie — szczególnie po każdej wymianie kart.
+        </div>
+      </div>
+
+      {/* Stan danych */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+        {[
+          {label:"Członków",val:dane.czlonkowie?.length||0,color:"#ffd700"},
+          {label:"Kart posiadanych",val:kartyCount,color:"#0c6"},
+          {label:"Duplikatów",val:dupCount,color:"#87CEEB"},
+        ].map(s=>(
+          <div key={s.label} style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px",textAlign:"center"}}>
+            <div style={{fontSize:20,fontWeight:"bold",color:s.color}}>{s.val}</div>
+            <div style={{fontSize:10,color:"#555"}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {ostatniBackup && (
+        <div style={{fontSize:11,color:"#0c6",marginBottom:10,padding:"6px 10px",background:"rgba(0,200,100,0.08)",borderRadius:6,border:"1px solid #0c633"}}>
+          ✅ Ostatni backup: {ostatniBackup}
+        </div>
+      )}
+
+      {!ostatniBackup && (
+        <div style={{fontSize:11,color:"#f55",marginBottom:10,padding:"6px 10px",background:"rgba(255,50,50,0.08)",borderRadius:6,border:"1px solid #f5544433"}}>
+          ⚠️ Nie masz jeszcze żadnego backupu! Zrób go teraz.
+        </div>
+      )}
+
+      <button onClick={eksportuj} style={{
+        width:"100%",padding:14,background:"linear-gradient(135deg,#0c6,#0fa)",
+        border:"none",borderRadius:10,color:"#000",fontSize:15,fontWeight:"bold",
+        cursor:"pointer",marginBottom:10,
+      }}>
+        📥 Pobierz backup (JSON)
+      </button>
+
+      {/* Przywróć z backupu */}
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:"bold"}}>🔄 Przywróć z backupu</div>
+        <label style={{
+          display:"block",width:"100%",padding:12,
+          background:przywracanie?"rgba(255,165,0,0.1)":"rgba(255,255,255,0.05)",
+          border:"2px dashed #333",borderRadius:10,
+          color:przywracanie?"#fa0":"#666",fontSize:13,
+          cursor:"pointer",textAlign:"center",boxSizing:"border-box",
+        }}>
+          {przywracanie ? "⏳ Przywracam dane..." : "📂 Kliknij i wybierz plik backup (.json)"}
+          <input type="file" accept=".json" onChange={importuj} disabled={przywracanie}
+            style={{display:"none"}}/>
+        </label>
+      </div>
+
+      <div style={{padding:12,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,fontSize:11,color:"#555",lineHeight:1.7}}>
+        <strong style={{color:"#aaa"}}>Jak często robić backup?</strong><br/>
+        • Po każdej wymianie kart ✓<br/>
+        • Po wpisaniu nowych kart przez OCR ✓<br/>
+        • Przed resetem sezonu ✓<br/><br/>
+        <strong style={{color:"#aaa"}}>Gdzie trzymać backup?</strong><br/>
+        Google Drive, pendrive, e-mail do siebie — gdziekolwiek poza telefonem.
+      </div>
     </div>
   );
 }
