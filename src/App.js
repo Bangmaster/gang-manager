@@ -932,14 +932,15 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                     <div key={karta.nazwa} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                       <button
                         onClick={mozeEdytowac?()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane"):undefined}
-                        onMouseEnter={!ma?(e)=>{
+                        onMouseEnter={(e)=>{
+                          if(ma) return; // karta posiadana — bez tooltipa
                           const dawcy=czlonkowie.filter(c=>
                             c.id!==osoba.id &&
                             duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]
                           ).map(c=>c.nazwa);
                           setTooltipPos({x:e.clientX, y:e.clientY});
                           setTooltip({kartaNazwa:karta.nazwa,dawcy});
-                        }:null}
+                        }}
                         onMouseLeave={()=>setTooltip(null)}
 
                         style={{
