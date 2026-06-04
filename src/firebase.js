@@ -45,10 +45,12 @@ export async function loadGangData() {
   try {
     const snap = await getDoc(GANG_DOC);
     if (snap.exists()) return snap.data();
-    return null;
+    return null; // dokument naprawdę nie istnieje
   } catch (e) {
     console.error("Błąd ładowania:", e);
-    return null;
+    // WAŻNE: rzuć błąd dalej — nie zwracaj null bo apka pomyśli że bazy nie ma
+    // i nadpisze dane domyślnymi!
+    throw e;
   }
 }
 
