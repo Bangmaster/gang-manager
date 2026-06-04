@@ -4499,25 +4499,7 @@ function BackupDanych({dane, zapiszStrukture}) {
     setOstatniBackup(teraz);
   };
 
-  const importuj = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const backup = JSON.parse(ev.target.result);
-        if (!backup.dane) { alert("Nieprawidłowy plik backup!"); return; }
-        if (!window.confirm(`Przywrócić dane z ${backup.data}?
 
-To NADPISZE wszystkie obecne dane gangu!`)) return;
-        // Zapisz do Firebase przez zapiszStrukture
-        alert("⚠️ Funkcja przywracania wymaga ręcznego wklejenia danych do Firebase Console.
-
-Plik backup zawiera wszystkie dane — skontaktuj się z adminem apki.");
-      } catch { alert("Błąd odczytu pliku!"); }
-    };
-    reader.readAsText(file);
-  };
 
   const kartyCount = dane.posiadane ? Object.keys(dane.posiadane).length : 0;
   const dupCount = dane.duplikaty ? Object.keys(dane.duplikaty).length : 0;
