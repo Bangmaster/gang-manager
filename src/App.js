@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, startTransition } from "react";
+import { createPortal } from "react-dom";
 import "./gangStyles.css";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup } from "./firebase";
 import OcrView from "./OcrView";
@@ -832,13 +833,6 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
   const [tooltip,setTooltip]=useState(null);
   const [pokazProfil,setPokazProfil]=useState(null);
-  const tooltipTimerRef = useRef(null);
-  const hideTooltip = () => {
-    tooltipTimerRef.current = setTimeout(()=>setTooltip(null), 150);
-  };
-  const cancelHide = () => {
-    if(tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
-  };
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
@@ -935,7 +929,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                         onMouseMove={(e)=>{
                           if(!ma) setTooltip(p=>p?{...p,x:e.clientX,y:e.clientY}:null);
                         }}
-                        onMouseLeave={hideTooltip}
+                        onMouseLeave={()=>setTooltip(null)}
 
                         style={{
                           padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
@@ -1095,25 +1089,30 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
         );
       })()}
 
-      {tooltip&&(
-        <div
-          onMouseEnter={cancelHide}
-          onMouseLeave={hideTooltip}
-          style={{
-          position:"fixed",left:tooltip.x+14,top:tooltip.y+14,
-          zIndex:99999,pointerEvents:"auto",
-          background:"#0a0518",border:"1px solid #ffd70088",
-          borderRadius:8,padding:"8px 12px",
+      {tooltip && createPortal(
+        <div style={{
+          position:"fixed",
+          left:Math.min(tooltip.x+14, window.innerWidth-220),
+          top:Math.min(tooltip.y+14, window.innerHeight-150),
+          zIndex:2147483647,
+          pointerEvents:"none",
+          background:"#0a0518",
+          border:"1px solid #ffd700",
+          borderRadius:8,
+          padding:"8px 12px",
           boxShadow:"0 4px 20px rgba(0,0,0,0.9)",
-          minWidth:150,maxWidth:210,
+          minWidth:150,
+          maxWidth:210,
+          fontFamily:"Georgia,serif",
         }}>
           <div style={{fontSize:11,color:"#ffd700",fontWeight:"bold",marginBottom:3}}>💎 Kto ma duplikat:</div>
-          <div style={{fontSize:10,color:"#666",marginBottom:4,fontStyle:"italic"}}>{tooltip.kartaNazwa}</div>
+          <div style={{fontSize:10,color:"#555",marginBottom:4,fontStyle:"italic"}}>{tooltip.kartaNazwa}</div>
           {tooltip.dawcy.length===0
-            ?<div style={{fontSize:11,color:"#555"}}>Nikt nie ma duplikatu</div>
-            :tooltip.dawcy.map(d=><div key={d} style={{fontSize:12,color:"#0c6"}}>✓ {d}</div>)
+            ?<div style={{fontSize:11,color:"#888"}}>Nikt nie ma duplikatu</div>
+            :tooltip.dawcy.map(d=><div key={d} style={{fontSize:12,color:"#0c6",padding:"1px 0"}}>✓ {d}</div>)
           }
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
