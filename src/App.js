@@ -830,8 +830,20 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
   const [wybranaOsoba,setWybranaOsoba]=useState(startIdx);
   const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
-  const [tooltip,setTooltip]=useState(null); // {kartaNazwa, taliaId, x, y}
-  const [pokazProfil,setPokazProfil]=useState(null); // id osoby której profil pokazujemy
+  const [tooltip,setTooltip]=useState(null); // {kartaNazwa, dawcy}
+  const [tooltipPos,setTooltipPos]=useState({x:0,y:0}); // osobno śledzona pozycja
+  const [pokazProfil,setPokazProfil]=useState(null);
+  const tooltipRef = useRef(null);
+
+  // Śledź pozycję myszy globalnie gdy tooltip jest widoczny
+  useEffect(()=>{
+    if(!tooltip) return;
+    const handleMove = (e) => {
+      setTooltipPos({x: e.clientX, y: e.clientY});
+    };
+    window.addEventListener("mousemove", handleMove);
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, [tooltip]);
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
@@ -852,7 +864,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const mozeEdytowac = isAdmin;
 
   return (
-    <div>
+    <div onClick={()=>setTooltip(null)}>
       {/* Filtry typów */}
       <div style={{display:"flex",gap:6,marginBottom:10}}>
         {[
@@ -926,9 +938,11 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                             c.id!==osoba.id &&
                             duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]
                           ).map(c=>c.nazwa);
-                          setTooltip({kartaNazwa:karta.nazwa,taliaId:talia.id,dawcy,x:e.clientX,y:e.clientY});
+                          setTooltipPos({x:e.clientX, y:e.clientY});
+                          setTooltip({kartaNazwa:karta.nazwa,dawcy});
                         }:null}
                         onMouseLeave={!ma?()=>setTooltip(null):null}
+
                         style={{
                           padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
                           maxWidth:90,textAlign:"center",lineHeight:1.2,
@@ -1089,10 +1103,12 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
 
       {/* Tooltip — kto ma duplikat tej karty */}
       {tooltip&&(
-        <div style={{
+        <div ref={tooltipRef} style={{
           position:"fixed",
-          left:Math.min(tooltip.x+10, window.innerWidth-220),
-          top:Math.min(tooltip.y-10, window.innerHeight-120),
+          left: Math.min(tooltipPos.x+14, window.innerWidth-(tooltipRef.current?.offsetWidth||220)-8),
+          top: tooltipPos.y - (tooltipRef.current?.offsetHeight||100) - 8 < 8
+            ? tooltipPos.y + 14  // pokaż poniżej jeśli za blisko góry
+            : tooltipPos.y - (tooltipRef.current?.offsetHeight||100) - 8,
           zIndex:9999,
           background:"rgba(10,5,25,0.97)",
           border:"1px solid #ffd70055",
@@ -1100,6 +1116,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
           boxShadow:"0 4px 20px rgba(0,0,0,0.8)",
           pointerEvents:"none",
           minWidth:160,maxWidth:220,
+          transition:"left 0.05s, top 0.05s",
         }}>
           <div style={{fontSize:11,color:"#ffd700",fontWeight:"bold",marginBottom:4}}>
             💎 Kto ma duplikat:
@@ -1112,6 +1129,9 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
           ):tooltip.dawcy.map(d=>(
             <div key={d} style={{fontSize:12,color:"#0c6",padding:"1px 0"}}>✓ {d}</div>
           ))}
+          <div style={{fontSize:9,color:"#333",marginTop:4}}>
+            kliknij żeby zamknąć
+          </div>
         </div>
       )}
     </div>
@@ -2096,19 +2116,55 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       });
   };
 
+  // Przelicz zamknieciaInfo po zmianie listy wymian
+  const przeliczZamkniecia = (noweWymiany) => {
+    const symPos={...posiadane};
+    noweWymiany.forEach(w=>{
+      const o=czlonkowie.find(c=>c.nazwa===w.do);
+      const t=talie.find(t=>t.nazwa===w.talia);
+      if(o&&t) symPos[`${o.id}_${t.id}_${w.karta}`]=true;
+    });
+    const zamknieciaInfo=[];
+    czlonkowie.forEach(osoba=>{
+      talie.forEach(talia=>{
+        const kPrzed=talia.karty.every(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        const kPo=talia.karty.every(k=>symPos[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+        if(!kPrzed&&kPo){
+          const liczbaPoWymianie=liczKartyOsoby(osoba.id,talie,symPos);
+          const progPrzed=obliczProg(liczKartyOsoby(osoba.id,talie,posiadane));
+          const progPo=obliczProg(liczbaPoWymianie);
+          const nowyProg=progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
+          zamknieciaInfo.push({
+            osoba:osoba.nazwa, talia:talia.nazwa, nagroda:pobierzNagrode(talia,osoba.krag),
+            nowyProg: nowyProg ? progPo.ostatniProg : null,
+          });
+        }
+      });
+    });
+    return zamknieciaInfo;
+  };
+
   const podmienWymiane=(idx,nowaWymiana)=>{
-    setWynik(prev=>({
-      ...prev,
-      planoweWymiany: prev.planoweWymiany.map((w,i)=>i===idx?nowaWymiana:w)
-    }));
+    setWynik(prev=>{
+      const noweWymiany = prev.planoweWymiany.map((w,i)=>i===idx?nowaWymiana:w);
+      return {
+        ...prev,
+        planoweWymiany: noweWymiany,
+        zamknieciaInfo: przeliczZamkniecia(noweWymiany),
+      };
+    });
     setPodmienDawce(null);
   };
 
   const usunWymiane=(idx)=>{
-    setWynik(prev=>({
-      ...prev,
-      planoweWymiany: prev.planoweWymiany.filter((_,i)=>i!==idx)
-    }));
+    setWynik(prev=>{
+      const noweWymiany = prev.planoweWymiany.filter((_,i)=>i!==idx);
+      return {
+        ...prev,
+        planoweWymiany: noweWymiany,
+        zamknieciaInfo: przeliczZamkniecia(noweWymiany),
+      };
+    });
   };
 
   const generuj=()=>{
