@@ -293,6 +293,60 @@ export function subscribeChat(callback) {
   });
 }
 
+// === PEŁNY BACKUP ===
+export async function pobierzPelnyBackup() {
+  const wyniki = {};
+  try {
+    // Główne dane gangu
+    const main = await getDoc(GANG_DOC);
+    if (main.exists()) wyniki.main = main.data();
+
+    // Historia wymian
+    const historia = await getDoc(HISTORIA_DOC);
+    if (historia.exists()) wyniki.historia = historia.data();
+
+    // Kalendarz
+    const kalendarz = await getDoc(KALENDARZ_DOC);
+    if (kalendarz.exists()) wyniki.kalendarz = kalendarz.data();
+
+    // Taktyka
+    const taktykaDoc = doc(db, "gang_data", "taktyka");
+    const taktyka = await getDoc(taktykaDoc);
+    if (taktyka.exists()) wyniki.taktyka = taktyka.data();
+
+    // Chat (ostatnie 100 wiadomości)
+    const chatDoc = doc(db, "gang_data", "chat");
+    const chat = await getDoc(chatDoc);
+    if (chat.exists()) wyniki.chat = chat.data();
+
+    return wyniki;
+  } catch(e) {
+    console.error("Błąd pobierania backupu:", e);
+    throw e;
+  }
+}
+
+export async function przywrocPelnyBackup(backup, zapiszStruktureFn) {
+  if (backup.main) {
+    const d = backup.main;
+    if (d.talie) await zapiszStruktureFn("talie", d.talie);
+    if (d.czlonkowie) await zapiszStruktureFn("czlonkowie", d.czlonkowie);
+    if (d.posiadane) await zapiszStruktureFn("posiadane", d.posiadane);
+    if (d.duplikaty) await zapiszStruktureFn("duplikaty", d.duplikaty);
+    if (d.walki) await zapiszStruktureFn("walki", d.walki);
+  }
+  if (backup.historia) {
+    await setDoc(HISTORIA_DOC, backup.historia, { merge: false });
+  }
+  if (backup.kalendarz) {
+    await setDoc(KALENDARZ_DOC, backup.kalendarz, { merge: false });
+  }
+  if (backup.taktyka) {
+    const taktykaDoc = doc(db, "gang_data", "taktyka");
+    await setDoc(taktykaDoc, backup.taktyka, { merge: false });
+  }
+}
+
 // === TAKTYKA ===
 const TAKTYKA_DOC = doc(db, "gang_data", "taktyka");
 
