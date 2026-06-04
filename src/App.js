@@ -832,6 +832,13 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
   const [tooltip,setTooltip]=useState(null);
   const [pokazProfil,setPokazProfil]=useState(null);
+  const tooltipTimerRef = useRef(null);
+  const hideTooltip = () => {
+    tooltipTimerRef.current = setTimeout(()=>setTooltip(null), 150);
+  };
+  const cancelHide = () => {
+    if(tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+  };
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
@@ -928,7 +935,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                         onMouseMove={(e)=>{
                           if(!ma) setTooltip(p=>p?{...p,x:e.clientX,y:e.clientY}:null);
                         }}
-                        onMouseLeave={()=>setTooltip(null)}
+                        onMouseLeave={hideTooltip}
 
                         style={{
                           padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
@@ -1089,9 +1096,12 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
       })()}
 
       {tooltip&&(
-        <div style={{
+        <div
+          onMouseEnter={cancelHide}
+          onMouseLeave={hideTooltip}
+          style={{
           position:"fixed",left:tooltip.x+14,top:tooltip.y+14,
-          zIndex:99999,pointerEvents:"none",
+          zIndex:99999,pointerEvents:"auto",
           background:"#0a0518",border:"1px solid #ffd70088",
           borderRadius:8,padding:"8px 12px",
           boxShadow:"0 4px 20px rgba(0,0,0,0.9)",
