@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, startTransition } from "react";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -3679,6 +3679,56 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
 function SzybkieWprowadzanie({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaOsoba,setWybranaOsoba,wybranaTalia,setWybranaTalia}) {
   const osoba=czlonkowie[wybranaOsoba];
   const talia=talie[wybranaTalia];
+  const [masowe, setMasowe] = useState(false);
+  const [masowePoster, setMasowePoster] = useState("");
+
+  // Zaznacz typ kart (złote/diamentowe) dla WSZYSTKICH członków
+  const zaznaczMasowo = async (typ) => {
+    const etykieta = typ === "złota" ? "⭐ złote" : "💎 diamentowe";
+    if (!window.confirm(`Zaznaczyć WSZYSTKIE karty ${etykieta} dla WSZYSTKICH ${czlonkowie.length} członków?
+
+To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart × ${czlonkowie.length} osób.`)) return;
+    setMasowe(true);
+    setMasowePoster(`Zaznaczam ${etykieta} dla wszystkich...`);
+    let count = 0;
+    for (const c of czlonkowie) {
+      for (const t of talie) {
+        for (const k of t.karty.filter(kk=>kk.typ===typ)) {
+          const key = `${c.id}_${t.id}_${k.nazwa}`;
+          if (!posiadane[key]) {
+            await zapiszKarte("posiadane", key, true);
+            count++;
+          }
+        }
+      }
+      setMasowePoster(`Zaznaczam ${etykieta}... ${czlonkowie.indexOf(c)+1}/${czlonkowie.length} osób`);
+    }
+    setMasowe(false);
+    setMasowePoster(`✅ Gotowe — zaznaczono ${count} kart`);
+    setTimeout(() => setMasowePoster(""), 3000);
+  };
+
+  const odznaczMasowo = async (typ) => {
+    const etykieta = typ === "złota" ? "⭐ złote" : "💎 diamentowe";
+    if (!window.confirm(`Odznaczyć WSZYSTKIE karty ${etykieta} dla WSZYSTKICH członków?`)) return;
+    setMasowe(true);
+    setMasowePoster(`Odznaczam ${etykieta} dla wszystkich...`);
+    let count = 0;
+    for (const c of czlonkowie) {
+      for (const t of talie) {
+        for (const k of t.karty.filter(kk=>kk.typ===typ)) {
+          const key = `${c.id}_${t.id}_${k.nazwa}`;
+          if (posiadane[key]) {
+            await zapiszKarte("posiadane", key, null);
+            count++;
+          }
+        }
+      }
+    }
+    setMasowe(false);
+    setMasowePoster(`✅ Odznaczono ${count} kart`);
+    setTimeout(() => setMasowePoster(""), 3000);
+  };
 
   const zaznaczWszystkie=(typ)=>{
     if(!osoba||!talia) return;
@@ -3712,6 +3762,44 @@ function SzybkieWprowadzanie({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,w
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:10,padding:12,marginBottom:12}}>
         <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>⚡ Szybkie wprowadzanie — zaznacz wszystkie karty osoby dla jednej talii</div>
         <div style={{fontSize:11,color:"#888"}}>Wybierz osobę i talię → kliknij karty które ma lub użyj przycisków "Zaznacz wszystkie"</div>
+      </div>
+
+      {/* MASOWE WPROWADZANIE — dla wszystkich naraz */}
+      <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#f88",marginBottom:6}}>
+          ⚡ Masowe wprowadzanie — dla WSZYSTKICH członków naraz
+        </div>
+        <div style={{fontSize:11,color:"#555",marginBottom:10}}>
+          Używaj gdy wszyscy dostali ten sam zestaw kart (np. początek sezonu).
+        </div>
+        {masowePoster && (
+          <div style={{fontSize:11,color:masowePoster.startsWith("✅")?"#0c6":"#fa0",
+            marginBottom:8,padding:"4px 8px",background:"rgba(0,0,0,0.2)",borderRadius:4}}>
+            {masowePoster}
+          </div>
+        )}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+          <button onClick={()=>zaznaczMasowo("złota")} disabled={masowe} style={{
+            padding:"10px 8px",borderRadius:8,cursor:masowe?"wait":"pointer",fontSize:12,fontWeight:"bold",
+            background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",color:"#000",
+            opacity:masowe?0.5:1,
+          }}>⭐ Zaznacz złote<br/><span style={{fontSize:9,fontWeight:"normal"}}>dla wszystkich</span></button>
+          <button onClick={()=>zaznaczMasowo("diamentowa")} disabled={masowe} style={{
+            padding:"10px 8px",borderRadius:8,cursor:masowe?"wait":"pointer",fontSize:12,fontWeight:"bold",
+            background:"linear-gradient(135deg,#1a3a8f,#87CEEB)",border:"none",color:"#fff",
+            opacity:masowe?0.5:1,
+          }}>💎 Zaznacz diamentowe<br/><span style={{fontSize:9,fontWeight:"normal"}}>dla wszystkich</span></button>
+          <button onClick={()=>odznaczMasowo("złota")} disabled={masowe} style={{
+            padding:"8px 8px",borderRadius:8,cursor:masowe?"wait":"pointer",fontSize:11,
+            background:"rgba(255,215,0,0.08)",border:"1px solid #b8860b44",color:"#b8860b",
+            opacity:masowe?0.5:1,
+          }}>⭐ Odznacz złote</button>
+          <button onClick={()=>odznaczMasowo("diamentowa")} disabled={masowe} style={{
+            padding:"8px 8px",borderRadius:8,cursor:masowe?"wait":"pointer",fontSize:11,
+            background:"rgba(135,206,235,0.08)",border:"1px solid #87CEEB44",color:"#87CEEB",
+            opacity:masowe?0.5:1,
+          }}>💎 Odznacz diamentowe</button>
+        </div>
       </div>
 
       {/* Wybór osoby */}
@@ -4473,30 +4561,32 @@ function BackupDanych({dane, zapiszStrukture}) {
   const [ostatniBackup, setOstatniBackup] = useState(() => {
     return localStorage.getItem("gang_ostatni_backup") || null;
   });
+  const [eksportuje, setEksportuje] = useState(false);
 
-  const eksportuj = () => {
-    const backup = {
-      wersja: "1.0",
-      data: new Date().toISOString(),
-      dane: {
-        talie: dane.talie,
-        czlonkowie: dane.czlonkowie,
-        posiadane: dane.posiadane,
-        duplikaty: dane.duplikaty,
-        walki: dane.walki,
-      }
-    };
-    const json = JSON.stringify(backup, null, 2);
-    const blob = new Blob([json], {type: "application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `gang-backup-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    const teraz = new Date().toLocaleString("pl-PL");
-    localStorage.setItem("gang_ostatni_backup", teraz);
-    setOstatniBackup(teraz);
+  const eksportuj = async () => {
+    setEksportuje(true);
+    try {
+      const pelnyBackup = await pobierzPelnyBackup();
+      const backup = {
+        wersja: "2.0",
+        data: new Date().toISOString(),
+        ...pelnyBackup,
+      };
+      const json = JSON.stringify(backup, null, 2);
+      const blob = new Blob([json], {type: "application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gang-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      const teraz = new Date().toLocaleString("pl-PL");
+      localStorage.setItem("gang_ostatni_backup", teraz);
+      setOstatniBackup(teraz);
+    } catch(e) {
+      alert("Błąd eksportu: " + e.message);
+    }
+    setEksportuje(false);
   };
 
 
@@ -4527,12 +4617,17 @@ To NADPISZE wszystkie obecne dane gangu!`
         )) return;
         setPrzywracanie(true);
         try {
-          if (backup.dane.talie) await zapiszStrukture("talie", backup.dane.talie);
-          if (backup.dane.czlonkowie) await zapiszStrukture("czlonkowie", backup.dane.czlonkowie);
-          if (backup.dane.posiadane) await zapiszStrukture("posiadane", backup.dane.posiadane);
-          if (backup.dane.duplikaty) await zapiszStrukture("duplikaty", backup.dane.duplikaty);
-          if (backup.dane.walki) await zapiszStrukture("walki", backup.dane.walki);
-          alert("Dane przywrócone! Odśwież stronę.");
+          // Obsłuż oba formaty: stary (backup.dane) i nowy (backup.main)
+          if (backup.wersja === "2.0") {
+            await przywrocPelnyBackup(backup, zapiszStrukture);
+          } else if (backup.dane) {
+            if (backup.dane.talie) await zapiszStrukture("talie", backup.dane.talie);
+            if (backup.dane.czlonkowie) await zapiszStrukture("czlonkowie", backup.dane.czlonkowie);
+            if (backup.dane.posiadane) await zapiszStrukture("posiadane", backup.dane.posiadane);
+            if (backup.dane.duplikaty) await zapiszStrukture("duplikaty", backup.dane.duplikaty);
+            if (backup.dane.walki) await zapiszStrukture("walki", backup.dane.walki);
+          }
+          alert("✅ Dane przywrócone! Odśwież stronę.");
         } catch(err) {
           alert("Błąd przywracania: " + err.message);
         }
@@ -4580,12 +4675,13 @@ To NADPISZE wszystkie obecne dane gangu!`
         </div>
       )}
 
-      <button onClick={eksportuj} style={{
-        width:"100%",padding:14,background:"linear-gradient(135deg,#0c6,#0fa)",
+      <button onClick={eksportuj} disabled={eksportuje} style={{
+        width:"100%",padding:14,
+        background:eksportuje?"rgba(0,200,100,0.3)":"linear-gradient(135deg,#0c6,#0fa)",
         border:"none",borderRadius:10,color:"#000",fontSize:15,fontWeight:"bold",
-        cursor:"pointer",marginBottom:10,
+        cursor:eksportuje?"wait":"pointer",marginBottom:10,
       }}>
-        📥 Pobierz backup (JSON)
+        {eksportuje ? "⏳ Pobieranie danych..." : "📥 Pobierz pełny backup (JSON)"}
       </button>
 
       {/* Przywróć z backupu */}
@@ -4605,12 +4701,18 @@ To NADPISZE wszystkie obecne dane gangu!`
       </div>
 
       <div style={{padding:12,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,fontSize:11,color:"#555",lineHeight:1.7}}>
-        <strong style={{color:"#aaa"}}>Jak często robić backup?</strong><br/>
-        • Po każdej wymianie kart ✓<br/>
-        • Po wpisaniu nowych kart przez OCR ✓<br/>
-        • Przed resetem sezonu ✓<br/><br/>
-        <strong style={{color:"#aaa"}}>Gdzie trzymać backup?</strong><br/>
-        Google Drive, pendrive, e-mail do siebie — gdziekolwiek poza telefonem.
+        <strong style={{color:"#aaa"}}>Co zawiera backup:</strong><br/>
+        • Talie z nagrodami K1/K2 ✓<br/>
+        • Członkowie i kręgi ✓<br/>
+        • Posiadane karty i duplikaty ✓<br/>
+        • Walki sezonu ✓<br/>
+        • Historia wymian ✓<br/>
+        • Kalendarz eventów ✓<br/>
+        • Taktyka sezonu ✓<br/><br/>
+        <strong style={{color:"#aaa"}}>Kiedy robić backup?</strong><br/>
+        Po każdej wymianie · Po OCR · Przed resetem<br/><br/>
+        <strong style={{color:"#aaa"}}>Gdzie trzymać?</strong><br/>
+        Google Drive, e-mail, pendrive — poza telefonem.
       </div>
     </div>
   );
