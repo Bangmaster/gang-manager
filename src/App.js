@@ -1992,6 +1992,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
   const [wylaczoneOsoby,setWylaczoneOsoby]=useState(new Set());
+  const [wylaczoneDawcy,setWylaczoneDawcy]=useState(new Set());
+  const [pokazWylaczenia,setPokazWylaczenia]=useState(false);
 
   const toggleTalia=id=>setWylaczoneTalie(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleOsoba=id=>setWylaczoneOsoby(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
@@ -2126,7 +2128,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       return true;
     }); // odbiorcy
     // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:czlonkowie,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
+    const aktywniDawcy=czlonkowie.filter(c=>!wylaczoneDawcy.has(c.id));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -2447,38 +2450,99 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         )}
       </div>
 
-      {/* Wyłącz osoby */}
-      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",borderRadius:8,padding:12,marginBottom:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700"}}>
-            🚫 Wyłącz osoby z generowania (jako odbiorcy)
-            {wylaczoneOsoby.size>0&&<span style={{marginLeft:8,fontSize:11,color:"#fa0"}}>({wylaczoneOsoby.size} wyłączone)</span>}
+      {/* Wyłącz osoby — rozwijane menu */}
+      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",borderRadius:8,marginBottom:12,overflow:"hidden"}}>
+        {/* Nagłówek — klikalny */}
+        <div onClick={()=>setPokazWylaczenia(p=>!p)} style={{
+          display:"flex",justifyContent:"space-between",alignItems:"center",
+          padding:"10px 12px",cursor:"pointer",
+          background:pokazWylaczenia?"rgba(255,215,0,0.04)":"transparent",
+        }}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",display:"flex",alignItems:"center",gap:8}}>
+            🚫 Wyłącz graczy
+            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0)&&(
+              <span style={{fontSize:10,color:"#fa0",fontWeight:"normal"}}>
+                {wylaczoneOsoby.size>0&&`${wylaczoneOsoby.size}× brak odbioru`}
+                {wylaczoneOsoby.size>0&&wylaczoneDawcy.size>0&&" · "}
+                {wylaczoneDawcy.size>0&&`${wylaczoneDawcy.size}× brak dawcy`}
+              </span>
+            )}
           </div>
-          {wylaczoneOsoby.size>0&&(
-            <button onClick={()=>setWylaczoneOsoby(new Set())} style={{fontSize:10,padding:"2px 8px",background:"rgba(255,165,0,0.1)",border:"1px solid #fa055",borderRadius:4,color:"#fa0",cursor:"pointer"}}>
-              Włącz wszystkich
-            </button>
-          )}
-        </div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-          {czlonkowie.map(c=>{
-            const wylaczona=wylaczoneOsoby.has(c.id);
-            return (
-              <button key={c.id} onClick={()=>toggleOsoba(c.id)} style={{
-                padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
-                background:wylaczona?"rgba(255,50,50,0.15)":"rgba(255,255,255,0.05)",
-                border:wylaczona?"1px solid #f5544488":"1px solid #2a2a3a",
-                color:wylaczona?"#f55":"#888",
-                textDecoration:wylaczona?"line-through":"none",
-              }}>
-                {wylaczona?"🚫 ":""}{c.nazwa}{(c.krag||1)>1&&<span style={{fontSize:9,color:'#da70d6',marginLeft:3}}>K{c.krag}</span>}
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0)&&(
+              <button onClick={e=>{e.stopPropagation();setWylaczoneOsoby(new Set());setWylaczoneDawcy(new Set());}}
+                style={{fontSize:10,padding:"2px 8px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:4,color:"#f55",cursor:"pointer"}}>
+                Resetuj
               </button>
-            );
-          })}
+            )}
+            <span style={{fontSize:12,color:"#555"}}>{pokazWylaczenia?"▲":"▼"}</span>
+          </div>
         </div>
-        {wylaczoneOsoby.size>0&&(
-          <div style={{fontSize:10,color:"#666",marginTop:6}}>
-            Wyłączone osoby nie dostają kart w tej wymianie (mogą nadal wysyłać jako dawcy).
+
+        {/* Rozwijana lista */}
+        {pokazWylaczenia&&(
+          <div style={{padding:"0 12px 12px",borderTop:"1px solid #1a1a2e"}}>
+            {/* Legenda */}
+            <div style={{display:"flex",gap:10,marginBottom:8,marginTop:8,fontSize:10,color:"#555"}}>
+              <span>Kliknij żeby zmienić tryb wyłączenia:</span>
+              <span style={{color:"#888"}}>⬜ aktywny</span>
+              <span style={{color:"#f55"}}>🚫 bez odbioru</span>
+              <span style={{color:"#fa0"}}>📤 bez dawcy</span>
+              <span style={{color:"#a55"}}>⛔ oba</span>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {czlonkowie.map(c=>{
+                const bezOdbioru = wylaczoneOsoby.has(c.id);
+                const bezDawcy = wylaczoneDawcy.has(c.id);
+                const obie = bezOdbioru && bezDawcy;
+
+                // Cykl: aktywny → bez odbioru → bez dawcy → oba → aktywny
+                const handleClick = () => {
+                  if (!bezOdbioru && !bezDawcy) {
+                    // aktywny → bez odbioru
+                    setWylaczoneOsoby(prev=>{const n=new Set(prev);n.add(c.id);return n;});
+                  } else if (bezOdbioru && !bezDawcy) {
+                    // bez odbioru → bez dawcy
+                    setWylaczoneOsoby(prev=>{const n=new Set(prev);n.delete(c.id);return n;});
+                    setWylaczoneDawcy(prev=>{const n=new Set(prev);n.add(c.id);return n;});
+                  } else if (!bezOdbioru && bezDawcy) {
+                    // bez dawcy → oba
+                    setWylaczoneOsoby(prev=>{const n=new Set(prev);n.add(c.id);return n;});
+                  } else {
+                    // oba → aktywny
+                    setWylaczoneOsoby(prev=>{const n=new Set(prev);n.delete(c.id);return n;});
+                    setWylaczoneDawcy(prev=>{const n=new Set(prev);n.delete(c.id);return n;});
+                  }
+                };
+
+                const ikona = obie?"⛔":bezOdbioru?"🚫":bezDawcy?"📤":"";
+                const kolor = obie?"#a55":bezOdbioru?"#f55":bezDawcy?"#fa0":"#888";
+                const bg = obie?"rgba(180,50,50,0.15)":bezOdbioru?"rgba(255,50,50,0.12)":bezDawcy?"rgba(255,165,0,0.12)":"rgba(255,255,255,0.05)";
+                const border = obie?"1px solid #a5544488":bezOdbioru?"1px solid #f5544488":bezDawcy?"1px solid #fa055":"1px solid #2a2a3a";
+
+                return (
+                  <button key={c.id} onClick={handleClick} title={
+                    obie?"Kliknij → aktywny":
+                    bezOdbioru?"Kliknij → bez dawcy":
+                    bezDawcy?"Kliknij → oba wyłączone":
+                    "Kliknij → bez odbioru"
+                  } style={{
+                    padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+                    background:bg, border, color:kolor,
+                    textDecoration:(bezOdbioru||obie)?"line-through":"none",
+                  }}>
+                    {ikona&&<span style={{marginRight:3}}>{ikona}</span>}
+                    {c.nazwa}
+                    {(c.krag||1)>1&&<span style={{fontSize:9,color:"#da70d6",marginLeft:3}}>K{c.krag}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{marginTop:8,fontSize:10,color:"#555",lineHeight:1.6}}>
+              🚫 <strong style={{color:"#f55"}}>bez odbioru</strong> — nie dostaje kart (może wysyłać) ·
+              📤 <strong style={{color:"#fa0"}}>bez dawcy</strong> — nie wysyła kart (może dostać) ·
+              ⛔ <strong style={{color:"#a55"}}>oba</strong> — całkowicie wyłączony z wymiany
+            </div>
           </div>
         )}
       </div>
