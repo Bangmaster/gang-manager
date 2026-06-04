@@ -830,7 +830,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
   const [wybranaOsoba,setWybranaOsoba]=useState(startIdx);
   const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
-  const [tooltip,setTooltip]=useState(null); // {kartaNazwa, dawcy, x, y}
+  const [tooltip,setTooltip]=useState(null);
   const [pokazProfil,setPokazProfil]=useState(null);
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
@@ -922,15 +922,11 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                         onClick={mozeEdytowac?()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane"):undefined}
                         onMouseEnter={(e)=>{
                           if(ma) return;
-                          const dawcy=czlonkowie.filter(c=>
-                            c.id!==osoba.id &&
-                            duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]
-                          ).map(c=>c.nazwa);
+                          const dawcy=czlonkowie.filter(c=>c.id!==osoba.id&&duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]).map(c=>c.nazwa);
                           setTooltip({kartaNazwa:karta.nazwa,dawcy,x:e.clientX,y:e.clientY});
                         }}
                         onMouseMove={(e)=>{
-                          if(ma) return;
-                          if(tooltip) setTooltip(prev=>prev?{...prev,x:e.clientX,y:e.clientY}:null);
+                          if(!ma) setTooltip(p=>p?{...p,x:e.clientX,y:e.clientY}:null);
                         }}
                         onMouseLeave={()=>setTooltip(null)}
 
@@ -1092,31 +1088,21 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
         );
       })()}
 
-      {/* Tooltip — kto ma duplikat tej karty */}
       {tooltip&&(
         <div style={{
-          position:"fixed",
-          left:Math.min(tooltip.x+12, window.innerWidth-230),
-          top:Math.min(tooltip.y+12, window.innerHeight-130),
-          zIndex:9999,
-          background:"rgba(10,5,25,0.97)",
-          border:"1px solid #ffd70055",
+          position:"fixed",left:tooltip.x+14,top:tooltip.y+14,
+          zIndex:99999,pointerEvents:"none",
+          background:"#0a0518",border:"1px solid #ffd70088",
           borderRadius:8,padding:"8px 12px",
-          boxShadow:"0 4px 20px rgba(0,0,0,0.8)",
-          pointerEvents:"none",
-          minWidth:160,maxWidth:220,
+          boxShadow:"0 4px 20px rgba(0,0,0,0.9)",
+          minWidth:150,maxWidth:210,
         }}>
-          <div style={{fontSize:11,color:"#ffd700",fontWeight:"bold",marginBottom:4}}>
-            💎 Kto ma duplikat:
-          </div>
-          <div style={{fontSize:11,color:"#888",marginBottom:4,fontStyle:"italic"}}>
-            {tooltip.kartaNazwa}
-          </div>
-          {tooltip.dawcy.length===0?(
-            <div style={{fontSize:11,color:"#555"}}>Nikt nie ma duplikatu</div>
-          ):tooltip.dawcy.map(d=>(
-            <div key={d} style={{fontSize:12,color:"#0c6",padding:"1px 0"}}>✓ {d}</div>
-          ))}
+          <div style={{fontSize:11,color:"#ffd700",fontWeight:"bold",marginBottom:3}}>💎 Kto ma duplikat:</div>
+          <div style={{fontSize:10,color:"#666",marginBottom:4,fontStyle:"italic"}}>{tooltip.kartaNazwa}</div>
+          {tooltip.dawcy.length===0
+            ?<div style={{fontSize:11,color:"#555"}}>Nikt nie ma duplikatu</div>
+            :tooltip.dawcy.map(d=><div key={d} style={{fontSize:12,color:"#0c6"}}>✓ {d}</div>)
+          }
         </div>
       )}
     </div>
