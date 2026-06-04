@@ -1996,7 +1996,6 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [pokazWylaczenia,setPokazWylaczenia]=useState(false);
 
   const toggleTalia=id=>setWylaczoneTalie(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
-  const toggleOsoba=id=>setWylaczoneOsoby(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const [ignorujTrudne,setIgnorujTrudne]=useState(false);
   const [maxKartNaOsobe,setMaxKartNaOsobe]=useState(0); // 0 = bez limitu
   const [sprawiedliwe,setSprawiedliwe]=useState(false);
