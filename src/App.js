@@ -830,20 +830,8 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
   const [wybranaOsoba,setWybranaOsoba]=useState(startIdx);
   const [filtrTyp,setFiltrTyp]=useState("wszystkie"); // wszystkie / złote / diamentowe
-  const [tooltip,setTooltip]=useState(null); // {kartaNazwa, dawcy}
-  const [tooltipPos,setTooltipPos]=useState({x:0,y:0}); // osobno śledzona pozycja
+  const [tooltip,setTooltip]=useState(null); // {kartaNazwa, dawcy, x, y}
   const [pokazProfil,setPokazProfil]=useState(null);
-  const tooltipRef = useRef(null);
-
-  // Śledź pozycję myszy globalnie gdy tooltip jest widoczny
-  useEffect(()=>{
-    if(!tooltip) return;
-    const handleMove = (e) => {
-      setTooltipPos({x: e.clientX, y: e.clientY});
-    };
-    window.addEventListener("mousemove", handleMove);
-    return () => window.removeEventListener("mousemove", handleMove);
-  }, [tooltip]);
 
   const toggleKarta=(osobaId,taliaId,kartaNazwa,tryb)=>{
     const key=`${osobaId}_${taliaId}_${kartaNazwa}`;
@@ -864,7 +852,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   const mozeEdytowac = isAdmin;
 
   return (
-    <div onClick={()=>setTooltip(null)}>
+    <div>
       {/* Filtry typów */}
       <div style={{display:"flex",gap:6,marginBottom:10}}>
         {[
@@ -933,13 +921,16 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                       <button
                         onClick={mozeEdytowac?()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane"):undefined}
                         onMouseEnter={(e)=>{
-                          if(ma) return; // karta posiadana — bez tooltipa
+                          if(ma) return;
                           const dawcy=czlonkowie.filter(c=>
                             c.id!==osoba.id &&
                             duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]
                           ).map(c=>c.nazwa);
-                          setTooltipPos({x:e.clientX, y:e.clientY});
-                          setTooltip({kartaNazwa:karta.nazwa,dawcy});
+                          setTooltip({kartaNazwa:karta.nazwa,dawcy,x:e.clientX,y:e.clientY});
+                        }}
+                        onMouseMove={(e)=>{
+                          if(ma) return;
+                          if(tooltip) setTooltip(prev=>prev?{...prev,x:e.clientX,y:e.clientY}:null);
                         }}
                         onMouseLeave={()=>setTooltip(null)}
 
@@ -1103,12 +1094,10 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
 
       {/* Tooltip — kto ma duplikat tej karty */}
       {tooltip&&(
-        <div ref={tooltipRef} style={{
+        <div style={{
           position:"fixed",
-          left: Math.min(tooltipPos.x+14, window.innerWidth-(tooltipRef.current?.offsetWidth||220)-8),
-          top: tooltipPos.y - (tooltipRef.current?.offsetHeight||100) - 8 < 8
-            ? tooltipPos.y + 14  // pokaż poniżej jeśli za blisko góry
-            : tooltipPos.y - (tooltipRef.current?.offsetHeight||100) - 8,
+          left:Math.min(tooltip.x+12, window.innerWidth-230),
+          top:Math.min(tooltip.y+12, window.innerHeight-130),
           zIndex:9999,
           background:"rgba(10,5,25,0.97)",
           border:"1px solid #ffd70055",
@@ -1116,7 +1105,6 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
           boxShadow:"0 4px 20px rgba(0,0,0,0.8)",
           pointerEvents:"none",
           minWidth:160,maxWidth:220,
-          transition:"left 0.05s, top 0.05s",
         }}>
           <div style={{fontSize:11,color:"#ffd700",fontWeight:"bold",marginBottom:4}}>
             💎 Kto ma duplikat:
@@ -1129,9 +1117,6 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
           ):tooltip.dawcy.map(d=>(
             <div key={d} style={{fontSize:12,color:"#0c6",padding:"1px 0"}}>✓ {d}</div>
           ))}
-          <div style={{fontSize:9,color:"#333",marginTop:4}}>
-            kliknij żeby zamknąć
-          </div>
         </div>
       )}
     </div>
