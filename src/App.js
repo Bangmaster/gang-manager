@@ -931,8 +931,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                   return (
                     <div key={karta.nazwa} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                       <button
-                        disabled={!mozeEdytowac}
-                        onClick={()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane")}
+                        onClick={mozeEdytowac?()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane"):undefined}
                         onMouseEnter={!ma?(e)=>{
                           const dawcy=czlonkowie.filter(c=>
                             c.id!==osoba.id &&
@@ -941,7 +940,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                           setTooltipPos({x:e.clientX, y:e.clientY});
                           setTooltip({kartaNazwa:karta.nazwa,dawcy});
                         }:null}
-                        onMouseLeave={!ma?()=>setTooltip(null):null}
+                        onMouseLeave={()=>setTooltip(null)}
 
                         style={{
                           padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
