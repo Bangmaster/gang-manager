@@ -4501,6 +4501,47 @@ function BackupDanych({dane, zapiszStrukture}) {
 
 
 
+  const [przywracanie, setPrzywracanie] = useState(false);
+
+  const importuj = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const backup = JSON.parse(ev.target.result);
+        if (!backup.dane) { alert("Nieprawidłowy plik backup!"); return; }
+        const dataBackup = new Date(backup.data).toLocaleString("pl-PL");
+        const czlonkowieCount = backup.dane.czlonkowie?.length || 0;
+        const posiadaneCount = Object.keys(backup.dane.posiadane || {}).length;
+        const dupCount2 = Object.keys(backup.dane.duplikaty || {}).length;
+        if (!window.confirm(
+          `Przywrócić dane z ${dataBackup}?
+
+Członków: ${czlonkowieCount}
+Kart posiadanych: ${posiadaneCount}
+Duplikatów: ${dupCount2}
+
+To NADPISZE wszystkie obecne dane gangu!`
+        )) return;
+        setPrzywracanie(true);
+        try {
+          if (backup.dane.talie) await zapiszStrukture("talie", backup.dane.talie);
+          if (backup.dane.czlonkowie) await zapiszStrukture("czlonkowie", backup.dane.czlonkowie);
+          if (backup.dane.posiadane) await zapiszStrukture("posiadane", backup.dane.posiadane);
+          if (backup.dane.duplikaty) await zapiszStrukture("duplikaty", backup.dane.duplikaty);
+          if (backup.dane.walki) await zapiszStrukture("walki", backup.dane.walki);
+          alert("Dane przywrócone! Odśwież stronę.");
+        } catch(err) {
+          alert("Błąd przywracania: " + err.message);
+        }
+        setPrzywracanie(false);
+      } catch { alert("Błąd odczytu pliku!"); }
+    };
+    reader.readAsText(file);
+  };
+
   const kartyCount = dane.posiadane ? Object.keys(dane.posiadane).length : 0;
   const dupCount = dane.duplikaty ? Object.keys(dane.duplikaty).length : 0;
 
