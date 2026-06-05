@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // Klucze API — te same co w gemini.js
 const KLUCZE = [
@@ -280,6 +280,12 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
   const [podsumowanieSezonu, setPodsumowanieSezonu] = useState(null);
   const [edytowanyGracz, setEdytowanyGracz] = useState(null);
   const [aktywnyScreen, setAktywnyScreen] = useState(0);
+  const [plikiAktywnosci, setPlikiAktywnosci] = useState([]);
+  const [podgladAktywnosci, setPodgladAktywnosci] = useState([]);
+  const [analizujacAktywnosc, setAnalizujacAktywnosc] = useState(false);
+  const [wynikiAktywnosci, setWynikiAktywnosci] = useState(null);
+  const [opoznienie, setOpoznienie] = useState("0");
+  const [progressAkt, setProgressAkt] = useState("");
 
   const handleFiles = (e) => {
     const fs = Array.from(e.target.files || []);
@@ -1142,6 +1148,41 @@ function formatLiczby(n) {
   return n.toString();
 }
 
+function GraczRaport({ g, i, linie, kolor, total }) {
+  const [rozwiniety, setRozwiniety] = useState(false);
+  return (
+    <div style={{ marginBottom: 8, borderRadius: 8, overflow: "hidden", border: `1px solid ${kolor}33`, background: "rgba(0,0,0,0.2)" }}>
+      <div onClick={() => setRozwiniety(p=>!p)} style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "10px 12px", cursor: "pointer",
+        background: rozwiniety ? `${kolor}11` : "transparent",
+      }}>
+        <div style={{ fontSize: 16, width: 24, textAlign: "center", flexShrink: 0 }}>
+          {i===0?"👑":i===1?"🥈":i===2?"🥉":i>=19?"🥄":"👤"}
+        </div>
+        <div style={{ flex: 1 }}>
+          <span style={{ fontSize: 13, fontWeight: "bold", color: kolor }}>{g.nazwa}</span>
+          <span style={{ fontSize: 10, color: "#555", marginLeft: 8 }}>
+            #{g.pozycjaSezonu} · {formatLiczby(g.obrazeniaLacznie)} obrażeń · {g.uczestnictwa} walk
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: "#555" }}>{rozwiniety ? "▲" : "▼"}</div>
+      </div>
+      {rozwiniety && (
+        <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${kolor}22` }}>
+          {linie.map((l, li) => (
+            <div key={li} style={{
+              fontSize: 11, color: "#bbb", lineHeight: 1.7,
+              padding: "6px 0",
+              borderBottom: li < linie.length-1 ? "1px solid #1a1a2e" : "none",
+            }}>{l}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
   const pozycja = g.pozycjaSezonu;
   const total = wszyscy.length;
@@ -1325,8 +1366,11 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
         {wszyscy.map((g, i) => {
           const linie = generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka);
           const kolor = i===0?"#ffd700":i===1?"#c0c0c0":i===2?"#cd7f32":i>=wszyscy.length-2?"#f55":"#888";
-          const [rozwiniety, setRozwiniety] = React.useState(false);
-          return (
+          return <GraczRaport key={g.nazwa} g={g} i={i} linie={linie} kolor={kolor} />;
+        })}
+      </div>
+
+      {/* Pełny ranking z edycją — przeniesiony za mapy */}
             <div key={g.nazwa} style={{
               marginBottom: 8, borderRadius: 8, overflow: "hidden",
               border: `1px solid ${kolor}33`,
