@@ -274,7 +274,21 @@ const DOMYSLNE_DANE = {
 export default function App() {
   // sessionStorage = auto-wylogowanie przy zamknięciu karty/przeglądarki
   const [zalogowany, setZalogowany] = useState(() => {
-    try { const z = localStorage.getItem("gang_user"); return z ? JSON.parse(z) : null; } catch { return null; }
+    try { 
+      // Admini mogą być zapamiętani (localStorage), członkowie muszą się logować każdym razem (sessionStorage)
+      const zSession = sessionStorage.getItem("gang_user");
+      if (zSession) return JSON.parse(zSession);
+      const zLocal = localStorage.getItem("gang_user");
+      if (zLocal) {
+        const u = JSON.parse(zLocal);
+        // Tylko admin może być zapamiętany
+        if (u.rola === "admin" || u.rola === "zastepca") return u;
+        // Członkowie — usuń stary zapis i wymuś logowanie
+        localStorage.removeItem("gang_user");
+        return null;
+      }
+      return null;
+    } catch { return null; }
   });
   const [dane, setDane] = useState(null); // null = loading
   const [zakładka, setZakładka] = useState(() => {
@@ -431,8 +445,17 @@ export default function App() {
   // Zapis loginu
   useEffect(() => {
     try {
-      if (zalogowany) sessionStorage.setItem("gang_user", JSON.stringify(zalogowany));
-      else localStorage.removeItem("gang_user");
+      if (zalogowany) {
+        if (zalogowany.rola === "admin" || zalogowany.rola === "zastepca") {
+          localStorage.setItem("gang_user", JSON.stringify(zalogowany)); // admin zapamiętany
+        } else {
+          sessionStorage.setItem("gang_user", JSON.stringify(zalogowany)); // członek tylko na sesję
+          localStorage.removeItem("gang_user"); // wyczyść stary zapis
+        }
+      } else {
+        sessionStorage.removeItem("gang_user");
+        localStorage.removeItem("gang_user");
+      }
     } catch {}
   }, [zalogowany]);
 
