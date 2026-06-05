@@ -1338,8 +1338,7 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
   const srednia = Math.round(g.obrazeniaLacznie / Math.max(g.uczestnictwa, 1));
   const sredniaGangu = Math.round(wszyscy.reduce((s,x)=>s+x.obrazeniaLacznie,0) / Math.max(wszyscy.reduce((s,x)=>s+x.uczestnictwa,0),1));
   const frekwencja = lacznaWalka > 0 ? Math.round(g.uczestnictwa / lacznaWalka * 100) : 0;
-  const frekwencjaObecnosc = g.maObecnoscDane && lacznaWalka > 0
-    ? Math.round((g.obecnosciLacznie || 0) / lacznaWalka * 100) : null;
+
   const maxWalka = g.historiaObr.length > 0 ? Math.max(...g.historiaObr.map(h=>h.obr)) : 0;
   const minWalka = g.historiaObr.length > 0 ? Math.min(...g.historiaObr.map(h=>h.obr)) : 0;
   const rozpitosc = maxWalka > 0 ? Math.round(maxWalka / Math.max(minWalka, 1)) : 1;
@@ -1348,8 +1347,7 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
   const histPoz = g.historiaPozyc || [];
   let zmianaPoz = null;
   if (histPoz.length >= 2) {
-    const pierwszaObr = histPoz[0].obrazenia;
-    const ostatniaObr = histPoz[histPoz.length - 1].obrazenia;
+
     // Oszacuj pozycję przez porównanie z innymi
     const rankPierwsza = [...wszyscy]
       .sort((a, b) => (b.historiaPozyc[0]?.obrazenia||0) - (a.historiaPozyc[0]?.obrazenia||0))
@@ -1615,5 +1613,3 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
     </div>
   );
 }
-
-
