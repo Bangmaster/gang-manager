@@ -715,11 +715,14 @@ function RankingTabela({ gracze, edytowalne, onChange }) {
     if (n >= 1000) return (n / 1000).toFixed(2).replace(".", ",") + "k";
     return n.toString();
   };
-  const max = Math.max(1, ...gracze.map(g => g.obrazenia));
+  // Sortuj wg obrażeń malejąco
+  const posortowani = [...gracze].sort((a, b) => b.obrazenia - a.obrazenia);
+  const max = Math.max(1, ...posortowani.map(g => g.obrazenia));
   return (
     <div>
-      {gracze.map((g, i) => {
+      {posortowani.map((g, i) => {
         const kolor = i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#888";
+        const obecnosc = g.bylNaWalce;
         return (
           <div key={i} style={{
             display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
@@ -728,6 +731,11 @@ function RankingTabela({ gracze, edytowalne, onChange }) {
           }}>
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(g.obrazenia / max) * 100}%`, background: `${kolor}08`, zIndex: 0 }} />
             <span style={{ fontSize: 13, color: kolor, fontWeight: "bold", width: 24, zIndex: 1 }}>{i + 1}.</span>
+            {obecnosc !== undefined && (
+              <span style={{ fontSize: 9, zIndex: 1 }} title={obecnosc ? "Był na walce" : "Nie był na walce"}>
+                {obecnosc ? "🟢" : "🔴"}
+              </span>
+            )}
             <span style={{ flex: 1, fontSize: 12, color: "#ddd", fontWeight: i < 3 ? "bold" : "normal", zIndex: 1 }}>
               {g.nazwa} <span style={{ fontSize: 10, color: "#666" }}>L{g.poziom}</span>
             </span>
@@ -1584,6 +1592,40 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Tabela obecności wszystkich członków */}
+      {wszyscy.some(g => g.maObecnoscDane) && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>📊 Frekwencja na walkach</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "4px 10px", alignItems: "center" }}>
+            <div style={{ fontSize: 10, color: "#555", paddingBottom: 4, borderBottom: "1px solid #2a2a3a" }}>Gracz</div>
+            <div style={{ fontSize: 10, color: "#555", textAlign: "center", paddingBottom: 4, borderBottom: "1px solid #2a2a3a" }}>Był</div>
+            <div style={{ fontSize: 10, color: "#555", textAlign: "center", paddingBottom: 4, borderBottom: "1px solid #2a2a3a" }}>Nie był</div>
+            <div style={{ fontSize: 10, color: "#555", textAlign: "center", paddingBottom: 4, borderBottom: "1px solid #2a2a3a" }}>%</div>
+            {[...wszyscy].sort((a,b) => (b.obecnosciLacznie||0) - (a.obecnosciLacznie||0)).map(g => {
+              if (!g.maObecnoscDane) return null;
+              const byl = g.obecnosciLacznie || 0;
+              const nieByl = lacznaWalka - byl;
+              const proc = Math.round(byl / lacznaWalka * 100);
+              const kolor = proc >= 80 ? "#0c6" : proc >= 50 ? "#fa0" : "#f55";
+              return [
+                <div key={`n_${g.nazwa}`} style={{ fontSize: 11, color: "#ddd" }}>
+                  {g.nazwa.replace(/™FAM™|fAM™|FAM™/g, "")}
+                </div>,
+                <div key={`b_${g.nazwa}`} style={{ fontSize: 11, color: "#0c6", textAlign: "center", fontWeight: "bold" }}>
+                  🟢 {byl}
+                </div>,
+                <div key={`nb_${g.nazwa}`} style={{ fontSize: 11, color: "#f55", textAlign: "center" }}>
+                  {nieByl > 0 ? `🔴 ${nieByl}` : "—"}
+                </div>,
+                <div key={`p_${g.nazwa}`} style={{ fontSize: 11, color: kolor, textAlign: "center", fontWeight: "bold" }}>
+                  {proc}%
+                </div>,
+              ];
+            })}
+          </div>
         </div>
       )}
 
