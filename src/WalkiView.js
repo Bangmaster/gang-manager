@@ -587,7 +587,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
       )}
 
       {podglad === "historia" && (
-        <HistoriaWalk walki={walki || []} usunWalke={usunWalke} isAdmin={isAdmin} />
+        <HistoriaWalk walki={walki || []} usunWalke={usunWalke} isAdmin={isAdmin} zapiszWalki={zapiszWalki} />
       )}
 
       {podglad === "sezon" && (
@@ -740,8 +740,26 @@ function RankingTabela({ gracze, edytowalne, onChange }) {
   );
 }
 
-function HistoriaWalk({ walki, usunWalke, isAdmin }) {
+function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
   const [rozwiniete, setRozwiniete] = useState(null);
+  const [trybEdycji, setTrybEdycji] = useState(null); // id walki w trybie edycji obecności
+
+  const toggleObecnosc = async (walkaId, graczNazwa) => {
+    const noweWalki = walki.map(w => {
+      if (w.id !== walkaId) return w;
+      return {
+        ...w,
+        gracze: w.gracze.map(g => {
+          if (g.nazwa !== graczNazwa) return g;
+          const obecny = g.bylNaWalce;
+          // jeśli nie ma danych aktywności, zaczynamy od true
+          const nowa = obecny === undefined ? false : !obecny;
+          return { ...g, bylNaWalce: nowa };
+        })
+      };
+    });
+    await zapiszWalki(noweWalki);
+  };
 
   if (walki.length === 0) {
     return (
@@ -758,29 +776,79 @@ function HistoriaWalk({ walki, usunWalke, isAdmin }) {
   return (
     <div>
       <div style={{ fontSize: 12, color: "#aaa", marginBottom: 10 }}>Zapisano <strong style={{ color: "#ffd700" }}>{walki.length}</strong> walk</div>
-      {sorted.map(w => (
-        <div key={w.id} style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 12, marginBottom: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13 }}>{w.nazwa}</div>
-              <div style={{ fontSize: 10, color: "#666" }}>{new Date(w.data).toLocaleString("pl-PL")} • {w.gracze.length} graczy</div>
+      {sorted.map(w => {
+        const bylaNaWalce = w.gracze.filter(g => g.bylNaWalce === true).length;
+        const niebylo = w.gracze.filter(g => g.bylNaWalce === false).length;
+        const maObecnosc = w.gracze.some(g => g.bylNaWalce !== undefined);
+        return (
+          <div key={w.id} style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 12, marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13 }}>{w.nazwa}</div>
+                <div style={{ fontSize: 10, color: "#666", marginTop: 2 }}>
+                  {new Date(w.data).toLocaleString("pl-PL")} • {w.gracze.length} graczy
+                  {maObecnosc && <span style={{ marginLeft: 8 }}>
+                    <span style={{ color: "#0c6" }}>🟢{bylaNaWalce}</span>
+                    <span style={{ color: "#f55", marginLeft: 4 }}>🔴{niebylo}</span>
+                  </span>}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 5 }}>
+                {isAdmin && (
+                  <button onClick={() => setTrybEdycji(trybEdycji === w.id ? null : w.id)} style={{
+                    padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
+                    background: trybEdycji === w.id ? "rgba(100,150,255,0.2)" : "rgba(100,150,255,0.08)",
+                    border: `1px solid ${trybEdycji === w.id ? "#6496ff" : "#6496ff33"}`,
+                    color: "#6496ff",
+                  }}>👥 Obecność</button>
+                )}
+                <button onClick={() => setRozwiniete(rozwiniete === w.id ? null : w.id)} style={{
+                  padding: "4px 10px", background: "rgba(255,215,0,0.1)", border: "1px solid #b8860b55", borderRadius: 5, color: "#b8860b", cursor: "pointer", fontSize: 11,
+                }}>{rozwiniete === w.id ? "Zwiń" : "Pokaż"}</button>
+                {isAdmin && (
+                  <button onClick={() => usunWalke(w.id)} style={{
+                    padding: "4px 8px", background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", borderRadius: 5, color: "#f55", cursor: "pointer", fontSize: 11,
+                  }}>🗑</button>
+                )}
+              </div>
             </div>
-            <button onClick={() => setRozwiniete(rozwiniete === w.id ? null : w.id)} style={{
-              padding: "4px 10px", background: "rgba(255,215,0,0.1)", border: "1px solid #b8860b55", borderRadius: 5, color: "#b8860b", cursor: "pointer", fontSize: 11,
-            }}>{rozwiniete === w.id ? "Zwiń" : "Pokaż"}</button>
-            {isAdmin && (
-              <button onClick={() => usunWalke(w.id)} style={{
-                padding: "4px 8px", background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", borderRadius: 5, color: "#f55", cursor: "pointer", fontSize: 11,
-              }}>🗑</button>
+
+            {/* Edycja obecności */}
+            {trybEdycji === w.id && (
+              <div style={{ marginTop: 10, padding: 10, background: "rgba(100,150,255,0.06)", border: "1px solid #6496ff22", borderRadius: 6 }}>
+                <div style={{ fontSize: 11, color: "#6496ff", marginBottom: 8, fontWeight: "bold" }}>
+                  👥 Edycja obecności — kliknij gracza żeby zmienić status
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {w.gracze.sort((a,b)=>a.nazwa.localeCompare(b.nazwa)).map(g => {
+                    const byl = g.bylNaWalce;
+                    const kolor = byl === true ? "#0c6" : byl === false ? "#f55" : "#888";
+                    const bg = byl === true ? "rgba(0,200,100,0.12)" : byl === false ? "rgba(255,50,50,0.1)" : "rgba(255,255,255,0.05)";
+                    const ikona = byl === true ? "🟢" : byl === false ? "🔴" : "⚪";
+                    return (
+                      <button key={g.nazwa} onClick={() => toggleObecnosc(w.id, g.nazwa)} style={{
+                        padding: "4px 10px", borderRadius: 16, cursor: "pointer", fontSize: 11,
+                        background: bg, border: `1px solid ${kolor}44`, color: kolor,
+                      }}>
+                        {ikona} {g.nazwa.replace(/™FAM™|fAM™|FAM™/g, "")}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>
+                  ⚪ nieznana · 🟢 był · 🔴 nie był — zmiany zapisują się automatycznie
+                </div>
+              </div>
+            )}
+
+            {rozwiniete === w.id && (
+              <div style={{ marginTop: 12 }}>
+                <RankingTabela gracze={w.gracze} edytowalne={false} />
+              </div>
             )}
           </div>
-          {rozwiniete === w.id && (
-            <div style={{ marginTop: 12 }}>
-              <RankingTabela gracze={w.gracze} edytowalne={false} />
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -871,10 +939,11 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
       s.uczestnictwa++;
       s.miejsca.push(g.miejsce || 99);
       s.historiaObr.push({ data: w.data, obr: g.obrazenia, walkaId: w.id });
-      // Jeśli mamy dane aktywności — zapisz obecność
+      s.historiaPozyc.push({ data: w.data, walkaId: w.id, obrazenia: g.obrazenia });
+      // Jeśli mamy dane aktywności — zapisz obecność (bylNaWalce)
       if (g.bylNaWalce !== undefined) {
         s.obecnosciLacznie = (s.obecnosciLacznie || 0) + (g.bylNaWalce ? 1 : 0);
-        s.maObeznoscDane = true;
+        s.maObecnoscDane = true;
       }
     });
   });
@@ -886,6 +955,11 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
   wszyscy.forEach((g, i) => { g.pozycjaSezonu = i + 1; });
 
   const lacznaWalka = walki.length;
+  // Helper: prawdziwa frekwencja (z bylNaWalce) lub uczestnictwa jako fallback
+  const getFrekwencja = (g) => {
+    if (g.maObecnoscDane) return { liczba: g.obecnosciLacznie || 0, zDanych: true };
+    return { liczba: g.uczestnictwa, zDanych: false };
+  };
   const ciekawostki = [];
 
   // 1. Król obrażeń
@@ -931,11 +1005,86 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     }
   }
 
-  // 4. Najaktywniejszy — max uczestnictwa (cap do liczby walk)
-  const najwiecejWalk = [...wszyscy].sort((a, b) => b.uczestnictwa - a.uczestnictwa)[0];
+  // 3b. Awanse i spadki pozycji w rankingu między 1. a ostatnią walką
+  if (lacznaWalka >= 2) {
+    const walkiSort = [...walki].sort((a, b) => new Date(a.data) - new Date(b.data));
+    const pierwszaWalka = walkiSort[0];
+    const ostatniaWalka = walkiSort[walkiSort.length - 1];
+
+    // Ranking w pierwszej walce
+    const rankPierwsza = [...pierwszaWalka.gracze]
+      .sort((a, b) => b.obrazenia - a.obrazenia)
+      .map((g, i) => ({ nazwa: g.nazwa, poz: i + 1 }));
+
+    // Ranking w ostatniej walce
+    const rankOstatnia = [...ostatniaWalka.gracze]
+      .sort((a, b) => b.obrazenia - a.obrazenia)
+      .map((g, i) => ({ nazwa: g.nazwa, poz: i + 1 }));
+
+    // Oblicz zmianę pozycji dla każdego gracza
+    const zmianyPozycji = [];
+    rankOstatnia.forEach(ro => {
+      const rp = rankPierwsza.find(r => r.nazwa === ro.nazwa);
+      if (!rp) return;
+      const zmiana = rp.poz - ro.poz; // dodatnia = awans (był wyżej numerycznie = gorzej)
+      if (Math.abs(zmiana) >= 2) {
+        zmianyPozycji.push({ nazwa: ro.nazwa, zmiana, pozPierwsza: rp.poz, pozOstatnia: ro.poz });
+      }
+    });
+
+    if (zmianyPozycji.length > 0) {
+      const awanse = zmianyPozycji.filter(z => z.zmiana > 0).sort((a, b) => b.zmiana - a.zmiana);
+      const spadki = zmianyPozycji.filter(z => z.zmiana < 0).sort((a, b) => a.zmiana - b.zmiana);
+
+      if (awanse.length > 0) {
+        const a = awanse[0];
+        ciekawostki.push({
+          ikona: "🚀",
+          tytul: "Największy awans sezonu",
+          opis: `${a.nazwa} — z #${a.pozPierwsza} na #${a.pozOstatnia} (+${a.zmiana} miejsc między 1. a ostatnią walką)`
+        });
+      }
+      if (spadki.length > 0) {
+        const s = spadki[0];
+        ciekawostki.push({
+          ikona: "📉",
+          tytul: "Największy spadek sezonu",
+          opis: `${s.nazwa} — z #${s.pozPierwsza} na #${s.pozOstatnia} (${s.zmiana} miejsc między 1. a ostatnią walką)`
+        });
+      }
+
+      // Wszyscy co awansowali/spadli — krótka lista
+      if (awanse.length > 1) {
+        const lista = awanse.slice(1, 4).map(a => `${a.nazwa} +${a.zmiana}`).join(", ");
+        ciekawostki.push({
+          ikona: "⬆️",
+          tytul: "Gracze w formie wzrostowej",
+          opis: `${lista}${awanse.length > 4 ? ` i ${awanse.length - 4} innych` : ""}`
+        });
+      }
+      if (spadki.length > 1) {
+        const lista = spadki.slice(1, 4).map(s => `${s.nazwa} ${s.zmiana}`).join(", ");
+        ciekawostki.push({
+          ikona: "⬇️",
+          tytul: "Gracze w formie spadkowej",
+          opis: `${lista}${spadki.length > 4 ? ` i ${spadki.length - 4} innych` : ""}`
+        });
+      }
+    }
+  }
+
+  // 4. Najaktywniejszy — używaj bylNaWalce jeśli dostępne
+  const sortWgAktywnosci = [...wszyscy].sort((a, b) => {
+    const fa = getFrekwencja(a);
+    const fb = getFrekwencja(b);
+    return fb.liczba - fa.liczba;
+  });
+  const najwiecejWalk = sortWgAktywnosci[0];
   if (najwiecejWalk) {
-    const procent = Math.round((najwiecejWalk.uczestnictwa / lacznaWalka) * 100);
-    ciekawostki.push({ ikona: "🎮", tytul: "Najaktywniejszy", opis: `${najwiecejWalk.nazwa} — był w ${najwiecejWalk.uczestnictwa} z ${lacznaWalka} walk (${procent}%)` });
+    const fr = getFrekwencja(najwiecejWalk);
+    const procent = Math.round((fr.liczba / lacznaWalka) * 100);
+    const label = fr.zDanych ? "obecny na" : "w rankingu";
+    ciekawostki.push({ ikona: "🎮", tytul: "Najaktywniejszy", opis: `${najwiecejWalk.nazwa} — ${label} ${fr.liczba} z ${lacznaWalka} walk (${procent}%)` });
   }
 
   // 5. Konsekwentny gracz — najmniejsza wariancja wyników (stabilna forma)
@@ -1189,9 +1338,33 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
   const srednia = Math.round(g.obrazeniaLacznie / Math.max(g.uczestnictwa, 1));
   const sredniaGangu = Math.round(wszyscy.reduce((s,x)=>s+x.obrazeniaLacznie,0) / Math.max(wszyscy.reduce((s,x)=>s+x.uczestnictwa,0),1));
   const frekwencja = lacznaWalka > 0 ? Math.round(g.uczestnictwa / lacznaWalka * 100) : 0;
+  const frekwencjaObecnosc = g.maObecnoscDane && lacznaWalka > 0
+    ? Math.round((g.obecnosciLacznie || 0) / lacznaWalka * 100) : null;
   const maxWalka = g.historiaObr.length > 0 ? Math.max(...g.historiaObr.map(h=>h.obr)) : 0;
   const minWalka = g.historiaObr.length > 0 ? Math.min(...g.historiaObr.map(h=>h.obr)) : 0;
   const rozpitosc = maxWalka > 0 ? Math.round(maxWalka / Math.max(minWalka, 1)) : 1;
+
+  // Pozycja vs poprzedni sezon (pierwsza vs ostatnia walka)
+  const histPoz = g.historiaPozyc || [];
+  let zmianaPoz = null;
+  if (histPoz.length >= 2) {
+    const pierwszaObr = histPoz[0].obrazenia;
+    const ostatniaObr = histPoz[histPoz.length - 1].obrazenia;
+    // Oszacuj pozycję przez porównanie z innymi
+    const rankPierwsza = [...wszyscy]
+      .sort((a, b) => (b.historiaPozyc[0]?.obrazenia||0) - (a.historiaPozyc[0]?.obrazenia||0))
+      .findIndex(x => x.nazwa === g.nazwa) + 1;
+    const rankOstatnia = [...wszyscy]
+      .sort((a, b) => {
+        const ao = a.historiaPozyc[a.historiaPozyc.length-1]?.obrazenia||0;
+        const bo = b.historiaPozyc[b.historiaPozyc.length-1]?.obrazenia||0;
+        return bo - ao;
+      })
+      .findIndex(x => x.nazwa === g.nazwa) + 1;
+    if (rankPierwsza > 0 && rankOstatnia > 0) {
+      zmianaPoz = rankPierwsza - rankOstatnia; // dodatnia = awans
+    }
+  }
 
   // Trend — porównaj pierwszą i drugą połowę walk
   let trend = "stały";
@@ -1276,6 +1449,15 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
     linie.push(`Rozpiętość wyników ${formatLiczby(minWalka)}–${formatLiczby(maxWalka)}. Można grać jak bóg albo jak obserwator. I jedno i drugie ma miejsce w tej historii.`);
   } else if (rozpitosc <= 2 && g.uczestnictwa >= 3 && srednia > 10000) {
     linie.push(`Wyniki równe jak stół. ${formatLiczby(minWalka)}–${formatLiczby(maxWalka)}. Regularność godna szacunku. Albo autokliker. Nie osądzamy.`);
+  }
+
+  // Zmiana pozycji
+  if (zmianaPoz !== null && Math.abs(zmianaPoz) >= 1 && g.uczestnictwa >= 2) {
+    if (zmianaPoz > 0) {
+      linie.push(`Awans o ${zmianaPoz} ${zmianaPoz===1?"miejsce":zmianaPoz<5?"miejsca":"miejsc"} w rankingu między pierwszą a ostatnią walką sezonu. Forma wzrostowa. Odnotowane.`);
+    } else if (zmianaPoz < 0) {
+      linie.push(`Spadek o ${Math.abs(zmianaPoz)} ${Math.abs(zmianaPoz)===1?"miejsce":Math.abs(zmianaPoz)<5?"miejsca":"miejsc"} w rankingu między pierwszą a ostatnią walką. Forma się nie poprawia. Dane też tego nie ukrywają.`);
+    }
   }
 
   // Rekord
