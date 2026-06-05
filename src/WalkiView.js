@@ -58,6 +58,113 @@ async function scaleScreenyWalki(files) {
   return canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
 }
 
+// Prompt dla screenów aktywności członków
+function buildActivityPrompt(ileScreenow) {
+  const wieloInfo = ileScreenow > 1
+    ? `Masz ${ileScreenow} screeny złączone pionowo. Każdego gracza zwróć TYLKO RAZ.`
+    : "Masz jeden screen z listą członków gangu.";
+
+  return `Rozpoznaj listę członków gangu z gry The Gang. ${wieloInfo}
+
+Każdy wiersz zawiera:
+- numer porządkowy (1, 2, 3...)
+- nazwa gracza (np. "SaMaNtA", "™FAM™Fallven") — skopiuj DOKŁADNIE
+- czas ostatniej aktywności: "teraz", "X s. temu", "X min. temu", "X godz. temu", "Xg Ym temu"
+
+Zamień czas na minuty:
+- "teraz" lub "online" = 0
+- "X s. temu" = 0 (zaokrąglij do 0)
+- "X min. temu" = X
+- "X godz. temu" = X * 60
+- "Xg Ym temu" = X*60 + Y
+- "godzinę temu" = 60
+- "2 godziny temu" = 120
+
+Zwróć WYŁĄCZNIE JSON (bez markdown):
+{"czlonkowie":[{"nazwa":"SaMaNtA","minutTemu":4},{"nazwa":"™FAM™Fallven","minutTemu":120}]}
+
+Zwróć każdego gracza TYLKO RAZ. Ignoruj graczy bez czasu aktywności.`;
+}
+
+// Analizuje screeny aktywności członków
+async function analyzeActivityImages(files, onProgress) {
+  if (KLUCZE.length === 0) {
+    return { sukces: false, blad: "🔑 Brak klucza API", czlonkowie: [] };
+  }
+
+  try {
+    onProgress?.(`📸 Scalanie ${files.length} screen${files.length === 1 ? "u" : "ów"} aktywności...`);
+    const base64 = files.length === 1
+      ? await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result.split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(files[0]);
+        })
+      : await scaleScreenyWalki(files); // ta sama funkcja skalowania
+
+    onProgress?.("🤖 Analizuję aktywność członków...");
+
+    let ostatniBladMsg = "";
+    for (let proba = 0; proba < 3; proba++) {
+      try {
+        const url = pobierzURL();
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { text: buildActivityPrompt(files.length) },
+              { inline_data: { mime_type: "image/jpeg", data: base64 } }
+            ]}],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let msg = `Błąd ${response.status}`;
+          try {
+            const j = JSON.parse(errText);
+            const code = j.error?.code, m = j.error?.message || "";
+            if (code === 429) msg = "⏳ Limit — czekaj";
+            else if (code === 403) msg = "🔑 Klucz zablokowany";
+            else msg = `Błąd ${code}: ${m.substring(0, 80)}`;
+          } catch {}
+          ostatniBladMsg = msg;
+          nastepnyKlucz();
+          if (proba < 2) {
+            onProgress?.(`${msg} — próba ${proba + 2}/3 za 10s...`);
+            await new Promise(r => setTimeout(r, 10000));
+          }
+          continue;
+        }
+
+        const data = await response.json();
+        let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+        if (text.startsWith("```json")) text = text.slice(7);
+        else if (text.startsWith("```")) text = text.slice(3);
+        if (text.endsWith("```")) text = text.slice(0, -3);
+        const parsed = JSON.parse(text.trim());
+        nastepnyKlucz();
+        return { sukces: true, czlonkowie: parsed.czlonkowie || [] };
+
+      } catch (e) {
+        ostatniBladMsg = e.message;
+        nastepnyKlucz();
+        if (proba < 2) {
+          onProgress?.(`Błąd — próba ${proba + 2}/3 za 10s...`);
+          await new Promise(r => setTimeout(r, 10000));
+        }
+      }
+    }
+    return { sukces: false, blad: ostatniBladMsg, czlonkowie: [] };
+
+  } catch (e) {
+    return { sukces: false, blad: e.message, czlonkowie: [] };
+  }
+}
+
 // Prompt dla scalonego rankingu
 function buildBattlePrompt(ileScreenow) {
   const wieloInfo = ileScreenow > 1
@@ -201,6 +308,53 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
     setAnalizujac(false);
   };
 
+  const handleAktywnosc = (e) => {
+    const fs = Array.from(e.target.files || []);
+    podgladAktywnosci.forEach(u => URL.revokeObjectURL(u));
+    setPlikiAktywnosci(fs);
+    setPodgladAktywnosci(fs.map(f => URL.createObjectURL(f)));
+    setWynikiAktywnosci(null);
+  };
+
+  const analizujAktywnosc = async () => {
+    if (plikiAktywnosci.length === 0) return;
+    setAnalizujacAktywnosc(true);
+    setProgressAkt("");
+    const wynik = await analyzeActivityImages(plikiAktywnosci, setProgressAkt);
+    if (wynik.sukces) {
+      const opozn = parseInt(opoznienie) || 0;
+      const PROG = 30 + opozn; // walka trwa 30 min + opóźnienie screena
+      const przetworzone = wynik.czlonkowie
+        .filter(c => c.nazwa && c.nazwa.toLowerCase() !== "mob")
+        .map(c => ({
+          ...c,
+          bylNaWalce: c.minutTemu <= PROG,
+        }));
+      setWynikiAktywnosci(przetworzone);
+    }
+    setAnalizujacAktywnosc(false);
+  };
+
+  const dołączAktywnoscDoWalki = () => {
+    if (!wynikiAktywnosci || !wyniki) return;
+    // Dołącz info o aktywności do graczy w wynikach walki
+    const aktMap = {};
+    wynikiAktywnosci.forEach(c => { aktMap[c.nazwa.toLowerCase()] = c; });
+    const zaktualizowani = wyniki.gracze.map(g => {
+      const akt = aktMap[g.nazwa.toLowerCase()];
+      return akt ? { ...g, bylNaWalce: akt.bylNaWalce, minutTemu: akt.minutTemu } : g;
+    });
+    // Dodaj też tych co są na aktywności ale nie na rankingu walki (0 obrażeń)
+    wynikiAktywnosci.forEach(c => {
+      const jestNaRankingu = wyniki.gracze.some(g => g.nazwa.toLowerCase() === c.nazwa.toLowerCase());
+      if (!jestNaRankingu && c.bylNaWalce) {
+        zaktualizowani.push({ nazwa: c.nazwa, obrazenia: 0, tarcze: 0, bylNaWalce: true, minutTemu: c.minutTemu, miejsce: 99 });
+      }
+    });
+    setWyniki(prev => ({ ...prev, gracze: zaktualizowani }));
+    alert(`✅ Dołączono dane aktywności. ${wynikiAktywnosci.filter(c=>c.bylNaWalce).length} osób było na walce.`);
+  };
+
   const zapiszWalke = async () => {
     if (!wyniki || !nazwaWalki.trim()) {
       alert("Wpisz nazwę/datę walki przed zapisaniem!");
@@ -287,6 +441,85 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
                 <div style={{ height: 4, background: "#12122a", borderRadius: 2, overflow: "hidden", marginTop: 8 }}>
                   <div style={{ height: "100%", width: "100%", background: "linear-gradient(90deg,#b8860b,#ffd700)", animation: "pulse 1.5s ease-in-out infinite" }} />
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sekcja aktywności członków */}
+          <div style={{ background: "rgba(0,100,200,0.06)", border: "1px solid #6496ff33", borderRadius: 10, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: "bold", color: "#6496ff", marginBottom: 8 }}>
+              👥 Aktywność członków <span style={{ fontSize: 10, color: "#555", fontWeight: "normal" }}>(opcjonalne)</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 10, lineHeight: 1.6 }}>
+              Wgraj screeny z zakładki <strong style={{ color: "#aaa" }}>Członkowie</strong> gangu zrobione zaraz po walce.
+              Apka sprawdzi kto był aktywny w trakcie walki (30 min + opóźnienie).
+            </div>
+
+            {/* Opóźnienie */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>Ile minut po walce robisz screen?</div>
+              <input type="number" value={opoznienie} onChange={e => setOpoznienie(e.target.value)}
+                min="0" max="60" style={{
+                  width: 60, padding: "4px 8px", background: "#12122a", border: "1px solid #6496ff44",
+                  borderRadius: 6, color: "#6496ff", fontSize: 14, fontWeight: "bold", textAlign: "center"
+                }}/>
+              <div style={{ fontSize: 10, color: "#555" }}>min (próg: {30 + (parseInt(opoznienie)||0)} min)</div>
+            </div>
+
+            <input type="file" accept="image/*" multiple onChange={handleAktywnosc}
+              style={{ width: "100%", padding: 8, background: "#12122a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontSize: 12, marginBottom: 8 }} />
+
+            {plikiAktywnosci.length > 0 && (
+              <div style={{ fontSize: 11, color: "#6496ff", marginBottom: 8 }}>
+                Wybrano {plikiAktywnosci.length} {plikiAktywnosci.length === 1 ? "plik" : "pliki"} aktywności
+              </div>
+            )}
+
+            <button onClick={analizujAktywnosc} disabled={plikiAktywnosci.length === 0 || analizujacAktywnosc}
+              style={{
+                width: "100%", padding: 10,
+                background: plikiAktywnosci.length === 0 || analizujacAktywnosc ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,#1a3a8f,#6496ff)",
+                border: "none", borderRadius: 8,
+                color: plikiAktywnosci.length === 0 || analizujacAktywnosc ? "#666" : "#fff",
+                fontSize: 13, fontWeight: "bold",
+                cursor: plikiAktywnosci.length === 0 || analizujacAktywnosc ? "not-allowed" : "pointer",
+              }}>
+              {analizujacAktywnosc ? "⏳ Analizuję aktywność..." : "🤖 Analizuj aktywność"}
+            </button>
+
+            {progressAkt && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "#6496ff", textAlign: "center" }}>{progressAkt}</div>
+            )}
+
+            {/* Wyniki aktywności */}
+            {wynikiAktywnosci && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: "#aaa", marginBottom: 6 }}>
+                  ✅ <strong style={{ color: "#0c6" }}>{wynikiAktywnosci.filter(c=>c.bylNaWalce).length} było</strong> na walce ·
+                  <strong style={{ color: "#f55" }}> {wynikiAktywnosci.filter(c=>!c.bylNaWalce).length} nieobecnych</strong>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+                  {wynikiAktywnosci.map(c => (
+                    <div key={c.nazwa} style={{
+                      fontSize: 10, padding: "2px 8px", borderRadius: 12,
+                      background: c.bylNaWalce ? "rgba(0,200,100,0.15)" : "rgba(255,50,50,0.12)",
+                      border: `1px solid ${c.bylNaWalce ? "#0c633" : "#f5544433"}`,
+                      color: c.bylNaWalce ? "#0c6" : "#f55",
+                    }}>
+                      {c.bylNaWalce ? "✓" : "✗"} {c.nazwa}
+                      <span style={{ color: "#555", marginLeft: 3 }}>{c.minutTemu}min</span>
+                    </div>
+                  ))}
+                </div>
+                {wyniki && (
+                  <button onClick={dołączAktywnoscDoWalki} style={{
+                    width: "100%", padding: 8, background: "rgba(0,200,100,0.15)",
+                    border: "1px solid #0c633", borderRadius: 6,
+                    color: "#0c6", fontSize: 12, fontWeight: "bold", cursor: "pointer",
+                  }}>
+                    ➕ Dołącz aktywność do wyników walki
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -446,6 +679,12 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
                 <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(g.obrazenia / max) * 100}%`, background: `${kolor}08`, zIndex: 0 }} />
                 <span style={{ fontSize: 13, color: kolor, fontWeight: "bold", width: 24, zIndex: 1 }}>{i + 1}.</span>
                 <span style={{ flex: 1, fontSize: 12, color: "#ddd", fontWeight: i < 3 ? "bold" : "normal", zIndex: 1 }}>
+                  {g.bylNaWalce !== undefined && (
+                    <span title={g.bylNaWalce ? `Był na walce (${g.minutTemu} min temu)` : "Nieobecny na walce"}
+                      style={{ marginRight: 4, fontSize: 11 }}>
+                      {g.bylNaWalce ? "🟢" : "🔴"}
+                    </span>
+                  )}
                   {g.nazwa} <span style={{ fontSize: 10, color: "#555" }}>L{g.poziom}</span>
                 </span>
                 <span style={{ fontSize: 12, color: "#ffd700", zIndex: 1 }}>🔫 {fmt(g.obrazenia)}</span>
@@ -626,6 +865,11 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
       s.uczestnictwa++;
       s.miejsca.push(g.miejsce || 99);
       s.historiaObr.push({ data: w.data, obr: g.obrazenia, walkaId: w.id });
+      // Jeśli mamy dane aktywności — zapisz obecność
+      if (g.bylNaWalce !== undefined) {
+        s.obecnosciLacznie = (s.obecnosciLacznie || 0) + (g.bylNaWalce ? 1 : 0);
+        s.maObeznoscDane = true;
+      }
     });
   });
 
@@ -898,6 +1142,109 @@ function formatLiczby(n) {
   return n.toString();
 }
 
+function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
+  const pozycja = g.pozycjaSezonu;
+  const total = wszyscy.length;
+  const srednia = Math.round(g.obrazeniaLacznie / Math.max(g.uczestnictwa, 1));
+  const sredniaGangu = Math.round(wszyscy.reduce((s,x)=>s+x.obrazeniaLacznie,0) / Math.max(wszyscy.reduce((s,x)=>s+x.uczestnictwa,0),1));
+  const frekwencja = lacznaWalka > 0 ? Math.round(g.uczestnictwa / lacznaWalka * 100) : 0;
+  const maxWalka = g.historiaObr.length > 0 ? Math.max(...g.historiaObr.map(h=>h.obr)) : 0;
+  const minWalka = g.historiaObr.length > 0 ? Math.min(...g.historiaObr.map(h=>h.obr)) : 0;
+  const rozpitosc = maxWalka > 0 ? Math.round(maxWalka / Math.max(minWalka, 1)) : 1;
+
+  // Trend — porównaj pierwszą i drugą połowę walk
+  let trend = "stały";
+  if (g.historiaObr.length >= 4) {
+    const pol = Math.floor(g.historiaObr.length / 2);
+    const sr1 = g.historiaObr.slice(0, pol).reduce((s,h)=>s+h.obr,0)/pol;
+    const sr2 = g.historiaObr.slice(pol).reduce((s,h)=>s+h.obr,0)/(g.historiaObr.length-pol);
+    if (sr2 > sr1 * 1.3) trend = "rosnący";
+    else if (sr2 < sr1 * 0.7) trend = "spadający";
+  }
+
+  const linie = [];
+
+  // Pozycja w rankingu
+  if (pozycja === 1) {
+    linie.push("Najlepszy w gangu w tym sezonie. Albo faktycznie dobry, albo reszta się nie starała. Prawdopodobnie jedno i drugie.");
+  } else if (pozycja <= 3) {
+    linie.push(`TOP ${pozycja} gangu. Blisko szczytu. Dalej jest tylko ${wszyscy[0].nazwa} — ale o tym raczej wiadomo.`);
+  } else if (pozycja > total - 2) {
+    linie.push(`Pozycja ${pozycja} z ${total}. Podium jest w tej samej galaktyce, ale na innej planecie.`);
+  } else {
+    linie.push(`Pozycja ${pozycja} z ${total}. Środek stawki — bezpieczna strefa dla tych co nie chcą się wyróżniać ani za bardzo, ani za mało.`);
+  }
+
+  // Frekwencja — jeśli mamy dane aktywności, użyj ich; inaczej użyj uczestnictw
+  if (g.maObeznoscDane && lacznaWalka > 0) {
+    const frekAkt = Math.round((g.obecnosciLacznie || 0) / lacznaWalka * 100);
+    if (frekAkt === 100) {
+      linie.push(`Obecność 100% — był na każdej walce. Niezawodny jak szwajcarski zegarek. Albo po prostu nie ma co robić.`);
+    } else if (frekAkt >= 80) {
+      linie.push(`Obecność ${frekAkt}% — prawie zawsze tam gdzie trzeba. Gangi wygrywają przez takich jak on. I przez tych co go przewyższają.`);
+    } else if (frekAkt >= 50) {
+      linie.push(`Obecność ${frekAkt}%. Pojawia się gdy chce. Gang walczy gdy musi. Matematyka jest bezlitosna.`);
+    } else {
+      linie.push(`Obecność ${frekAkt}% — był na ${g.obecnosciLacznie || 0} z ${lacznaWalka} walk. Oficjalnie członek. Nieoficjalnie — obserwator.`);
+    }
+  } else {
+    if (frekwencja === 100) {
+      linie.push(`Uczestnictwo 100% — był na każdej walce. Albo nie ma życia poza gangiem, albo ma bardzo dużo życia w gangu. Różnica subtelna.`);
+    } else if (frekwencja >= 80) {
+      linie.push(`Uczestnictwo ${frekwencja}% — prawie zawsze obecny. Te ${100-frekwencja}% nieobecności to prawdopodobnie siła wyższa.`);
+    } else if (frekwencja >= 50) {
+      linie.push(`Uczestnictwo ${frekwencja}%. Grał kiedy chciał. Gang walczył kiedy musiał. Nie zawsze to samo.`);
+    } else {
+      linie.push(`Uczestnictwo ${frekwencja}%. Był tu. Czasem. Głównie duchem.`);
+    }
+  }
+
+  // Obrażenia vs średnia gangu
+  const stosunekDoSredniej = srednia / Math.max(sredniaGangu, 1);
+  if (stosunekDoSredniej > 1.5) {
+    linie.push(`Średnio ${formatLiczby(srednia)} obrażeń na walkę — ${Math.round((stosunekDoSredniej-1)*100)}% powyżej średniej gangu. Liczby nie kłamią, choć czasem chciałyby.`);
+  } else if (stosunekDoSredniej > 1.1) {
+    linie.push(`Średnio ${formatLiczby(srednia)} obrażeń na walkę — lekko powyżej przeciętnej. Gang docenia. Ale po cichu.`);
+  } else if (stosunekDoSredniej > 0.7) {
+    linie.push(`Średnio ${formatLiczby(srednia)} obrażeń na walkę — w okolicach średniej gangu. Solidna mediokerność, jak to się mówi.`);
+  } else {
+    linie.push(`Średnio ${formatLiczby(srednia)} obrażeń na walkę — ${Math.round((1-stosunekDoSredniej)*100)}% poniżej średniej. Statystyki wolą nie komentować. My też.`);
+  }
+
+  // Tarcze
+  if (g.tarczeLacznie > 0) {
+    const tarczNaWalke = (g.tarczeLacznie / g.uczestnictwa).toFixed(1);
+    if (parseFloat(tarczNaWalke) >= 2) {
+      linie.push(`${g.tarczeLacznie} tarcz w sezonie (${tarczNaWalke} na walkę). Entuzjasta defensywy. Albo po prostu lubi klikać w tarcze.`);
+    } else if (g.tarczeLacznie > 0) {
+      linie.push(`${g.tarczeLacznie} tarcz w sezonie. Zdarzało się. Głównie przez przypadek, ale liczy się wynik.`);
+    }
+  } else if (g.uczestnictwa >= 3) {
+    linie.push(`Zero tarcz w całym sezonie. Konsekwentne podejście. Można to nazwać stylem.`);
+  }
+
+  // Trend
+  if (trend === "rosnący") {
+    linie.push(`Forma wzrostowa w drugiej połowie sezonu. Późny rozkwit? Może. Albo w końcu przeczytał jak grać.`);
+  } else if (trend === "spadający") {
+    linie.push(`Forma spadkowa w drugiej połowie. Wypalenie, nuda, inne priorytety? Dane milczą. My nie.`);
+  }
+
+  // Rozpiętość wyników
+  if (rozpitosc >= 10 && g.uczestnictwa >= 3) {
+    linie.push(`Rozpiętość wyników ${formatLiczby(minWalka)}–${formatLiczby(maxWalka)}. Można grać jak bóg albo jak obserwator. I jedno i drugie ma miejsce w tej historii.`);
+  } else if (rozpitosc <= 2 && g.uczestnictwa >= 3 && srednia > 10000) {
+    linie.push(`Wyniki równe jak stół. ${formatLiczby(minWalka)}–${formatLiczby(maxWalka)}. Regularność godna szacunku. Albo autokliker. Nie osądzamy.`);
+  }
+
+  // Rekord
+  if (maxWalka > 0 && g.uczestnictwa >= 2) {
+    linie.push(`Rekord sezonu: ${formatLiczby(maxWalka)} obrażeń w jednej walce. Zapamiętany. Przynajmniej przez apkę.`);
+  }
+
+  return linie;
+}
+
 function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }) {
   const [edycjaGracza, setEdycjaGracza] = useState(null);
   const [nowyNick, setNowyNick] = useState("");
@@ -966,6 +1313,56 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
                 <div style={{ fontSize: 12, fontWeight: "bold", color: titleColor, marginBottom: 3 }}>{c.tytul}</div>
                 <div style={{ fontSize: 11, color: "#bbb", lineHeight: 1.5 }}>{c.opis}</div>
               </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Osobiste podsumowania */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>📋 Raporty osobiste</div>
+        <div style={{ fontSize: 10, color: "#555", marginBottom: 10 }}>Indywidualna ocena każdego gracza na podstawie statystyk sezonu.</div>
+        {wszyscy.map((g, i) => {
+          const linie = generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka);
+          const kolor = i===0?"#ffd700":i===1?"#c0c0c0":i===2?"#cd7f32":i>=wszyscy.length-2?"#f55":"#888";
+          const [rozwiniety, setRozwiniety] = React.useState(false);
+          return (
+            <div key={g.nazwa} style={{
+              marginBottom: 8, borderRadius: 8, overflow: "hidden",
+              border: `1px solid ${kolor}33`,
+              background: "rgba(0,0,0,0.2)",
+            }}>
+              {/* Nagłówek */}
+              <div onClick={() => setRozwiniety(p=>!p)} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 12px", cursor: "pointer",
+                background: rozwiniety ? `${kolor}11` : "transparent",
+              }}>
+                <div style={{ fontSize: 16, width: 24, textAlign: "center", flexShrink: 0 }}>
+                  {i===0?"👑":i===1?"🥈":i===2?"🥉":i>=wszyscy.length-1?"🥄":"👤"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 13, fontWeight: "bold", color: kolor }}>{g.nazwa}</span>
+                  <span style={{ fontSize: 10, color: "#555", marginLeft: 8 }}>
+                    #{g.pozycjaSezonu} · {formatLiczby(g.obrazeniaLacznie)} obrażeń · {g.uczestnictwa} walk
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: "#555" }}>{rozwiniety ? "▲" : "▼"}</div>
+              </div>
+              {/* Treść */}
+              {rozwiniety && (
+                <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${kolor}22` }}>
+                  {linie.map((l, li) => (
+                    <div key={li} style={{
+                      fontSize: 11, color: "#bbb", lineHeight: 1.7,
+                      padding: "6px 0",
+                      borderBottom: li < linie.length-1 ? "1px solid #1a1a2e" : "none",
+                    }}>
+                      {l}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
