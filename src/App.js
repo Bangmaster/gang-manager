@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, startTransition } from "react";
 import { createPortal } from "react-dom";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -272,11 +272,16 @@ const DOMYSLNE_DANE = {
 };
 
 export default function App() {
+  // sessionStorage = auto-wylogowanie przy zamknięciu karty/przeglądarki
   const [zalogowany, setZalogowany] = useState(() => {
     try { const z = localStorage.getItem("gang_user"); return z ? JSON.parse(z) : null; } catch { return null; }
   });
   const [dane, setDane] = useState(null); // null = loading
-  const [zakładka, setZakładka] = useState("dane");
+  const [zakładka, setZakładka] = useState(() => {
+    // Jeśli jest aktywna wymiana — otwórz od razu rozpiskę
+    // (sprawdzimy po załadowaniu danych przez useEffect)
+    return "dane";
+  });
   const [typWymiany, setTypWymiany] = useState("złote");
   const [historiaWymian, setHistoriaWymian] = useState([]);
 
@@ -426,7 +431,7 @@ export default function App() {
   // Zapis loginu
   useEffect(() => {
     try {
-      if (zalogowany) localStorage.setItem("gang_user", JSON.stringify(zalogowany));
+      if (zalogowany) sessionStorage.setItem("gang_user", JSON.stringify(zalogowany));
       else localStorage.removeItem("gang_user");
     } catch {}
   }, [zalogowany]);
@@ -439,6 +444,14 @@ export default function App() {
   const posiadaneMemo = useMemo(() => dane?.posiadane || {}, [dane]);
   const duplikatyMemo = useMemo(() => dane?.duplikaty || {}, [dane]);
   const czlonkowieMemo = useMemo(() => dane?.czlonkowie || [], [dane]);
+
+  // Przełącz na rozpiskę przy pierwszym załadowaniu jeśli jest aktywna wymiana
+  useEffect(()=>{
+    if (dane?.aktywnaWymiana && zakładka === "dane") {
+      setZakładka("aktywna");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dane?.aktywnaWymiana]);
 
   if (!zalogowany) return <LoginScreen onLogin={setZalogowany} czlonkowie={dane?.czlonkowie||[]}/>;  
   if (!dane) return <LoadingScreen/>;
@@ -713,110 +726,160 @@ const TIPY=[
 ];
 
 function LoginScreen({onLogin, czlonkowie}) {
-  const [login,setLogin]=useState("");
-  const [haslo,setHaslo]=useState("");
-  const [blad,setBlad]=useState("");
-  const cytat=CYTATY[Math.floor(Date.now()/86400000)%CYTATY.length];
-  const tip=TIPY[Math.floor(Date.now()/43200000)%TIPY.length];
+  const [krok, setKrok] = useState("nick"); // nick → pin / ustawPin
+  const [login, setLogin] = useState("");
+  const [haslo, setHaslo] = useState("");
+  const [pin, setPin] = useState("");
+  const [pin2, setPin2] = useState("");
+  const [blad, setBlad] = useState("");
+  const [ladowanie, setLadowanie] = useState(false);
+  const cytat = CYTATY[Math.floor(Date.now()/86400000)%CYTATY.length];
+  const tip = TIPY[Math.floor(Date.now()/43200000)%TIPY.length];
 
-  const zaloguj=async()=>{
+  const zalogujAdmin = async () => {
     const fp = getFingerprint();
     const teraz = new Date().toISOString();
-
-    const u=ADMIN_CREDENTIALS.find(c=>c.login===login&&c.haslo===haslo);
-    if(u){
-      // Sprawdź czarną listę
-      const zablok = await pobierzZablokowane();
-      if (zablok.some(z => z.fp === fp)) {
-        setBlad("🚫 To urządzenie zostało zablokowane przez administratora.");
-        return;
-      }
-      // Wykryj nowe urządzenie dla admina
-      const znane = await pobierzFingerprinty();
-      const znaneAdmina = znane[u.login] || [];
-      const noweUrz = znaneAdmina.length > 0 && !znaneAdmina.includes(fp);
-      await zapiszLog({ nick: u.login, rola: u.rola, czas: teraz, fp, typ: noweUrz ? "login_nowe_urzadzenie" : "login", noweUrzadzenie: noweUrz });
-      await zapiszFingerprint(u.login, fp);
-      onLogin(u);
-      return;
-    }
-    if(login.trim().length>=2&&haslo===""){
-      const oryginalny=czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(login.trim()));
-      if(!oryginalny){
-        setBlad(`Nick "${login.trim()}" nie istnieje w gangu. Sprawdź pisownię.`);
-        return;
-      }
-      // Sprawdź czarną listę PRZED zalogowaniem
-      const zablokowane = await pobierzZablokowane();
-      if (zablokowane.some(z => z.fp === fp)) {
-        setBlad("🚫 To urządzenie zostało zablokowane przez administratora. Skontaktuj się z adminem.");
-        return;
-      }
-      // Sprawdź czy to nowe urządzenie
-      const znane = await pobierzFingerprinty();
-      const znaneNicka = znane[oryginalny.nazwa] || [];
-      const noweUrzadzenie = znaneNicka.length > 0 && !znaneNicka.includes(fp);
-      // Zapisz log (await — żeby zdążyło zapisać przy szybkim logowaniu)
-      await zapiszLog({
-        nick: oryginalny.nazwa, rola: "czlonek", czas: teraz, fp,
-        typ: noweUrzadzenie ? "login_nowe_urzadzenie" : "login",
-        noweUrzadzenie,
-      });
-      await zapiszFingerprint(oryginalny.nazwa, fp);
-      onLogin({login: oryginalny.nazwa, rola:"czlonek", noweUrzadzenie});
-      return;
-    }
-    setBlad("Błędne dane. Członek: tylko nick (bez hasła). Admin: login + hasło.");
+    const u = ADMIN_CREDENTIALS.find(c => c.login===login && c.haslo===haslo);
+    if (!u) { setBlad("Błędne hasło admina."); return; }
+    const zablok = await pobierzZablokowane();
+    if (zablok.some(z => z.fp === fp)) { setBlad("🚫 Urządzenie zablokowane."); return; }
+    const znane = await pobierzFingerprinty();
+    const noweUrz = (znane[u.login]||[]).length > 0 && !(znane[u.login]||[]).includes(fp);
+    await zapiszLog({ nick: u.login, rola: u.rola, czas: teraz, fp, typ: noweUrz?"login_nowe_urzadzenie":"login", noweUrzadzenie: noweUrz });
+    await zapiszFingerprint(u.login, fp);
+    onLogin(u);
   };
 
+  const sprawdzNick = async () => {
+    setBlad(""); setLadowanie(true);
+    const oryginalny = czlonkowie.find(c => normalizuj(c.nazwa) === normalizuj(login.trim()));
+    if (!oryginalny) { setBlad(`Nick "${login.trim()}" nie istnieje w gangu.`); setLadowanie(false); return; }
+    const fp = getFingerprint();
+    const zablokowane = await pobierzZablokowane();
+    if (zablokowane.some(z => z.fp === fp)) { setBlad("🚫 Urządzenie zablokowane."); setLadowanie(false); return; }
+    // Sprawdź czy ma PIN
+    const hasPin = await maPin(oryginalny.nazwa);
+    setLadowanie(false);
+    if (hasPin) {
+      setKrok("pin");
+    } else {
+      setKrok("ustawPin");
+    }
+  };
+
+  const zalogujPinem = async () => {
+    setBlad(""); setLadowanie(true);
+    const oryginalny = czlonkowie.find(c => normalizuj(c.nazwa) === normalizuj(login.trim()));
+    if (pin.length < 4) { setBlad("PIN musi mieć minimum 4 cyfry."); setLadowanie(false); return; }
+    const ok = await sprawdzPin(oryginalny.nazwa, pin);
+    if (!ok) { setBlad("❌ Błędny PIN. Spróbuj ponownie."); setLadowanie(false); return; }
+    const fp = getFingerprint();
+    const teraz = new Date().toISOString();
+    const znane = await pobierzFingerprinty();
+    const noweUrzadzenie = (znane[oryginalny.nazwa]||[]).length > 0 && !(znane[oryginalny.nazwa]||[]).includes(fp);
+    await zapiszLog({ nick: oryginalny.nazwa, rola:"czlonek", czas:teraz, fp, typ: noweUrzadzenie?"login_nowe_urzadzenie":"login", noweUrzadzenie });
+    await zapiszFingerprint(oryginalny.nazwa, fp);
+    setLadowanie(false);
+    onLogin({ login: oryginalny.nazwa, rola:"czlonek", noweUrzadzenie });
+  };
+
+  const ustawNowPin = async () => {
+    setBlad("");
+    if (pin.length < 4) { setBlad("PIN musi mieć minimum 4 cyfry."); return; }
+    if (pin !== pin2) { setBlad("PINy się nie zgadzają."); return; }
+    if (!/^\d+$/.test(pin)) { setBlad("PIN może zawierać tylko cyfry."); return; }
+    setLadowanie(true);
+    const oryginalny = czlonkowie.find(c => normalizuj(c.nazwa) === normalizuj(login.trim()));
+    await zapiszPin(oryginalny.nazwa, pin);
+    const fp = getFingerprint();
+    const teraz = new Date().toISOString();
+    await zapiszLog({ nick: oryginalny.nazwa, rola:"czlonek", czas:teraz, fp, typ:"pin_ustawiony" });
+    await zapiszFingerprint(oryginalny.nazwa, fp);
+    setLadowanie(false);
+    onLogin({ login: oryginalny.nazwa, rola:"czlonek" });
+  };
+
+  const inputStyle = {width:"100%",padding:"12px 14px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:16,boxSizing:"border-box",textAlign:"center",letterSpacing:2};
+  const btnStyle = {width:"100%",padding:13,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:8,fontWeight:"bold",fontSize:15,cursor:"pointer",color:"#000"};
+
   return (
-    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 50% 30%,#130d2e 0%,#0a0a12 60%,#0d0a10 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Georgia',serif",padding:20,position:"relative",overflow:"hidden"}}>
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 50% 30%,#130d2e 0%,#0a0a12 60%,#0d0a10 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Georgia,serif",padding:20}}>
+      <div style={{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:12}}>
 
-      {/* Dekoracyjne graffiti koła w tle */}
-      <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",border:"1px solid rgba(184,134,11,0.05)",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",width:600,height:600,borderRadius:"50%",border:"1px solid rgba(184,134,11,0.03)",top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(138,43,226,0.06) 0%,transparent 70%)",top:"30%",right:"10%",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",width:150,height:150,borderRadius:"50%",background:"radial-gradient(circle,rgba(184,134,11,0.08) 0%,transparent 70%)",bottom:"20%",left:"5%",pointerEvents:"none"}}/>
-
-      <div style={{width:"100%",maxWidth:340,display:"flex",flexDirection:"column",gap:12,position:"relative",zIndex:1}}>
-        {/* Cytat dnia */}
-        <div style={{background:"rgba(0,0,0,0.5)",border:"1px solid rgba(184,134,11,0.2)",borderRadius:10,padding:"12px 16px",textAlign:"center",backdropFilter:"blur(4px)"}}>
-          <div style={{fontSize:16,marginBottom:6}}>🃏</div>
+        {/* Cytat */}
+        <div style={{background:"rgba(0,0,0,0.5)",border:"1px solid rgba(184,134,11,0.2)",borderRadius:10,padding:"12px 16px",textAlign:"center"}}>
           <div style={{fontSize:11,color:"#b8860b",fontStyle:"italic",lineHeight:1.5}}>"{cytat}"</div>
         </div>
 
-        {/* Panel logowania */}
-        <div style={{
-          background:"linear-gradient(160deg,rgba(10,5,25,0.95),rgba(5,5,15,0.98))",
-          border:"1px solid rgba(184,134,11,0.4)",
-          borderRadius:16,padding:28,textAlign:"center",boxSizing:"border-box",
-          boxShadow:"0 0 40px rgba(184,134,11,0.1),inset 0 1px 0 rgba(255,215,0,0.05)",
-        }}>
-          {/* Narożniki jak w grze */}
-          <div style={{position:"relative"}}>
-            <div style={{position:"absolute",top:-20,left:-20,width:20,height:20,borderTop:"2px solid #b8860b",borderLeft:"2px solid #b8860b"}}/>
-            <div style={{position:"absolute",top:-20,right:-20,width:20,height:20,borderTop:"2px solid #b8860b",borderRight:"2px solid #b8860b"}}/>
-          </div>
-          <div style={{
-            fontSize:24,fontWeight:"bold",letterSpacing:4,marginBottom:2,
-            background:"linear-gradient(180deg,#fff8dc,#ffd700,#b8860b)",
-            WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
-            filter:"drop-shadow(0 0 15px rgba(255,215,0,0.3))",
-          }}>⚔ FAMILY ⚔</div>
+        {/* Panel */}
+        <div style={{background:"linear-gradient(160deg,rgba(10,5,25,0.95),rgba(5,5,15,0.98))",border:"1px solid rgba(184,134,11,0.4)",borderRadius:16,padding:28,textAlign:"center",boxSizing:"border-box"}}>
+          <div style={{fontSize:24,fontWeight:"bold",letterSpacing:4,marginBottom:2,background:"linear-gradient(180deg,#fff8dc,#ffd700,#b8860b)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⚔ FAMILY ⚔</div>
           <div style={{fontSize:10,color:"#444",marginBottom:20,letterSpacing:3}}>MENADŻER WYMIAN KART</div>
-          <input value={login} onChange={e=>setLogin(e.target.value)} placeholder="Twój nick / login admina"
-            style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:14,marginBottom:10,boxSizing:"border-box"}}/>
-          <input value={haslo} onChange={e=>setHaslo(e.target.value)} type="password" placeholder="Hasło (tylko admin)"
-            onKeyDown={e=>e.key==="Enter"&&zaloguj()}
-            style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:14,marginBottom:10,boxSizing:"border-box"}}/>
-          {blad&&<div style={{color:"#f55",fontSize:12,marginBottom:10}}>{blad}</div>}
-          <button onClick={zaloguj} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:8,fontWeight:"bold",fontSize:15,cursor:"pointer",color:"#000"}}>
-            Wejdź do gangu 💪
-          </button>
-          <div style={{fontSize:11,color:"#444",marginTop:14,lineHeight:1.6}}>Członek: wpisz nick, bez hasła.<br/>Admin: login + hasło.</div>
+
+          {/* KROK 1: wpisz nick */}
+          {krok==="nick"&&(
+            <>
+              <input value={login} onChange={e=>setLogin(e.target.value)} placeholder="Twój nick"
+                onKeyDown={e=>e.key==="Enter"&&(haslo?zalogujAdmin():sprawdzNick())}
+                style={{...inputStyle,marginBottom:10,letterSpacing:1}}/>
+              <input value={haslo} onChange={e=>setHaslo(e.target.value)} type="password"
+                placeholder="Hasło admina (tylko admin)"
+                onKeyDown={e=>e.key==="Enter"&&zalogujAdmin()}
+                style={{...inputStyle,marginBottom:10}}/>
+              {blad&&<div style={{color:"#f55",fontSize:12,marginBottom:10}}>{blad}</div>}
+              <button onClick={haslo?zalogujAdmin:sprawdzNick} disabled={ladowanie}
+                style={{...btnStyle,opacity:ladowanie?0.6:1}}>
+                {ladowanie?"⏳ Sprawdzam...":"Dalej →"}
+              </button>
+              <div style={{fontSize:10,color:"#444",marginTop:12}}>Członek: wpisz nick i kliknij Dalej<br/>Admin: nick + hasło</div>
+            </>
+          )}
+
+          {/* KROK 2a: wpisz PIN */}
+          {krok==="pin"&&(
+            <>
+              <div style={{fontSize:13,color:"#ffd700",marginBottom:16}}>👤 {login}</div>
+              <div style={{fontSize:12,color:"#aaa",marginBottom:10}}>🔐 Wpisz swój PIN</div>
+              <input value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
+                type="password" inputMode="numeric" placeholder="••••"
+                maxLength={8}
+                onKeyDown={e=>e.key==="Enter"&&zalogujPinem()}
+                style={{...inputStyle,marginBottom:10,fontSize:24,letterSpacing:8}}/>
+              {blad&&<div style={{color:"#f55",fontSize:12,marginBottom:10}}>{blad}</div>}
+              <button onClick={zalogujPinem} disabled={ladowanie} style={{...btnStyle,marginBottom:8,opacity:ladowanie?0.6:1}}>
+                {ladowanie?"⏳ Sprawdzam...":"Wejdź 💪"}
+              </button>
+              <button onClick={()=>{setKrok("nick");setPin("");setBlad("");}}
+                style={{background:"none",border:"none",color:"#555",fontSize:11,cursor:"pointer"}}>
+                ← Zmień nick
+              </button>
+              <div style={{fontSize:10,color:"#444",marginTop:8}}>Zapomniałeś PINu? Zgłoś się do admina.</div>
+            </>
+          )}
+
+          {/* KROK 2b: ustaw nowy PIN */}
+          {krok==="ustawPin"&&(
+            <>
+              <div style={{fontSize:13,color:"#ffd700",marginBottom:8}}>👤 {login}</div>
+              <div style={{fontSize:12,color:"#0c6",marginBottom:4}}>🔐 Pierwsze logowanie — ustaw swój PIN</div>
+              <div style={{fontSize:10,color:"#555",marginBottom:14}}>PIN będzie wymagany przy każdym logowaniu.<br/>Zapamiętaj go!</div>
+              <input value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
+                type="password" inputMode="numeric" placeholder="Wpisz PIN (4-8 cyfr)"
+                maxLength={8}
+                style={{...inputStyle,marginBottom:8}}/>
+              <input value={pin2} onChange={e=>setPin2(e.target.value.replace(/\D/g,""))}
+                type="password" inputMode="numeric" placeholder="Powtórz PIN"
+                maxLength={8}
+                onKeyDown={e=>e.key==="Enter"&&ustawNowPin()}
+                style={{...inputStyle,marginBottom:10}}/>
+              {blad&&<div style={{color:"#f55",fontSize:12,marginBottom:10}}>{blad}</div>}
+              <button onClick={ustawNowPin} disabled={ladowanie} style={{...btnStyle,opacity:ladowanie?0.6:1}}>
+                {ladowanie?"⏳ Zapisuję...":"Ustaw PIN i wejdź 💪"}
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Tip dnia */}
         <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a3a",borderRadius:8,padding:"10px 14px",textAlign:"center"}}>
           <div style={{fontSize:11,color:"#666",lineHeight:1.5}}>{tip}</div>
         </div>
@@ -2649,6 +2712,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
               potwierdzone: {},
             };
             await zapiszAktywna(aktywna);
+            zapiszAutoBackup("publikacja_wymiany");
             setPublikowanie(false);
             playSound("gold");
             launchConfetti(1500);
@@ -3303,6 +3367,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
   const wszystkichNadawcow=Object.keys(poNadawcach).length;
 
   const potwierdz=async()=>{
+    zapiszAutoBackup("potwierdzenie");
     // Efekty
     playSound("success");
     launchConfetti(2000);
@@ -3697,7 +3762,10 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
-      {tryb==="logi"&&<LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={onZablokuj} onOdblokuj={onOdblokuj}/>}
+      {tryb==="logi"&&<>
+        <ZarzadzajiePinami czlonkowie={czlonkowie}/>
+        <LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={onZablokuj} onOdblokuj={onOdblokuj}/>
+      </>}
       {tryb==="kalendarz"&&<KalendarzEventow/>}
       {tryb==="dashboard"&&<AdminDashboard
         dane={dane} talie={talie}
@@ -4593,6 +4661,70 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
 // ============================================================
 // BACKUP DANYCH
 // ============================================================
+function AutoBackupPanel() {
+  const [backupy, setBackupy] = useState([]);
+  const [ladowanie, setLadowanie] = useState(false);
+  const [rozwiniety, setRozwiniety] = useState(false);
+
+  const zaladuj = async () => {
+    setLadowanie(true);
+    const lista = await pobierzListeBackupow();
+    setBackupy(lista);
+    setLadowanie(false);
+  };
+
+  const przywroc = async (backup) => {
+    if (!window.confirm(`Przywrócić dane z ${backup.data}?\n\nTo NADPISZE wszystkie obecne dane gangu!`)) return;
+    try {
+      await przywrocAutoBackup(backup.id);
+      alert("✅ Dane przywrócone! Odśwież stronę.");
+    } catch(e) {
+      alert("Błąd: " + e.message);
+    }
+  };
+
+  return (
+    <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:8,padding:10,marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"#6496ff"}}>
+          🔒 Auto-backupy Firebase
+          <span style={{fontSize:10,color:"#555",marginLeft:6,fontWeight:"normal"}}>— tworzone automatycznie</span>
+        </div>
+        <button onClick={()=>{setRozwiniety(p=>!p);if(!rozwiniety)zaladuj();}} style={{
+          fontSize:10,padding:"3px 8px",background:"rgba(100,150,255,0.1)",
+          border:"1px solid #6496ff44",borderRadius:4,color:"#6496ff",cursor:"pointer"
+        }}>{rozwiniety?"▲ Schowaj":"▼ Pokaż"}</button>
+      </div>
+      {rozwiniety&&(
+        <div style={{marginTop:8}}>
+          {ladowanie&&<div style={{fontSize:11,color:"#555"}}>⏳ Ładowanie...</div>}
+          {!ladowanie&&backupy.length===0&&(
+            <div style={{fontSize:11,color:"#555"}}>
+              Brak auto-backupów. Tworzone są automatycznie po każdej publikacji wymiany i potwierdzeniu.
+            </div>
+          )}
+          {backupy.map(b=>(
+            <div key={b.id} style={{
+              display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"6px 8px",marginBottom:4,borderRadius:6,
+              background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",
+            }}>
+              <div>
+                <div style={{fontSize:11,color:"#ddd"}}>{b.data}</div>
+                <div style={{fontSize:9,color:"#555"}}>{b.powod}</div>
+              </div>
+              <button onClick={()=>przywroc(b)} style={{
+                fontSize:10,padding:"3px 10px",background:"rgba(100,150,255,0.15)",
+                border:"1px solid #6496ff44",borderRadius:4,color:"#6496ff",cursor:"pointer"
+              }}>Przywróć</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BackupDanych({dane, zapiszStrukture}) {
   const [ostatniBackup, setOstatniBackup] = useState(() => {
     return localStorage.getItem("gang_ostatni_backup") || null;
@@ -4720,9 +4852,12 @@ To NADPISZE wszystkie obecne dane gangu!`
         {eksportuje ? "⏳ Pobieranie danych..." : "📥 Pobierz pełny backup (JSON)"}
       </button>
 
+      {/* Auto-backupy Firebase */}
+      <AutoBackupPanel/>
+
       {/* Przywróć z backupu */}
       <div style={{marginBottom:10}}>
-        <div style={{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:"bold"}}>🔄 Przywróć z backupu</div>
+        <div style={{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:"bold"}}>🔄 Przywróć z pliku</div>
         <label style={{
           display:"block",width:"100%",padding:12,
           background:przywracanie?"rgba(255,165,0,0.1)":"rgba(255,255,255,0.05)",
@@ -6108,6 +6243,68 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
+function ZarzadzajiePinami({czlonkowie}) {
+  const [statusy, setStatusy] = useState({});
+  const [ladowanie, setLadowanie] = useState(false);
+  const [resetowany, setResetowany] = useState(null);
+
+  useEffect(()=>{
+    pobierzStatusyPinow().then(setStatusy);
+  },[]);
+
+  const resetPin = async (nick) => {
+    if (!window.confirm(`Zresetować PIN dla ${nick}?\n\nPrzy następnym logowaniu będzie musiał ustawić nowy.`)) return;
+    setResetowany(nick);
+    await resetujPin(nick);
+    setStatusy(prev => {const n={...prev}; delete n[nick]; return n;});
+    setResetowany(null);
+  };
+
+  const odswież = async () => {
+    setLadowanie(true);
+    const s = await pobierzStatusyPinow();
+    setStatusy(s);
+    setLadowanie(false);
+  };
+
+  return (
+    <div style={{marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>🔐 PINy członków</div>
+        <button onClick={odswież} style={{fontSize:10,padding:"3px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #ffd70033",borderRadius:4,color:"#ffd700",cursor:"pointer"}}>
+          {ladowanie?"⏳":"🔄"} Odśwież
+        </button>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {czlonkowie.map(c=>{
+          const maPIN = statusy[c.nazwa];
+          return (
+            <div key={c.id} style={{
+              display:"flex",alignItems:"center",gap:6,
+              padding:"5px 10px",borderRadius:8,
+              background:maPIN?"rgba(0,200,100,0.08)":"rgba(255,50,50,0.08)",
+              border:maPIN?"1px solid #0c633":"1px solid #f5544433",
+            }}>
+              <span style={{fontSize:11,color:maPIN?"#0c6":"#f55"}}>
+                {maPIN?"🔐":"⚠️"} {c.nazwa}
+              </span>
+              {maPIN&&(
+                <button onClick={()=>resetPin(c.nazwa)} disabled={resetowany===c.nazwa}
+                  style={{fontSize:9,padding:"1px 6px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544433",borderRadius:3,color:"#f55",cursor:"pointer"}}>
+                  {resetowany===c.nazwa?"...":"reset"}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{fontSize:10,color:"#555",marginTop:8}}>
+        🔐 PIN ustawiony · ⚠️ Brak PINu (przy logowaniu będzie musiał ustawić)
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukture}) {
   const czlonkowie = dane?.czlonkowie || [];
   const posiadane = dane?.posiadane || {};
