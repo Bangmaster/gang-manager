@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -65,6 +65,141 @@ export async function saveGangData(data) {
   }
 }
 
+// === SYSTEM PIN ===
+const PINY_DOC = doc(db, "gang_data", "piny");
+
+// Hash PIN przez Web Crypto (SHA-256)
+export async function hashPin(pin) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode("FAMILY_GANG_" + pin); // salt
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Zapisz PIN dla nicka
+export async function zapiszPin(nick, pin) {
+  try {
+    const hash = await hashPin(pin);
+    await setDoc(PINY_DOC, { [nick]: hash }, { merge: true });
+    return true;
+  } catch(e) { console.error(e); return false; }
+}
+
+// Sprawdź PIN
+export async function sprawdzPin(nick, pin) {
+  try {
+    const snap = await getDoc(PINY_DOC);
+    if (!snap.exists()) return false;
+    const hash = await hashPin(pin);
+    return snap.data()[nick] === hash;
+  } catch(e) { return false; }
+}
+
+// Sprawdź czy nick ma PIN
+export async function maPin(nick) {
+  try {
+    const snap = await getDoc(PINY_DOC);
+    if (!snap.exists()) return false;
+    return !!snap.data()[nick];
+  } catch(e) { return false; }
+}
+
+// Resetuj PIN (admin) - null = brak PINu
+export async function resetujPin(nick) {
+  try {
+    await updateDoc(PINY_DOC, { [nick]: deleteField() });
+    return true;
+  } catch(e) { console.error(e); return false; }
+}
+
+// Pobierz listę nicków z PINem
+export async function pobierzStatusyPinow() {
+  try {
+    const snap = await getDoc(PINY_DOC);
+    if (!snap.exists()) return {};
+    const data = snap.data();
+    // Zwróć tylko info czy mają PIN (nie hashe!)
+    return Object.fromEntries(Object.keys(data).map(k => [k, true]));
+  } catch(e) { return {}; }
+}
+
+// === AUTO-BACKUP ===
+const BACKUP_COL = "gang_backupy";
+const MAX_BACKUPOW = 10; // trzymamy max 10 snapshotów
+
+// Sprawdź czy dane wyglądają jak domyślne (guard przed nadpisaniem)
+function czyDomyslneDane(data) {
+  if (!data?.czlonkowie) return false;
+  const domyslne = data.czlonkowie.filter(c =>
+    c.nazwa && c.nazwa.match(/^Osoba \d+$/)
+  );
+  // Jeśli ponad połowa członków ma domyślne nazwy = podejrzane
+  return domyslne.length > (data.czlonkowie.length / 2);
+}
+
+// Zapisz snapshot do kolekcji backupów
+export async function zapiszAutoBackup(powod = "auto") {
+  try {
+    const snap = await getDoc(GANG_DOC);
+    if (!snap.exists()) return;
+    const dane = snap.data();
+
+    // Nie backupuj domyślnych danych
+    if (czyDomyslneDane(dane)) return;
+
+    const timestamp = Date.now();
+    const backupDoc = doc(db, BACKUP_COL, String(timestamp));
+    await setDoc(backupDoc, {
+      timestamp,
+      powod,
+      data: new Date(timestamp).toLocaleString("pl-PL"),
+      main: dane,
+    });
+
+    // Usuń stare backupy powyżej limitu
+    const q = query(collection(db, BACKUP_COL), orderBy("timestamp", "desc"), firestoreLimit(100));
+    const wszystkie = await getDocs(q);
+    const docs = wszystkie.docs;
+    if (docs.length > MAX_BACKUPOW) {
+      const doUsuniecia = docs.slice(MAX_BACKUPOW);
+      await Promise.all(doUsuniecia.map(d => deleteDoc(d.ref)));
+    }
+  } catch (e) {
+    console.error("Błąd auto-backupu:", e);
+  }
+}
+
+// Pobierz listę backupów
+export async function pobierzListeBackupow() {
+  try {
+    const q = query(collection(db, BACKUP_COL), orderBy("timestamp", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.error("Błąd pobierania backupów:", e);
+    return [];
+  }
+}
+
+// Przywróć konkretny backup
+export async function przywrocAutoBackup(backupId) {
+  try {
+    const backupDoc = doc(db, BACKUP_COL, backupId);
+    const snap = await getDoc(backupDoc);
+    if (!snap.exists()) throw new Error("Backup nie istnieje");
+    const { main } = snap.data();
+    if (main) {
+      await setDoc(GANG_DOC, main, { merge: false });
+    }
+    return true;
+  } catch (e) {
+    console.error("Błąd przywracania:", e);
+    throw e;
+  }
+}
+
+// === ZAZNACZ / ODZNACZ KARTĘ ===
 // Zaznacz lub odznacz pojedynczą kartę (atomowa operacja — nie nadpisuje innych zmian)
 export async function setCardField(typ, key, value) {
   try {
@@ -84,6 +219,22 @@ export async function setCardField(typ, key, value) {
 // Zapis strukturalny (talie, członkowie) — całe pole naraz
 export async function setStructure(pole, wartosc) {
   try {
+    // GUARD: jeśli zapisujemy czlonkowie z domyślnymi nazwami, sprawdź czy nie nadpisujemy prawdziwych
+    if (pole === "czlonkowie" && wartosc) {
+      const domyslne = wartosc.filter(c => c.nazwa?.match(/^Osoba \d+$/));
+      if (domyslne.length > wartosc.length / 2) {
+        // Sprawdź co jest w bazie
+        const snap = await getDoc(GANG_DOC);
+        if (snap.exists()) {
+          const obecne = snap.data().czlonkowie || [];
+          const obecnePrawdziwe = obecne.filter(c => !c.nazwa?.match(/^Osoba \d+$/));
+          if (obecnePrawdziwe.length > 3) {
+            console.error("GUARD: Blokada zapisu domyślnych danych — w bazie są prawdziwe dane!");
+            return false;
+          }
+        }
+      }
+    }
     await setDoc(GANG_DOC, { [pole]: wartosc }, { merge: true });
     return true;
   } catch (e) {
