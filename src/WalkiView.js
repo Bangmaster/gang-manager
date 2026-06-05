@@ -1387,27 +1387,32 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
     linie.push(`Pozycja ${pozycja} z ${total}. Środek stawki — bezpieczna strefa dla tych co nie chcą się wyróżniać ani za bardzo, ani za mało.`);
   }
 
-  // Frekwencja — jeśli mamy dane aktywności, użyj ich; inaczej użyj uczestnictw
-  if (g.maObeznoscDane && lacznaWalka > 0) {
-    const frekAkt = Math.round((g.obecnosciLacznie || 0) / lacznaWalka * 100);
+  // Obecność — użyj bylNaWalce jeśli dostępne
+  if (g.maObecnoscDane && lacznaWalka > 0) {
+    const obecnoscLiczba = g.obecnosciLacznie || 0;
+    const frekAkt = Math.round(obecnoscLiczba / lacznaWalka * 100);
+    const label = `${obecnoscLiczba}/${lacznaWalka} walk`;
     if (frekAkt === 100) {
-      linie.push(`Obecność 100% — był na każdej walce. Niezawodny jak szwajcarski zegarek. Albo po prostu nie ma co robić.`);
+      linie.push(`Obecność: ${label} (100%) — był na każdej walce. Niezawodny jak szwajcarski zegarek. Albo po prostu nie ma co robić.`);
     } else if (frekAkt >= 80) {
-      linie.push(`Obecność ${frekAkt}% — prawie zawsze tam gdzie trzeba. Gangi wygrywają przez takich jak on. I przez tych co go przewyższają.`);
+      linie.push(`Obecność: ${label} (${frekAkt}%) — prawie zawsze tam gdzie trzeba.`);
     } else if (frekAkt >= 50) {
-      linie.push(`Obecność ${frekAkt}%. Pojawia się gdy chce. Gang walczy gdy musi. Matematyka jest bezlitosna.`);
+      linie.push(`Obecność: ${label} (${frekAkt}%). Pojawia się gdy chce. Gang walczy gdy musi. Matematyka jest bezlitosna.`);
+    } else if (frekAkt > 0) {
+      linie.push(`Obecność: ${label} (${frekAkt}%). Oficjalnie członek. Nieoficjalnie — obserwator.`);
     } else {
-      linie.push(`Obecność ${frekAkt}% — był na ${g.obecnosciLacznie || 0} z ${lacznaWalka} walk. Oficjalnie członek. Nieoficjalnie — obserwator.`);
+      linie.push(`Obecność: 0/${lacznaWalka} walk. Był zarejestrowany. Fizycznie — nieobecny. Mamy dane.`);
     }
   } else {
+    const label = `${g.uczestnictwa}/${lacznaWalka} walk`;
     if (frekwencja === 100) {
-      linie.push(`Uczestnictwo 100% — był na każdej walce. Albo nie ma życia poza gangiem, albo ma bardzo dużo życia w gangu. Różnica subtelna.`);
+      linie.push(`W rankingu: ${label} (100%) — zadawał obrażenia w każdej walce.`);
     } else if (frekwencja >= 80) {
-      linie.push(`Uczestnictwo ${frekwencja}% — prawie zawsze obecny. Te ${100-frekwencja}% nieobecności to prawdopodobnie siła wyższa.`);
+      linie.push(`W rankingu: ${label} (${frekwencja}%) — prawie zawsze aktywny.`);
     } else if (frekwencja >= 50) {
-      linie.push(`Uczestnictwo ${frekwencja}%. Grał kiedy chciał. Gang walczył kiedy musiał. Nie zawsze to samo.`);
+      linie.push(`W rankingu: ${label} (${frekwencja}%). Grał kiedy chciał. Gang walczył kiedy musiał.`);
     } else {
-      linie.push(`Uczestnictwo ${frekwencja}%. Był tu. Czasem. Głównie duchem.`);
+      linie.push(`W rankingu: ${label} (${frekwencja}%). Był tu. Czasem. Głównie duchem.`);
     }
   }
 
