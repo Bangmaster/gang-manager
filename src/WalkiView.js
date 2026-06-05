@@ -1539,6 +1539,49 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
         })}
       </div>
 
+      {/* Obecność per walka */}
+      {walki.some(w => w.gracze.some(g => g.bylNaWalce !== undefined)) && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>👥 Obecność na walkach</div>
+          {[...walki].sort((a,b) => new Date(b.data)-new Date(a.data)).map(w => {
+            const maObecnosc = w.gracze.some(g => g.bylNaWalce !== undefined);
+            if (!maObecnosc) return null;
+            const byli = w.gracze.filter(g => g.bylNaWalce === true);
+            const niebylo = w.gracze.filter(g => g.bylNaWalce === false);
+            return (
+              <div key={w.id} style={{ marginBottom: 8, padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid #2a2a3a" }}>
+                <div style={{ fontSize: 12, fontWeight: "bold", color: "#ffd700", marginBottom: 6 }}>
+                  {w.nazwa}
+                  <span style={{ fontSize: 10, fontWeight: "normal", color: "#555", marginLeft: 8 }}>
+                    🟢 {byli.length} · 🔴 {niebylo.length}
+                  </span>
+                </div>
+                {byli.length > 0 && (
+                  <div style={{ marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: "#0c6", marginRight: 6 }}>Byli:</span>
+                    {byli.map(g => (
+                      <span key={g.nazwa} style={{ fontSize: 10, color: "#0c6", marginRight: 6 }}>
+                        {g.nazwa.replace(/™FAM™|fAM™|FAM™/g, "")}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {niebylo.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: 10, color: "#f55", marginRight: 6 }}>Nie było:</span>
+                    {niebylo.map(g => (
+                      <span key={g.nazwa} style={{ fontSize: 10, color: "#f55", marginRight: 6 }}>
+                        {g.nazwa.replace(/™FAM™|fAM™|FAM™/g, "")}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Osobiste podsumowania */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>📋 Raporty osobiste</div>
@@ -1613,3 +1656,5 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
     </div>
   );
 }
+
+
