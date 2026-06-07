@@ -68,6 +68,7 @@ function buildActivityPrompt(ileScreenow) {
 
 Każdy wiersz zawiera:
 - numer porządkowy (1, 2, 3...)
+- poziom gracza (liczba przy avatarze, np. 1552, 921, 330)
 - nazwa gracza (np. "SaMaNtA", "™FAM™Fallven") — skopiuj DOKŁADNIE
 - czas ostatniej aktywności: "teraz", "X s. temu", "X min. temu", "X godz. temu", "Xg Ym temu"
 
@@ -81,7 +82,7 @@ Zamień czas na minuty:
 - "2 godziny temu" = 120
 
 Zwróć WYŁĄCZNIE JSON (bez markdown):
-{"czlonkowie":[{"nazwa":"SaMaNtA","minutTemu":4},{"nazwa":"™FAM™Fallven","minutTemu":120}]}
+{"czlonkowie":[{"nazwa":"SaMaNtA","minutTemu":4,"poziom":1392},{"nazwa":"™FAM™Fallven","minutTemu":120,"poziom":1552}]}
 
 Zwróć każdego gracza TYLKO RAZ. Ignoruj graczy bez czasu aktywności.`;
 }
@@ -335,6 +336,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
         .map(c => ({
           ...c,
           bylNaWalce: c.minutTemu <= PROG,
+          poziom: c.poziom || null,
         }));
       setWynikiAktywnosci(przetworzone);
     }
@@ -514,6 +516,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
                     }}>
                       {c.bylNaWalce ? "✓" : "✗"} {c.nazwa}
                       <span style={{ color: "#555", marginLeft: 3 }}>{c.minutTemu}min</span>
+                      {c.poziom && <span style={{ color: "#6496ff", marginLeft: 3 }}>L{c.poziom}</span>}
                     </div>
                   ))}
                 </div>
@@ -948,6 +951,12 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
       s.miejsca.push(g.miejsce || 99);
       s.historiaObr.push({ data: w.data, obr: g.obrazenia, walkaId: w.id });
       s.historiaPozyc.push({ data: w.data, walkaId: w.id, obrazenia: g.obrazenia });
+      // Zapisz poziom jeśli dostępny (z danych aktywności)
+      const poziomGracza = g.poziomAkt || g.poziom || null;
+      if (poziomGracza) {
+        if (!s.historiaPoziomow) s.historiaPoziomow = [];
+        s.historiaPoziomow.push({ data: w.data, poziom: poziomGracza });
+      }
       // Jeśli mamy dane aktywności — zapisz obecność (bylNaWalce)
       if (g.bylNaWalce !== undefined) {
         s.obecnosciLacznie = (s.obecnosciLacznie || 0) + (g.bylNaWalce ? 1 : 0);
@@ -1010,6 +1019,37 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     }
     if (najgorszaForma && najgorszaForma.zmiana < -15) {
       ciekawostki.push({ ikona: "📉", tytul: "Największy spadek formy", opis: `${najgorszaForma.nazwa} — spadek o ${Math.abs(najgorszaForma.zmiana).toFixed(0)}% (śr. ${formatLiczby(Math.round(najgorszaForma.srPierwsze))} → ${formatLiczby(Math.round(najgorszaForma.srDrugie))} na walkę)` });
+    }
+  }
+
+  // 3a. Awanse poziomów w sezonie
+  const awansePoziomu = [];
+  wszyscy.forEach(g => {
+    const hist = g.historiaPoziomow || [];
+    if (hist.length >= 2) {
+      const pierwszy = hist[0].poziom;
+      const ostatni = hist[hist.length - 1].poziom;
+      const roznica = ostatni - pierwszy;
+      if (roznica > 0) {
+        awansePoziomu.push({ nazwa: g.nazwa, pierwszy, ostatni, roznica });
+      }
+    }
+  });
+
+  if (awansePoziomu.length > 0) {
+    const maxAwans = [...awansePoziomu].sort((a, b) => b.roznica - a.roznica)[0];
+    ciekawostki.push({
+      ikona: "⬆️",
+      tytul: "Największy awans poziomów",
+      opis: `${maxAwans.nazwa} — awansował z L${maxAwans.pierwszy} na L${maxAwans.ostatni} (+${maxAwans.roznica} lvl w sezonie)`
+    });
+    if (awansePoziomu.length > 1) {
+      const lista = awansePoziomu.slice(1, 5).map(a => `${a.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")} +${a.roznica}`).join(", ");
+      ciekawostki.push({
+        ikona: "📈",
+        tytul: "Postęp poziomów sezonu",
+        opis: lista + (awansePoziomu.length > 5 ? ` i ${awansePoziomu.length - 5} innych` : "")
+      });
     }
   }
 
