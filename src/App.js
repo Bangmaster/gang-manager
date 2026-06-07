@@ -3754,6 +3754,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"dashboard",label:"📊 Dashboard"},
     {id:"taktyka",label:"⚔️ Taktyka"},
     {id:"kalkulator_event",label:"🧮 Kalkulator eventu"},
+    {id:"tracker_krecen",label:"🎯 Tracker kręceń"},
   ];
 
   return (
@@ -3798,6 +3799,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       />}
       {tryb==="taktyka"&&<TaktykaSezonu zapiszStrukture={zapiszStrukture}/>}
       {tryb==="kalkulator_event"&&<KalkulatorEventu/>}
+      {tryb==="tracker_krecen"&&<TrackerKrecen/>}
     </div>
   );
 }
@@ -6799,6 +6801,246 @@ function TaktykaSezonu({zapiszStrukture}) {
 // ============================================================
 // KALKULATOR OPŁACALNOŚCI EVENTU
 // ============================================================
+function TrackerKrecen() {
+  const MNOZNIKI = [1,2,3,5,10,15,25,30,50];
+  const [sesja, setSesja] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("tracker_sesja")) || []; } catch { return []; }
+  });
+  const [historia, setHistoria] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("tracker_historia")) || []; } catch { return []; }
+  });
+  const [aktMnoznik, setAktMnoznik] = useState(1);
+  const [ammo, setAmmo] = useState(() => localStorage.getItem("tracker_ammo") || "5000");
+  const [pokazAnalize, setPokazAnalize] = useState(false);
+
+  const zapiszStan = (nowaSesja, nowaHistoria, noweAmmo) => {
+    if (nowaSesja !== undefined) localStorage.setItem("tracker_sesja", JSON.stringify(nowaSesja));
+    if (nowaHistoria !== undefined) localStorage.setItem("tracker_historia", JSON.stringify(nowaHistoria));
+    if (noweAmmo !== undefined) localStorage.setItem("tracker_ammo", noweAmmo);
+  };
+
+  const dodajKrecenie = (krytyk = false) => {
+    const noweKrecenie = { mnoznik: aktMnoznik, krytyk, nr: sesja.length + 1 };
+    const nowaSesja = [...sesja, noweKrecenie];
+    setSesja(nowaSesja);
+    const noweAmmo = String(Math.max(0, parseInt(ammo) - aktMnoznik));
+    setAmmo(noweAmmo);
+    zapiszStan(nowaSesja, undefined, noweAmmo);
+  };
+
+  const zapiszSesje = () => {
+    if (sesja.length === 0) return;
+    const nowaHistoria = [...historia, { data: new Date().toISOString(), krecenia: sesja }];
+    setHistoria(nowaHistoria);
+    setSesja([]);
+    zapiszStan([], nowaHistoria);
+  };
+
+  const resetujSesje = () => {
+    if (!window.confirm("Wyczyścić aktualną sesję?")) return;
+    setSesja([]);
+    zapiszStan([], undefined);
+  };
+
+  const wyczyścHistorie = () => {
+    if (!window.confirm("Wyczyścić całą historię? Stracisz wszystkie zebrane dane.")) return;
+    setHistoria([]);
+    setSesja([]);
+    zapiszStan([], []);
+  };
+
+  // Analiza danych
+  const analizuj = () => {
+    const wszystkieKrecenia = [...historia.flatMap(s => s.krecenia), ...sesja];
+    if (wszystkieKrecenia.length === 0) return null;
+
+    // Ile kręceń między krytykami
+    const odleglosci = [];
+    let licznik = 0;
+    for (const k of wszystkieKrecenia) {
+      licznik++;
+      if (k.krytyk) { odleglosci.push(licznik); licznik = 0; }
+    }
+
+    // Sekwencje mnożników przed krytykiem
+    const sekwencje = {};
+    for (let i = 0; i < wszystkieKrecenia.length; i++) {
+      if (wszystkieKrecenia[i].krytyk) {
+        const okno = wszystkieKrecenia.slice(Math.max(0, i-3), i+1).map(k => `×${k.mnoznik}`).join("→");
+        sekwencje[okno] = (sekwencje[okno] || 0) + 1;
+      }
+    }
+
+    const krytyków = wszystkieKrecenia.filter(k => k.krytyk).length;
+    const srOdleglosc = odleglosci.length > 0 ? (odleglosci.reduce((s,v)=>s+v,0)/odleglosci.length).toFixed(1) : "?";
+    const srAmmo = odleglosci.length > 0
+      ? (wszystkieKrecenia.filter(k=>k.krytyk).map((k,i) => {
+          const start = i === 0 ? 0 : wszystkieKrecenia.indexOf(wszystkieKrecenia.filter(x=>x.krytyk)[i-1]) + 1;
+          const koniec = wszystkieKrecenia.indexOf(k);
+          return wszystkieKrecenia.slice(start, koniec+1).reduce((s,x)=>s+x.mnoznik, 0);
+        }).reduce((s,v)=>s+v,0) / krytyków).toFixed(0)
+      : "?";
+
+    // Top sekwencje
+    const topSek = Object.entries(sekwencje).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+    return { krytyków, łącznie: wszystkieKrecenia.length, srOdleglosc, srAmmo, topSek, odleglosci };
+  };
+
+  const analiza = analizuj();
+  const ostatnie10 = sesja.slice(-10);
+
+  return (
+    <div>
+      <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70033",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:2}}>🎯 Tracker kręceń — szukamy wzorca</div>
+        <div style={{fontSize:11,color:"#555",lineHeight:1.6}}>
+          Klikaj mnożnik przed każdym kręceniem, potem "Kręcenie" lub "KRYTYK" jeśli wypadły 3× celowniki. Po kilku sesjach analiza pokaże czy jest wzorzec.
+        </div>
+      </div>
+
+      {/* Ammo */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,padding:"8px 12px",background:"rgba(255,165,0,0.08)",borderRadius:8,border:"1px solid #fa033"}}>
+        <span style={{fontSize:11,color:"#fa0",flexShrink:0}}>🔫 Ammo:</span>
+        <input type="number" value={ammo} onChange={e=>{setAmmo(e.target.value);localStorage.setItem("tracker_ammo",e.target.value);}}
+          style={{flex:1,padding:"4px 8px",background:"#12122a",border:"1px solid #fa033",borderRadius:5,color:"#fa0",fontSize:16,fontWeight:"bold"}}/>
+        <span style={{fontSize:10,color:"#555"}}>sesja: {sesja.length} kręceń</span>
+      </div>
+
+      {/* Wybór mnożnika */}
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>Wybierz mnożnik:</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {MNOZNIKI.map(m=>(
+            <button key={m} onClick={()=>setAktMnoznik(m)} style={{
+              padding:"8px 12px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:"bold",
+              background:aktMnoznik===m?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
+              border:aktMnoznik===m?"none":"1px solid #2a2a3a",
+              color:aktMnoznik===m?"#000":"#666",
+            }}>×{m}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Przyciski akcji */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+        <button onClick={()=>dodajKrecenie(false)} style={{
+          padding:16,background:"rgba(255,255,255,0.06)",border:"1px solid #333",
+          borderRadius:10,color:"#888",fontSize:14,cursor:"pointer",fontWeight:"bold",
+        }}>
+          🎰 Kręcenie ×{aktMnoznik}
+          <div style={{fontSize:10,color:"#555",marginTop:2}}>−{aktMnoznik} ammo</div>
+        </button>
+        <button onClick={()=>dodajKrecenie(true)} style={{
+          padding:16,background:"rgba(255,50,50,0.15)",border:"2px solid #f55",
+          borderRadius:10,color:"#f55",fontSize:14,cursor:"pointer",fontWeight:"bold",
+        }}>
+          🎯 KRYTYK! ×{aktMnoznik}
+          <div style={{fontSize:10,color:"#f5544488",marginTop:2}}>3× celownik!</div>
+        </button>
+      </div>
+
+      {/* Ostatnie 10 kręceń */}
+      {ostatnie10.length > 0 && (
+        <div style={{marginBottom:12,padding:"8px 10px",background:"rgba(0,0,0,0.2)",borderRadius:8,border:"1px solid #2a2a3a"}}>
+          <div style={{fontSize:10,color:"#555",marginBottom:5}}>Ostatnie {ostatnie10.length} kręceń:</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {ostatnie10.map((k,i)=>(
+              <div key={i} style={{
+                fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:"bold",
+                background:k.krytyk?"rgba(255,50,50,0.2)":"rgba(255,255,255,0.05)",
+                border:k.krytyk?"1px solid #f55":"1px solid #333",
+                color:k.krytyk?"#f55":"#666",
+              }}>
+                {k.krytyk?"🎯":"🎰"} ×{k.mnoznik}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Przyciski sesji */}
+      <div style={{display:"flex",gap:6,marginBottom:14}}>
+        <button onClick={zapiszSesje} disabled={sesja.length===0} style={{
+          flex:1,padding:10,
+          background:sesja.length>0?"linear-gradient(135deg,#0c6,#0fa)":"rgba(255,255,255,0.05)",
+          border:"none",borderRadius:8,color:sesja.length>0?"#000":"#444",
+          fontWeight:"bold",fontSize:12,cursor:sesja.length>0?"pointer":"not-allowed",
+        }}>💾 Zapisz sesję ({sesja.length} kręceń)</button>
+        <button onClick={resetujSesje} disabled={sesja.length===0} style={{
+          padding:"10px 12px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",
+          borderRadius:8,color:"#f55",cursor:"pointer",fontSize:11,
+        }}>🗑 Reset</button>
+      </div>
+
+      {/* Analiza */}
+      {historia.length > 0 && analiza && (
+        <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:pokazAnalize?10:0}}>
+            <div style={{fontSize:12,fontWeight:"bold",color:"#6496ff"}}>
+              📊 Analiza ({historia.length} sesji, {analiza.łącznie} kręceń, {analiza.krytyków} krytyków)
+            </div>
+            <button onClick={()=>setPokazAnalize(p=>!p)} style={{
+              fontSize:10,padding:"2px 8px",background:"rgba(100,150,255,0.1)",border:"1px solid #6496ff33",
+              borderRadius:4,color:"#6496ff",cursor:"pointer",
+            }}>{pokazAnalize?"▲":"▼"}</button>
+          </div>
+          {pokazAnalize&&(
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+                {[
+                  {label:"Krytyk co śr.",val:`${analiza.srOdleglosc} kręceń`,c:"#f55"},
+                  {label:"Ammo na krytyk",val:`~${analiza.srAmmo}`,c:"#fa0"},
+                  {label:"Skuteczność",val:`${((analiza.krytyków/analiza.łącznie)*100).toFixed(1)}%`,c:"#0c6"},
+                ].map(s=>(
+                  <div key={s.label} style={{background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"8px",textAlign:"center"}}>
+                    <div style={{fontSize:15,fontWeight:"bold",color:s.c}}>{s.val}</div>
+                    <div style={{fontSize:9,color:"#555"}}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {analiza.topSek.length > 0 && (
+                <div>
+                  <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>🔍 Najczęstsze sekwencje przed krytykiem:</div>
+                  {analiza.topSek.map(([sek, ile])=>(
+                    <div key={sek} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",marginBottom:3,background:"rgba(255,50,50,0.08)",borderRadius:5,border:"1px solid #f5544422"}}>
+                      <span style={{fontSize:11,color:"#ddd",fontFamily:"monospace"}}>{sek}</span>
+                      <span style={{fontSize:11,color:"#f55",fontWeight:"bold"}}>{ile}×</span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:10,color:"#555",marginTop:6}}>
+                    Im więcej danych tym bardziej miarodajna analiza. Cel: min 200 kręceń.
+                  </div>
+                </div>
+              )}
+
+              {analiza.odleglosci.length >= 5 && (
+                <div style={{marginTop:8,padding:"6px 8px",background:"rgba(0,0,0,0.2)",borderRadius:5,fontSize:10,color:"#666"}}>
+                  Odległości między krytykami: {analiza.odleglosci.slice(-10).join(", ")} (ostatnie 10)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {historia.length > 0 && (
+        <button onClick={wyczyścHistorie} style={{
+          width:"100%",padding:8,background:"rgba(255,50,50,0.08)",border:"1px solid #f5544422",
+          borderRadius:6,color:"#f5544466",fontSize:11,cursor:"pointer",
+        }}>🗑 Wyczyść całą historię ({historia.length} sesji)</button>
+      )}
+
+      {historia.length === 0 && sesja.length === 0 && (
+        <div style={{textAlign:"center",padding:20,color:"#555",fontSize:11}}>
+          Zacznij kręcić i zbieraj dane. Po kilku sesjach analiza pokaże czy jest wzorzec w sekwencjach mnożników.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KalkulatorEventu() {
   // Progi łączone — kręcisz cały czas w górę, po drodze zbierasz nagrody
   const TYPY_NAGRODY = [
