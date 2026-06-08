@@ -3755,6 +3755,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     {id:"taktyka",label:"⚔️ Taktyka"},
     {id:"kalkulator_event",label:"🧮 Kalkulator eventu"},
     {id:"tracker_krecen",label:"🎯 Tracker kręceń"},
+    {id:"rzadkie_karty",label:"💎 Rzadkie karty"},
   ];
 
   return (
@@ -3800,6 +3801,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="taktyka"&&<TaktykaSezonu zapiszStrukture={zapiszStrukture}/>}
       {tryb==="kalkulator_event"&&<KalkulatorEventu/>}
       {tryb==="tracker_krecen"&&<TrackerKrecen/>}
+      {tryb==="rzadkie_karty"&&<RzadkieKarty talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty}/>}
     </div>
   );
 }
@@ -6801,6 +6803,181 @@ function TaktykaSezonu({zapiszStrukture}) {
 // ============================================================
 // KALKULATOR OPŁACALNOŚCI EVENTU
 // ============================================================
+function RzadkieKarty({ talie, czlonkowie, posiadane, duplikaty }) {
+  const [filtr, setFiltr] = useState("rzadkie"); // rzadkie / duplikaty / brakuje
+  const [filtrTalia, setFiltrTalia] = useState("wszystkie");
+  const [filtrTyp, setFiltrTyp] = useState("wszystkie"); // wszystkie / złota / diamentowa
+  const [limit, setLimit] = useState(20);
+
+  const totalOsob = czlonkowie.length;
+
+  // Oblicz statystyki dla każdej karty
+  const statystyki = [];
+  talie.forEach(talia => {
+    talia.karty.forEach(karta => {
+      const ilePosiada = czlonkowie.filter(c =>
+        posiadane[`${c.id}_${talia.id}_${karta.nazwa}`]
+      ).length;
+      const ileDuplikatow = czlonkowie.filter(c =>
+        duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]
+      ).length;
+      const procent = Math.round(ilePosiada / totalOsob * 100);
+
+      statystyki.push({
+        talia: talia.nazwa,
+        taliaId: talia.id,
+        taliaNumer: talia.numer || 99,
+        karta: karta.nazwa,
+        typ: karta.typ,
+        ilePosiada,
+        ileDuplikatow,
+        brakuje: totalOsob - ilePosiada,
+        procent,
+      });
+    });
+  });
+
+  // Filtruj
+  let filtered = statystyki;
+  if (filtrTalia !== "wszystkie") filtered = filtered.filter(s => s.taliaNumer === parseInt(filtrTalia));
+  if (filtrTyp !== "wszystkie") filtered = filtered.filter(s => s.typ === filtrTyp);
+
+  // Sortuj wg trybu
+  let sorted;
+  if (filtr === "rzadkie") {
+    sorted = [...filtered].sort((a, b) => a.ilePosiada - b.ilePosiada || a.taliaNumer - b.taliaNumer);
+  } else if (filtr === "duplikaty") {
+    sorted = [...filtered].sort((a, b) => a.ileDuplikatow - b.ileDuplikatow || a.taliaNumer - b.taliaNumer);
+  } else {
+    sorted = [...filtered].sort((a, b) => b.brakuje - a.brakuje || a.taliaNumer - b.taliaNumer);
+  }
+
+  const pokazywane = sorted.slice(0, limit);
+
+  // Kolory
+  const kolorProcent = (p) => p <= 20 ? "#f55" : p <= 50 ? "#fa0" : p <= 80 ? "#ffd700" : "#0c6";
+  const kolorTyp = (typ) => typ === "złota" ? "#ffd700" : "#87CEEB";
+
+  return (
+    <div>
+      <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:"bold",color:"#6496ff",marginBottom:2}}>💎 Rzadkie karty gangu</div>
+        <div style={{fontSize:11,color:"#555"}}>
+          Analiza na podstawie danych {totalOsob} członków · {statystyki.length} kart łącznie
+        </div>
+      </div>
+
+      {/* Tryb widoku */}
+      <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
+        {[
+          {id:"rzadkie", label:"💎 Najrzadsze", opis:"kto najmniej posiada"},
+          {id:"duplikaty", label:"📦 Brak duplikatów", opis:"najmniej duplikatów"},
+          {id:"brakuje", label:"❌ Brakuje", opis:"ile osób nie ma"},
+        ].map(t=>(
+          <button key={t.id} onClick={()=>setFiltr(t.id)} style={{
+            padding:"6px 12px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:"bold",
+            background:filtr===t.id?"linear-gradient(135deg,#1a3a8f,#6496ff)":"rgba(255,255,255,0.05)",
+            border:filtr===t.id?"none":"1px solid #2a2a3a",
+            color:filtr===t.id?"#fff":"#666",
+          }}>
+            {t.label}
+            <div style={{fontSize:9,fontWeight:"normal",color:filtr===t.id?"#aaa":"#444"}}>{t.opis}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Filtry */}
+      <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+        <select value={filtrTalia} onChange={e=>setFiltrTalia(e.target.value)}
+          style={{padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#aaa",fontSize:11}}>
+          <option value="wszystkie">Wszystkie talie</option>
+          {[...talie].sort((a,b)=>(a.numer||99)-(b.numer||99)).map(t=>(
+            <option key={t.id} value={t.numer||99}>#{t.numer||"?"} {t.nazwa}</option>
+          ))}
+        </select>
+        <select value={filtrTyp} onChange={e=>setFiltrTyp(e.target.value)}
+          style={{padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#aaa",fontSize:11}}>
+          <option value="wszystkie">Złote + Diamentowe</option>
+          <option value="złota">⭐ Tylko złote</option>
+          <option value="diamentowa">💎 Tylko diamentowe</option>
+        </select>
+      </div>
+
+      {/* Lista kart */}
+      <div style={{marginBottom:10}}>
+        {/* Nagłówek */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:4,padding:"4px 8px",marginBottom:4}}>
+          {["Karta","Posiada","Duplikaty","Brakuje"].map(h=>(
+            <div key={h} style={{fontSize:9,color:"#444",textAlign:"center"}}>{h}</div>
+          ))}
+        </div>
+
+        {pokazywane.map((s,i)=>{
+          const kolor = kolorProcent(s.procent);
+          const pasek = `${s.procent}%`;
+          return (
+            <div key={`${s.taliaId}_${s.karta}`} style={{
+              display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",
+              gap:4,padding:"7px 8px",marginBottom:3,borderRadius:7,
+              background:"rgba(0,0,0,0.2)",
+              border:`1px solid ${s.procent<=20?"#f5544422":s.procent<=50?"#fa055":"#2a2a3a"}`,
+              position:"relative",overflow:"hidden",alignItems:"center",
+            }}>
+              {/* Pasek tła */}
+              <div style={{position:"absolute",left:0,top:0,bottom:0,width:pasek,background:`${kolor}08`,zIndex:0}}/>
+              {/* Nazwa karty */}
+              <div style={{zIndex:1}}>
+                <div style={{fontSize:11,color:"#ddd",fontWeight:s.procent<=20?"bold":"normal"}}>
+                  <span style={{fontSize:9,color:kolorTyp(s.typ),marginRight:4}}>
+                    {s.typ==="złota"?"⭐":"💎"}
+                  </span>
+                  {s.karta}
+                </div>
+                <div style={{fontSize:9,color:"#444"}}>#{s.taliaNumer} {s.talia}</div>
+              </div>
+              {/* Posiada */}
+              <div style={{textAlign:"center",zIndex:1}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:kolor}}>{s.ilePosiada}/{totalOsob}</div>
+                <div style={{fontSize:8,color:"#555"}}>{s.procent}%</div>
+              </div>
+              {/* Duplikaty */}
+              <div style={{textAlign:"center",zIndex:1}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:s.ileDuplikatow>0?"#87CEEB":"#333"}}>
+                  {s.ileDuplikatow>0?s.ileDuplikatow:"—"}
+                </div>
+              </div>
+              {/* Brakuje */}
+              <div style={{textAlign:"center",zIndex:1}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:s.brakuje>0?"#f55":"#0c6"}}>
+                  {s.brakuje>0?s.brakuje:"✓"}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Pokaż więcej */}
+      {sorted.length > limit && (
+        <button onClick={()=>setLimit(l=>l+20)} style={{
+          width:"100%",padding:8,background:"rgba(255,255,255,0.05)",border:"1px solid #2a2a3a",
+          borderRadius:6,color:"#666",cursor:"pointer",fontSize:11,
+        }}>
+          Pokaż więcej ({sorted.length - limit} pozostałych)
+        </button>
+      )}
+
+      {/* Podsumowanie */}
+      <div style={{marginTop:10,padding:"8px 12px",background:"rgba(0,0,0,0.2)",borderRadius:8,border:"1px solid #2a2a3a",fontSize:11,color:"#555",lineHeight:1.8}}>
+        🔴 Czerwone (0-20%) — super rzadkie, priorytet w wymianach<br/>
+        🟡 Żółte (21-50%) — rzadkie, warto celować<br/>
+        🟡 Złote (51-80%) — powszechne<br/>
+        🟢 Zielone (81-100%) — prawie wszyscy mają
+      </div>
+    </div>
+  );
+}
+
 function TrackerKrecen() {
   const MNOZNIKI = [1,2,3,5,10,15,25,30,50];
   const [sesja, setSesja] = useState(() => {
