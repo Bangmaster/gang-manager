@@ -1149,15 +1149,6 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     }
   }
 
-  // 6. Brak obrażeń — nieobecni lub z zerowymi obrażeniami
-  const bezObr = czlonkowie.filter(c => {
-    const s = statystyki[c.nazwa];
-    return !s || s.obrazeniaLacznie === 0;
-  }).map(c => c.nazwa);
-  if (bezObr.length > 0) {
-    ciekawostki.push({ ikona: "💀", tytul: "Brak obrażeń", opis: `${bezObr.length} osób bez ani jednego obrażenia w sezonie: ${bezObr.slice(0, 5).join(", ")}${bezObr.length > 5 ? "..." : ""}` });
-  }
-
   // 7. Mało zaangażowani
   const malo = wszyscy.filter(g => g.obrazeniaLacznie < 500000 && g.uczestnictwa >= 2);
   if (malo.length > 0) {
