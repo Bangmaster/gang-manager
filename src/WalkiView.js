@@ -1155,6 +1155,33 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     ciekawostki.push({ ikona: "💤", tytul: "Mało zaangażowani", opis: `${malo.map(g => `${g.nazwa} (${formatLiczby(g.obrazeniaLacznie)})`).slice(0, 3).join(", ")}` });
   }
 
+  // Pasożyt eventu — duży przyrost lvl, małe obrażenia w walkach
+  if (wszyscy.some(g => (g.historiaPoziomow||[]).length >= 2)) {
+    const srednieObr2 = wszyscy.reduce((s,g)=>s+g.obrazeniaLacznie,0) / Math.max(wszyscy.length,1);
+    const pasozyt = wszyscy.filter(g => {
+      const hist = g.historiaPoziomow || [];
+      if (hist.length < 2 || g.uczestnictwa < 2) return false;
+      const przyrostLvl = hist[hist.length-1].poziom - hist[0].poziom;
+      // Duży przyrost lvl (>10 w sezonie) ale obrażenia poniżej 40% średniej gangu
+      return przyrostLvl >= 10 && g.obrazeniaLacznie < srednieObr2 * 0.4;
+    }).map(g => {
+      const hist = g.historiaPoziomow || [];
+      const przyrost = hist[hist.length-1].poziom - hist[0].poziom;
+      return { ...g, przyrostLvl: przyrost };
+    }).sort((a,b) => b.przyrostLvl - a.przyrostLvl);
+
+    if (pasozyt.length > 0) {
+      const lista = pasozyt.map(g =>
+        `${g.nazwa} (+${g.przyrostLvl} lvl, ${formatLiczby(g.obrazeniaLacznie)} obr.)`
+      ).join(", ");
+      ciekawostki.push({
+        ikona: "🪱",
+        tytul: "Pasożyt eventu",
+        opis: `${lista}. Duży przyrost lvl w sezonie, małe obrażenia w walkach. Aktywnie gra — ale nie dla gangu.`
+      });
+    }
+  }
+
   // 8. CZARNY HUMOR — ostro po bandzie
   const ostatniaWalka = [...walki].sort((a, b) => new Date(b.data) - new Date(a.data))[0];
   const lacznie = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0);
@@ -1525,6 +1552,22 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
     }
   }
 
+  // Przyrost lvl vs obrażenia w walkach
+  const histLvlOsobisty = g.historiaPoziomow || [];
+  if (histLvlOsobisty.length >= 2) {
+    const lvlStart2 = histLvlOsobisty[0].poziom;
+    const lvlEnd2 = histLvlOsobisty[histLvlOsobisty.length-1].poziom;
+    const przyrostLvl = lvlEnd2 - lvlStart2;
+    const sredGangu = wszyscy.reduce((s,x)=>s+x.obrazeniaLacznie,0) / Math.max(wszyscy.length,1);
+    if (przyrostLvl >= 10 && g.obrazeniaLacznie < sredGangu * 0.4) {
+      linie.push(`+${przyrostLvl} lvl w sezonie (L${lvlStart2}→L${lvlEnd2}), ale tylko ${formatLiczby(g.obrazeniaLacznie)} obrażeń w walkach. Gra aktywnie — eventy, questy, wszystko poza walkami dla gangu. Klasyczny pasożyt eventu.`);
+    } else if (przyrostLvl >= 10 && g.obrazeniaLacznie >= sredGangu * 0.8) {
+      linie.push(`+${przyrostLvl} lvl w sezonie i solidne obrażenia w walkach. Gra dla siebie i dla gangu jednocześnie. Rzadki okaz.`);
+    } else if (przyrostLvl >= 5) {
+      linie.push(`+${przyrostLvl} lvl w sezonie (L${lvlStart2}→L${lvlEnd2}).`);
+    }
+  }
+
   // Rekord
   if (maxWalka > 0 && g.uczestnictwa >= 2) {
     linie.push(`Rekord sezonu: ${formatLiczby(maxWalka)} obrażeń w jednej walce. Zapamiętany. Przynajmniej przez apkę.`);
@@ -1763,3 +1806,5 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
     </div>
   );
 }
+
+
