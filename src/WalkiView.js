@@ -1682,7 +1682,6 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
           const histLvlRank = g.historiaPoziomow || [];
           const lvlStart = histLvlRank.length > 0 ? histLvlRank[0].poziom : null;
           const lvlEnd = histLvlRank.length > 0 ? histLvlRank[histLvlRank.length-1].poziom : null;
-          const lvlDelta = lvlStart && lvlEnd ? lvlEnd - lvlStart : null;
 
           return (
             <div key={i} style={{
@@ -1738,5 +1737,3 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
     </div>
   );
 }
-
-
