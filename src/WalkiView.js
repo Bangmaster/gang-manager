@@ -1493,6 +1493,29 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
     linie.push(`Wyniki równe jak stół. ${formatLiczby(minWalka)}–${formatLiczby(maxWalka)}. Regularność godna szacunku. Albo autokliker. Nie osądzamy.`);
   }
 
+  // Progres poziomów walka po walce
+  const histLvl = g.historiaPoziomow || [];
+  if (histLvl.length >= 2) {
+    const lvlStart = histLvl[0].poziom;
+    const lvlEnd = histLvl[histLvl.length - 1].poziom;
+    const roznicaLvl = lvlEnd - lvlStart;
+    const sekwencja = histLvl.map((h, i) => {
+      if (i === 0) return `L${h.poziom}`;
+      const delta = h.poziom - histLvl[i-1].poziom;
+      return `L${h.poziom}${delta > 0 ? `(+${delta})` : ""}`;
+    }).join(" → ");
+    if (roznicaLvl > 0) {
+      linie.push(`Progres lvl: ${sekwencja}. Łącznie +${roznicaLvl} lvl. ${
+        roznicaLvl >= 50 ? "Intensywne granie. Widać zaangażowanie." :
+        roznicaLvl >= 20 ? "Solidny progres. Gang to zauważa." :
+        "Rośnie powoli. Ale rośnie."}`);
+    } else {
+      linie.push(`Progres lvl: ${sekwencja}. Bez zmian. Stabilizacja? Albo stagnacja. Cienka linia.`);
+    }
+  } else if (histLvl.length === 1) {
+    linie.push(`Aktualny poziom: L${histLvl[0].poziom}. Wgrywaj screeny aktywności regularnie żeby śledzić progres walka po walce.`);
+  }
+
   // Zmiana pozycji
   if (zmianaPoz !== null && Math.abs(zmianaPoz) >= 1 && g.uczestnictwa >= 2) {
     if (zmianaPoz > 0) {
