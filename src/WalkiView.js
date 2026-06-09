@@ -1155,29 +1155,47 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     ciekawostki.push({ ikona: "💤", tytul: "Mało zaangażowani", opis: `${malo.map(g => `${g.nazwa} (${formatLiczby(g.obrazeniaLacznie)})`).slice(0, 3).join(", ")}` });
   }
 
-  // Pasożyt eventu — duży przyrost lvl, małe obrażenia w walkach
-  if (wszyscy.some(g => (g.historiaPoziomow||[]).length >= 2)) {
-    const srednieObr2 = wszyscy.reduce((s,g)=>s+g.obrazeniaLacznie,0) / Math.max(wszyscy.length,1);
-    const pasozyt = wszyscy.filter(g => {
-      const hist = g.historiaPoziomow || [];
-      if (hist.length < 2 || g.uczestnictwa < 2) return false;
-      const przyrostLvl = hist[hist.length-1].poziom - hist[0].poziom;
-      // Duży przyrost lvl (>10 w sezonie) ale obrażenia poniżej 40% średniej gangu
-      return przyrostLvl >= 10 && g.obrazeniaLacznie < srednieObr2 * 0.4;
-    }).map(g => {
-      const hist = g.historiaPoziomow || [];
+  // Pasożyt eventu — stosunek obrażeń do zdobytych lvl
+  const graczeZLvl = wszyscy.filter(g => {
+    const hist = g.historiaPoziomow || [];
+    return hist.length >= 2 && g.uczestnictwa >= 2 && (hist[hist.length-1].poziom - hist[0].poziom) > 0;
+  });
+
+  if (graczeZLvl.length >= 2) {
+    // Oblicz obrażenia/lvl dla każdego
+    const stosunki = graczeZLvl.map(g => {
+      const hist = g.historiaPoziomow;
       const przyrost = hist[hist.length-1].poziom - hist[0].poziom;
-      return { ...g, przyrostLvl: przyrost };
-    }).sort((a,b) => b.przyrostLvl - a.przyrostLvl);
+      return { ...g, przyrostLvl: przyrost, obrNaLvl: g.obrazeniaLacznie / przyrost };
+    });
+
+    // Mediana stosunku gangu
+    const sortowane = [...stosunki].sort((a,b) => a.obrNaLvl - b.obrNaLvl);
+    const mediana = sortowane[Math.floor(sortowane.length/2)].obrNaLvl;
+
+    // Pasożyt = poniżej 25% mediany
+    const pasozyt = stosunki
+      .filter(g => g.obrNaLvl < mediana * 0.25)
+      .sort((a,b) => a.obrNaLvl - b.obrNaLvl);
 
     if (pasozyt.length > 0) {
       const lista = pasozyt.map(g =>
-        `${g.nazwa} (+${g.przyrostLvl} lvl, ${formatLiczby(g.obrazeniaLacznie)} obr.)`
+        `${g.nazwa} (${formatLiczby(Math.round(g.obrNaLvl))} obr/lvl)`
       ).join(", ");
       ciekawostki.push({
         ikona: "🪱",
         tytul: "Pasożyt eventu",
-        opis: `${lista}. Duży przyrost lvl w sezonie, małe obrażenia w walkach. Aktywnie gra — ale nie dla gangu.`
+        opis: `${lista}. Zdobywają lvl ale nie w walkach gangowych. Aktywnie grają — tylko nie dla gangu.`
+      });
+    }
+
+    // Top gracz — najlepszy stosunek obr/lvl
+    const najlepszy = stosunki.sort((a,b) => b.obrNaLvl - a.obrNaLvl)[0];
+    if (najlepszy) {
+      ciekawostki.push({
+        ikona: "⚔️",
+        tytul: "Walczy dla gangu",
+        opis: `${najlepszy.nazwa} — ${formatLiczby(Math.round(najlepszy.obrNaLvl))} obrażeń na każdy zdobyty lvl. Gra dla gangu, nie dla rankingów.`
       });
     }
   }
@@ -1552,19 +1570,29 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
     }
   }
 
-  // Przyrost lvl vs obrażenia w walkach
+  // Stosunek obrażeń do zdobytych lvl
   const histLvlOsobisty = g.historiaPoziomow || [];
   if (histLvlOsobisty.length >= 2) {
     const lvlStart2 = histLvlOsobisty[0].poziom;
     const lvlEnd2 = histLvlOsobisty[histLvlOsobisty.length-1].poziom;
     const przyrostLvl = lvlEnd2 - lvlStart2;
-    const sredGangu = wszyscy.reduce((s,x)=>s+x.obrazeniaLacznie,0) / Math.max(wszyscy.length,1);
-    if (przyrostLvl >= 10 && g.obrazeniaLacznie < sredGangu * 0.4) {
-      linie.push(`+${przyrostLvl} lvl w sezonie (L${lvlStart2}→L${lvlEnd2}), ale tylko ${formatLiczby(g.obrazeniaLacznie)} obrażeń w walkach. Gra aktywnie — eventy, questy, wszystko poza walkami dla gangu. Klasyczny pasożyt eventu.`);
-    } else if (przyrostLvl >= 10 && g.obrazeniaLacznie >= sredGangu * 0.8) {
-      linie.push(`+${przyrostLvl} lvl w sezonie i solidne obrażenia w walkach. Gra dla siebie i dla gangu jednocześnie. Rzadki okaz.`);
-    } else if (przyrostLvl >= 5) {
-      linie.push(`+${przyrostLvl} lvl w sezonie (L${lvlStart2}→L${lvlEnd2}).`);
+    if (przyrostLvl > 0) {
+      const obrNaLvl = Math.round(g.obrazeniaLacznie / przyrostLvl);
+      // Oblicz medianę gangu dla porównania
+      const stosunkiGangu = wszyscy
+        .filter(x => { const h=x.historiaPoziomow||[]; return h.length>=2 && (h[h.length-1].poziom-h[0].poziom)>0; })
+        .map(x => { const h=x.historiaPoziomow; return x.obrazeniaLacznie/(h[h.length-1].poziom-h[0].poziom); })
+        .sort((a,b)=>a-b);
+      const medGangu = stosunkiGangu.length > 0 ? stosunkiGangu[Math.floor(stosunkiGangu.length/2)] : 0;
+      const procMediany = medGangu > 0 ? Math.round(obrNaLvl/medGangu*100) : null;
+
+      if (procMediany !== null && procMediany < 25) {
+        linie.push(`${formatLiczby(obrNaLvl)} obr/lvl (+${przyrostLvl} lvl, L${lvlStart2}→L${lvlEnd2}). Tylko ${procMediany}% mediany gangu — zdobywa lvl gdzie indziej, nie w walkach. Klasyczny pasożyt eventu.`);
+      } else if (procMediany !== null && procMediany >= 150) {
+        linie.push(`${formatLiczby(obrNaLvl)} obr/lvl (+${przyrostLvl} lvl, L${lvlStart2}→L${lvlEnd2}). ${procMediany}% mediany gangu — walczy i walczy dobrze.`);
+      } else {
+        linie.push(`${formatLiczby(obrNaLvl)} obr/lvl (+${przyrostLvl} lvl, L${lvlStart2}→L${lvlEnd2}).`);
+      }
     }
   }
 
