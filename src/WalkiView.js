@@ -1726,6 +1726,9 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
                     <span>średnio: {formatLiczby(sredniaObr)}</span>
                     <span>🛡️ tarcz: <strong style={{ color: "#87CEEB" }}>{g.tarczeLacznie}</strong></span>
                     <span>śr. {sredniaTarcz}</span>
+                    {lvlEnd && <span style={{ color: "#6496ff" }}>
+                      L{lvlEnd}{lvlEnd - lvlStart > 0 ? <strong style={{color:"#0c6"}}> +{lvlEnd - lvlStart}</strong> : ""}
+                    </span>}
                   </div>
                 </>
               )}
