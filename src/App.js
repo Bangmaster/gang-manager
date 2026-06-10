@@ -2080,6 +2080,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [wylaczoneOsoby,setWylaczoneOsoby]=useState(new Set());
   const [wylaczoneDawcy,setWylaczoneDawcy]=useState(new Set());
   const [pokazWylaczenia,setPokazWylaczenia]=useState(false);
+  const [limitKartOsoby,setLimitKartOsoby]=useState({}); // {osobaId: liczba} — indywidualny limit kart
 
   const toggleTalia=id=>setWylaczoneTalie(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const [ignorujTrudne,setIgnorujTrudne]=useState(false);
@@ -2250,7 +2251,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     }); // odbiorcy
     // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
     const aktywniDawcy=czlonkowie.filter(c=>!wylaczoneDawcy.has(c.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -2586,12 +2587,13 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 {wylaczoneOsoby.size>0&&`${wylaczoneOsoby.size}× brak odbioru`}
                 {wylaczoneOsoby.size>0&&wylaczoneDawcy.size>0&&" · "}
                 {wylaczoneDawcy.size>0&&`${wylaczoneDawcy.size}× brak dawcy`}
+                {Object.keys(limitKartOsoby).length>0&&` · ${Object.keys(limitKartOsoby).length}× limit kart`}
               </span>
             )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0)&&(
-              <button onClick={e=>{e.stopPropagation();setWylaczoneOsoby(new Set());setWylaczoneDawcy(new Set());}}
+            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0||Object.keys(limitKartOsoby).length>0)&&(
+              <button onClick={e=>{e.stopPropagation();setWylaczoneOsoby(new Set());setWylaczoneDawcy(new Set());setLimitKartOsoby({});}}
                 style={{fontSize:10,padding:"2px 8px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:4,color:"#f55",cursor:"pointer"}}>
                 Resetuj
               </button>
@@ -2641,21 +2643,44 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 const bg = obie?"rgba(180,50,50,0.15)":bezOdbioru?"rgba(255,50,50,0.12)":bezDawcy?"rgba(255,165,0,0.12)":"rgba(255,255,255,0.05)";
                 const border = obie?"1px solid #a5544488":bezOdbioru?"1px solid #f5544488":bezDawcy?"1px solid #fa055":"1px solid #2a2a3a";
 
+                const limitOsoby = limitKartOsoby[c.id];
                 return (
-                  <button key={c.id} onClick={handleClick} title={
-                    obie?"Kliknij → aktywny":
-                    bezOdbioru?"Kliknij → bez dawcy":
-                    bezDawcy?"Kliknij → oba wyłączone":
-                    "Kliknij → bez odbioru"
-                  } style={{
-                    padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
-                    background:bg, border, color:kolor,
-                    textDecoration:(bezOdbioru||obie)?"line-through":"none",
-                  }}>
-                    {ikona&&<span style={{marginRight:3}}>{ikona}</span>}
-                    {c.nazwa}
-                    {(c.krag||1)>1&&<span style={{fontSize:9,color:"#da70d6",marginLeft:3}}>K{c.krag}</span>}
-                  </button>
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:3}}>
+                    <button onClick={handleClick} title={
+                      obie?"Kliknij → aktywny":
+                      bezOdbioru?"Kliknij → bez dawcy":
+                      bezDawcy?"Kliknij → oba wyłączone":
+                      "Kliknij → bez odbioru"
+                    } style={{
+                      padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+                      background:bg, border, color:kolor,
+                      textDecoration:(bezOdbioru||obie)?"line-through":"none",
+                    }}>
+                      {ikona&&<span style={{marginRight:3}}>{ikona}</span>}
+                      {c.nazwa}
+                      {(c.krag||1)>1&&<span style={{fontSize:9,color:"#da70d6",marginLeft:3}}>K{c.krag}</span>}
+                    </button>
+                    {/* Limit kart per osoba */}
+                    {!obie && !bezOdbioru && (
+                      <select value={limitOsoby ?? ""} onChange={e=>{
+                        const val = e.target.value;
+                        setLimitKartOsoby(prev=>{
+                          const n={...prev};
+                          if(val==="") delete n[c.id];
+                          else n[c.id]=parseInt(val);
+                          return n;
+                        });
+                      }} title="Max kart dla tej osoby (puste = bez limitu)" style={{
+                        padding:"2px 4px",background:"#12122a",
+                        border:`1px solid ${limitOsoby?"#fa0":"#2a2a3a"}`,
+                        borderRadius:4,color:limitOsoby?"#fa0":"#444",
+                        fontSize:10,cursor:"pointer",width:42,
+                      }}>
+                        <option value="">∞</option>
+                        {[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}
+                      </select>
+                    )}
+                  </div>
                 );
               })}
             </div>
