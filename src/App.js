@@ -1204,12 +1204,16 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0}) {
+function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0,limitKartOsoby={}}) {
   // czlonkowie = odbiorcy (aktywni), wszyscyCzlonkowie = dawcy (wszyscy łącznie z wyłączonymi)
   const dawcy = wszyscyCzlonkowie || czlonkowie;
   // Licznik kart przydzielonych per odbiorca (do limitu maxKartNaOsobe)
   const kartDlaosoby = {}; // osobaId -> count
-  const czyMozeDostac = (osobaId) => maxKartNaOsobe <= 0 || (kartDlaosoby[osobaId]||0) < maxKartNaOsobe;
+  const czyMozeDostac = (osobaId) => {
+    const ile = kartDlaosoby[osobaId] || 0;
+    if (limitKartOsoby[osobaId] !== undefined) return ile < limitKartOsoby[osobaId];
+    return maxKartNaOsobe <= 0 || ile < maxKartNaOsobe;
+  };
   const zaznaczDostala = (osobaId) => { kartDlaosoby[osobaId] = (kartDlaosoby[osobaId]||0) + 1; };
 
   // TRYB SPRAWIEDLIWY — oblicz "dług" każdej osoby
