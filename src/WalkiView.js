@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { zapiszAutoBackup } from "./firebase";
 
 // Klucze API — te same co w gemini.js
 const KLUCZE = [
@@ -375,6 +376,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
       gracze: wyniki.gracze,
     }];
     await zapiszWalki(noweWalki);
+    zapiszAutoBackup("zapis_walki");
     setWyniki(null);
     setPliki([]);
     setNazwaWalki("");
@@ -1909,5 +1911,3 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
     </div>
   );
 }
-
-
