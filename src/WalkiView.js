@@ -622,13 +622,12 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
 
   const startEdycji = (i) => {
     setEdytowanyGracz(i);
-    setTempVal({ nazwa: gracze[i].nazwa, obrazenia: fmt(gracze[i].obrazenia), tarcze: String(gracze[i].tarcze) });
+    setTempVal({ nazwa: gracze[i].nazwa, obrazenia: fmt(gracze[i].obrazenia), tarcze: String(gracze[i].tarcze), poziom: String(gracze[i].poziom || "") });
   };
 
   const zapiszEdycje = (i) => {
     const now = [...gracze];
-    now[i] = { ...now[i], nazwa: tempVal.nazwa || now[i].nazwa, obrazenia: parseLiczbe(tempVal.obrazenia), tarcze: parseInt(tempVal.tarcze) || 0 };
-    // Posortuj ponownie po obrażeniach
+    now[i] = { ...now[i], nazwa: tempVal.nazwa || now[i].nazwa, obrazenia: parseLiczbe(tempVal.obrazenia), tarcze: parseInt(tempVal.tarcze) || 0, poziom: parseInt(tempVal.poziom) || now[i].poziom || 0, poziomAkt: parseInt(tempVal.poziom) || now[i].poziomAkt || 0 };
     now.sort((a, b) => b.obrazenia - a.obrazenia);
     onChange(now);
     setEdytowanyGracz(null);
@@ -640,7 +639,7 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
     const now = [...gracze, { nazwa: "Nowy gracz", poziom: 0, obrazenia: 0, tarcze: 0 }];
     onChange(now);
     setEdytowanyGracz(now.length - 1);
-    setTempVal({ nazwa: "", obrazenia: "0", tarcze: "0" });
+    setTempVal({ nazwa: "", obrazenia: "0", tarcze: "0", poziom: "" });
   };
 
   const max = Math.max(1, ...gracze.map(g => g.obrazenia));
@@ -665,7 +664,7 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
                     placeholder="Nazwa gracza"
                     style={{ padding: "5px 8px", background: "#12122a", border: "1px solid #444", borderRadius: 4, color: "#fff", fontSize: 12 }} />
                   <div style={{ display: "flex", gap: 6 }}>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 2 }}>
                       <div style={{ fontSize: 10, color: "#888", marginBottom: 2 }}>🔫 Obrażenia (np. 27,25M lub 828k)</div>
                       <input value={tempVal.obrazenia} onChange={e => setTempVal(v => ({ ...v, obrazenia: e.target.value }))}
                         style={{ width: "100%", padding: "5px 8px", background: "#12122a", border: "1px solid #444", borderRadius: 4, color: "#ffd700", fontSize: 12, boxSizing: "border-box" }} />
@@ -674,6 +673,12 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
                       <div style={{ fontSize: 10, color: "#888", marginBottom: 2 }}>🛡️ Tarcze</div>
                       <input value={tempVal.tarcze} onChange={e => setTempVal(v => ({ ...v, tarcze: e.target.value }))}
                         style={{ width: "100%", padding: "5px 8px", background: "#12122a", border: "1px solid #444", borderRadius: 4, color: "#87CEEB", fontSize: 12, boxSizing: "border-box" }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, color: "#888", marginBottom: 2 }}>⚡ Poziom (lvl)</div>
+                      <input type="number" value={tempVal.poziom} onChange={e => setTempVal(v => ({ ...v, poziom: e.target.value }))}
+                        placeholder="np. 550"
+                        style={{ width: "100%", padding: "5px 8px", background: "#12122a", border: "1px solid #6496ff44", borderRadius: 4, color: "#6496ff", fontSize: 12, boxSizing: "border-box" }} />
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
@@ -754,6 +759,32 @@ function RankingTabela({ gracze, edytowalne, onChange }) {
 function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
   const [rozwiniete, setRozwiniete] = useState(null);
   const [trybEdycji, setTrybEdycji] = useState(null); // id walki w trybie edycji obecności
+  const [trybEdycjiLvl, setTrybEdycjiLvl] = useState(null); // id walki w trybie edycji lvl
+  const [edytowaneLvl, setEdytowaneLvl] = useState({}); // {nazwa: lvl}
+
+  const otworzyjedycjeLvl = (walka) => {
+    const init = {};
+    walka.gracze.forEach(g => { init[g.nazwa] = String(g.poziomAkt || g.poziom || ""); });
+    setEdytowaneLvl(init);
+    setTrybEdycjiLvl(walka.id);
+    setRozwiniete(walka.id);
+  };
+
+  const zapiszLvl = async (walkaId) => {
+    const noweWalki = walki.map(w => {
+      if (w.id !== walkaId) return w;
+      return {
+        ...w,
+        gracze: w.gracze.map(g => ({
+          ...g,
+          poziomAkt: parseInt(edytowaneLvl[g.nazwa]) || g.poziomAkt || g.poziom || 0,
+          poziom: parseInt(edytowaneLvl[g.nazwa]) || g.poziom || 0,
+        }))
+      };
+    });
+    await zapiszWalki(noweWalki);
+    setTrybEdycjiLvl(null);
+  };
 
   const toggleObecnosc = async (walkaId, graczNazwa) => {
     const noweWalki = walki.map(w => {
@@ -806,6 +837,14 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
               </div>
               <div style={{ display: "flex", gap: 5 }}>
                 {isAdmin && (
+                  <button onClick={() => otworzyjedycjeLvl(w)} style={{
+                    padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
+                    background: trybEdycjiLvl === w.id ? "rgba(100,200,255,0.2)" : "rgba(100,200,255,0.08)",
+                    border: `1px solid ${trybEdycjiLvl === w.id ? "#64c8ff" : "#64c8ff33"}`,
+                    color: "#64c8ff",
+                  }}>⚡ Lvl</button>
+                )}
+                {isAdmin && (
                   <button onClick={() => setTrybEdycji(trybEdycji === w.id ? null : w.id)} style={{
                     padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
                     background: trybEdycji === w.id ? "rgba(100,150,255,0.2)" : "rgba(100,150,255,0.08)",
@@ -823,6 +862,42 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
                 )}
               </div>
             </div>
+
+            {/* Edycja lvl */}
+            {trybEdycjiLvl === w.id && (
+              <div style={{ marginTop: 10, padding: 10, background: "rgba(100,200,255,0.06)", border: "1px solid #64c8ff22", borderRadius: 6 }}>
+                <div style={{ fontSize: 11, color: "#64c8ff", marginBottom: 8, fontWeight: "bold" }}>
+                  ⚡ Edycja poziomów — wpisz lvl dla każdego gracza
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 8 }}>
+                  {w.gracze.sort((a,b)=>a.nazwa.localeCompare(b.nazwa)).map(g => (
+                    <div key={g.nazwa} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ fontSize: 10, color: "#aaa", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {g.nazwa.replace(/™FAM™|fAM™|FAM™/g, "")}
+                      </span>
+                      <input
+                        type="number"
+                        value={edytowaneLvl[g.nazwa] || ""}
+                        onChange={e => setEdytowaneLvl(prev => ({ ...prev, [g.nazwa]: e.target.value }))}
+                        placeholder="lvl"
+                        style={{ width: 65, padding: "3px 6px", background: "#12122a", border: "1px solid #64c8ff44", borderRadius: 4, color: "#64c8ff", fontSize: 12, textAlign: "center" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => zapiszLvl(w.id)} style={{
+                    flex: 1, padding: "6px", background: "rgba(100,200,255,0.15)",
+                    border: "1px solid #64c8ff44", borderRadius: 5,
+                    color: "#64c8ff", cursor: "pointer", fontWeight: "bold", fontSize: 12,
+                  }}>✓ Zapisz poziomy</button>
+                  <button onClick={() => setTrybEdycjiLvl(null)} style={{
+                    padding: "6px 12px", background: "rgba(255,255,255,0.05)",
+                    border: "1px solid #444", borderRadius: 5, color: "#888", cursor: "pointer", fontSize: 12,
+                  }}>Anuluj</button>
+                </div>
+              </div>
+            )}
 
             {/* Edycja obecności */}
             {trybEdycji === w.id && (
