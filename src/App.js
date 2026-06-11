@@ -570,10 +570,10 @@ export default function App() {
           <div style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
             <span><span style={{color:"#ffd700"}}>{zalogowany.login}</span> <span style={{color:"#888"}}>({zalogowany.rola})</span></span>
             {statusZapisu && <span style={{color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
-            {/* Tip dnia */}
-            <span style={{fontSize:10,color:"#444",fontStyle:"italic",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
+            {/* Tip dnia - skrócony */}
+            <span style={{fontSize:10,color:"#444",fontStyle:"italic"}}
               title={TIPY[Math.floor(Date.now()/43200000)%TIPY.length]}>
-              {TIPY[Math.floor(Date.now()/43200000)%TIPY.length]}
+              💡 {TIPY[Math.floor(Date.now()/43200000)%TIPY.length].replace("💡 Tip dnia: ","").replace("💡 ","").slice(0,40)}{TIPY[Math.floor(Date.now()/43200000)%TIPY.length].length > 50 ? "..." : ""}
             </span>
             {/* Wskaźnik online */}
             {(()=>{
@@ -610,11 +610,11 @@ export default function App() {
         </div>
       </div>
 
-      {/* Pasek z cytatem nad zakładkami */}
+      {/* Pasek z cytatem nad zakładkami - zmienia się co godzinę */}
       <div style={{
         background:"rgba(184,134,11,0.06)",borderBottom:"1px solid rgba(184,134,11,0.15)",
-        padding:"4px 16px",fontSize:11,color:"#666",fontStyle:"italic",
-        textAlign:"center",minHeight:22,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",
+        padding:"4px 16px",fontSize:11,color:"#555",fontStyle:"italic",
+        textAlign:"center",
       }}>
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
       </div>
@@ -793,9 +793,9 @@ const CYTATY=[
   // Krystian i Domcia
   "Krystian jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
   "Domcia założyła gang i odeszła. Zostawiła Krystiana, tabletki i Sonny'ego z jego uczuciami.",
-  "Domcia nie gra już z nami. Specjalistka od białych proszków ma ważniejsze sprawy. Poważne.",
+  "Domcia odeszła. Gang trwa. To chyba coś mówi o gangu.",
   "Krystian i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
-  "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
+  "Domcia założyła gang i odeszła. Niektórzy tworzą legendy. Ona jest jedną z nich.",
   // Sonia i Bastek
   "Sonia: piękna, uciekła do AnyFam i jeszcze tam siedzi. Kickboxer kopie w powietrze z tęsknoty.",
   "Bastek uciekł do AnyFam i tam pozostał. Niektórzy wychodzą. Niektórzy nie.",
@@ -825,7 +825,7 @@ const TEKSTY_ROZPISKI = [
   "Artatuś nic nie mówi. Po prostu wysyła. Naśladować. Nie podziwiać. Wysyłać.",
   "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystian przyjedzie z ripostą.",
   "Kasia jest wszędzie. Zwłaszcza tutaj. Zwłaszcza teraz. Wyślij.",
-  "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
+  "Bodek wysłał kartę bez słowa. Mistrz klasy i skromności.",
   "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
   "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
   "Bastek uciekł i nie wrócił. Sonia też. Kickboxer kopie w powietrze i wysyła kartę za nich.",
