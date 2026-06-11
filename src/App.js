@@ -610,6 +610,15 @@ export default function App() {
         </div>
       </div>
 
+      {/* Pasek z cytatem nad zakładkami */}
+      <div style={{
+        background:"rgba(184,134,11,0.06)",borderBottom:"1px solid rgba(184,134,11,0.15)",
+        padding:"4px 16px",fontSize:11,color:"#666",fontStyle:"italic",
+        textAlign:"center",minHeight:22,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",
+      }}>
+        {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
+      </div>
+
       <div style={{display:"flex",background:"linear-gradient(180deg,rgba(0,0,0,0.7),rgba(5,5,20,0.9))",borderBottom:"1px solid rgba(255,215,0,0.12)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
@@ -718,21 +727,109 @@ function LoadingScreen() {
 }
 
 const CYTATY=[
+  // Ogólne
   "Nie pytaj co gang może zrobić dla Ciebie — pytaj komu możesz wysłać duplikat.",
   "Witaj w gangu. Twoje karty nas interesują bardziej niż Ty.",
-  "Motto ™FAM™: Wymieniam więc jestem.",
+  "™FAM™ — bo rodzina to ci co wysyłają karty na czas. I nie dezerterują do AnyFam.",
   "Uwaga: admin widzi wszystko. Łącznie z tym że nie potwierdziłeś wymiany od 3 dni.",
-  "W życiu są dwie pewne rzeczy: śmierć i to że Bangmasta będzie pytał czy wysłałeś kartę.",
-  "Karta sama się nie wyśle. Chyba że jesteś Sonnym.",
-  "Nie masz duplikatów? Nie ma problemu. Problem masz gdy je masz i nie wysyłasz.",
-  "Gang nie pyta skąd masz duplikaty. Gang pyta dlaczego jeszcze ich nie wysłałeś.",
-  "Zamknięta talia to nie cel — to minimalny standard.",
-  "Każda niezatwierdzona wymiana to łza na policzku admina.",
-  "Przed potwierdzeniem wymiany odetchnij. Po potwierdzeniu też.",
-  "™FAM™ — bo rodzina to ci co wysyłają karty na czas.",
-  "Pamiętaj: admin ma dostęp do Twoich danych. I do Twojego ego gdy nie wysyłasz.",
   "Sezon się kończy. Talie nie zamykają się same. Mamy cię na oku.",
-  "Wysłałeś kartę? Brawo. Teraz potwierdź to w apce, bo admin nie wróżbita.",
+  "Wysłałeś kartę? Brawo. Teraz potwierdź to w apce, bo Bangmasta nie wróżbita.",
+  // SaMaNtA
+  "SaMaNtA ma nieograniczone ammo i nieograniczoną cierpliwość. Ta druga kończy się po 3 sekundach.",
+  "SaMaNtA: dentysta, sadystka, właścicielka arsenału. Nie wysyłaj kart z nieznieczulonym sumieniem.",
+  "Gdy SaMaNtA mówi 'otwórz szerzej' — nie wiadomo czy chodzi o usta czy o zakładkę DUPLIKATY.",
+  // Fallven
+  "Fallven ma flagę Hiszpanii i twarz kogoś kto nigdy Hiszpanii nie widział. Piękna rozbieżność.",
+  "Fallven: wysoki lvl, hiszpańska flaga, twarz która sugeruje inne klimaty. Zagadka sezonu.",
+  "Fallven analizuje wymianę tak długo jak Tatuś analizuje krypto. Wynik podobny.",
+  // Sonny
+  "Sonny szuka drogi do własnej głowy od 2019 roku. Aplikacja go nie znajdzie, ale kartę musi wysłać.",
+  "Sonny po cichu kocha Domcię. Domcia po cichu wzięła tabletkę i poszła do łóżka.",
+  "Sonny wyszedł na chwilę. Wrócił po 4 godzinach z uśmiechem i bez karty. Klasyk.",
+  // BUBU
+  "BUBU zdezerterował do AnyFam. Wrócił. Nikt nie pyta dlaczego. Wszyscy wiedzą dlaczego.",
+  "BUBU i Sonia — weterani AnyFam, którzy wrócili. Gang przyjął. Gang nie zapomniał.",
+  "BUBU wrócił jak pies z podkulonym ogonem. Pies jest teraz w gangu i wysyła karty. Psie.",
+  // Kickboxer
+  "Kickboxer kopie w powietrze z pełnym zaangażowaniem. Powietrze jeszcze nie złożyło skargi.",
+  "Kickboxer zakręcił się, kopnął, przewrócił i... zapomniał wysłać kartę. Znowu.",
+  "Kickboxer lubi Sonię. Sonia uciekła do AnyFam. Kickboxer kopie w powietrze z żalu.",
+  // Kristoforo
+  "Kristoforo jest wiatrakiem z Holandii. Kręci się, kręci i jakoś zawsze wysyła karty.",
+  "Kristoforo robi turnieje po 20 osób i uważa że to genialny pomysł. Nikt mu nie powiedział.",
+  "Kristoforo i Artatuś — holenderskie tulipany w gangu. Jeden mówi, drugi milczy. Razem: jeden normalny.",
+  // Artatuś
+  "Artatuś siedzi w Hadze i milczy. Mówi tylko: 'Wysłałem' i 'Napiję się'. W tej kolejności.",
+  "Artatuś potwierdza wymianę cicho. Bez fanfar. Bez komentarza. Mistrz gatunku.",
+  // CHMARSONN
+  "CHMARSONN nie ogląda telewizji. Zamiast tego bije i wysyła karty. Produktywny człowiek.",
+  "Tomeczek nie potrzebuje TV. Ma gang, ma walki, ma krypto Tatusia do analizy.",
+  // Kasia
+  "Kasia jest wszędzie i nigdzie. Cicha nimfomanka gangu — nie bije ale w każdej fotce jest.",
+  "Kasia milczy, obserwuje i wie wszystko. Najniebezpieczniejszy typ w gangu.",
+  // Krime
+  "Krime istnieje. Bije się dobrze. Reszta to tajemnica otoczona zagadką.",
+  "Nikt nie wie kim jest Krime. Krime wie kim jesteś Ty. I wie że nie wysłałeś karty.",
+  // Szczawo
+  "Szczawo ma dwa imiona: Szczawiński i Gorzała. Gorzała to nie przydomek, to styl życia.",
+  "Szczawo zatwierdził wymianę między pierwszym a drugim kieliszkiem. Precyzja czasowa.",
+  // Tatuś
+  "Tatuś przeanalizował wymianę 7 razy z każdej strony. Wynik: wyślij kartę.",
+  "Tatuś gra na giełdzie, handluje krypto i zarządza gangiem. Portfolio zróżnicowane.",
+  "Tatuś jest Bossem. Lubi żarówki i krypto. Żarówki przynajmniej się nie krasują.",
+  // Ponton i KaY4k
+  "Ponton i KaY4k — bracia w Niemczech, bracia w podcietych tylkach, bracia w kartach.",
+  "KaY4k pracuje u Pontona bez pensji. Przynajmniej wie że karta do niego trafi.",
+  "Ponton pokazał wymiankę swojemu kotu. Kot mruknął aprobująco. Kot ma rację.",
+  // Bodek
+  "Bodek: Białorusin, wieczorami zajęty. Pytasz o co? Nie pytaj o co.",
+  "Bodek wysłał kartę zanim dzieci poszły spać. Priorytety ustawione prawidłowo.",
+  // Joker
+  "Joker nigdy nie schodzi z kasy w Lidlu. Mimo to wysłał kartę. Multitasking na poziomie.",
+  "Joker zeskanował kartę, zapakował zakupy i potwierdził wymianę. Kasa numer 4 nadal czynna.",
+  // Bangmasta
+  "Bangmasta stworzył tę apkę. Jeśli coś nie działa — jego wina. Jeśli działa — jego zasługa.",
+  "Bangmasta: spec od AI, twórca apki, Pinglorz z okularami. Przystojny. Sam tak mówi.",
+  // Krystian i Domcia
+  "Krystian jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
+  "Domcia założyła gang i odeszła. Zostawiła Krystiana, tabletki i Sonny'ego z jego uczuciami.",
+  "Domcia nie gra już z nami. Specjalistka od białych proszków ma ważniejsze sprawy. Poważne.",
+  "Krystian i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
+  "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
+  // Sonia i Bastek
+  "Sonia: piękna, uciekła do AnyFam i jeszcze tam siedzi. Kickboxer kopie w powietrze z tęsknoty.",
+  "Bastek uciekł do AnyFam i tam pozostał. Niektórzy wychodzą. Niektórzy nie.",
+  "Sonia siedzi w AnyFam. BUBU wrócił. Jeden z nich podjął właściwą decyzję.",
+  // Kombinowane
+  "Holenderskie trio: Kristoforo, Artatuś, Młody. Jeden kręci, drugi milczy, trzeci szuka drogi do domu.",
+  "Sonny kocha Domcię. Domcia wzięła tabletkę. Krystian patrzy i ostrzy ripostę.",
+  "Kickboxer, Sonny i Młody to trio które razem mogłoby nie trafić do własnych mieszkań.",
+  "Ponton, KaY4k i gebelsy — historia rodziny która podcięła sobie razem.",
+  "SaMaNtA z wiertłem, Bangmasta z aplikacją, Tatuś z analizą — gang ma narzędzia. Użyjcie ich.",
+  "BUBU wrócił. Sonia i Bastek zostali w AnyFam. ™FAM™ nie dla każdego. Widać.",
+  "Kasia obserwuje, Krime milczy, Bodek topi, Joker kasuje. ™FAM™ — różnorodność to nasza siła.",
+];
+
+// Teksty do rozpiski — pokazywane przy aktywnej wymianie
+const TEKSTY_ROZPISKI = [
+  "Karta się sama nie wyśle. Sonny sprawdzał — jest gdzieś w połowie drogi do własnej głowy.",
+  "Bangmasta patrzy. Aplikacja pamięta. Kasia obserwuje. Wyślij kartę.",
+  "SaMaNtA wysłała zanim skończyła wiercić. Masz mniej wymówek niż jej pacjenci.",
+  "Kickboxer skopał powietrze i potwierdził. Powietrze nic nie zrobiło. Ty coś zrób.",
+  "BUBU wrócił po dezerterskiej przygodzie. Najmniej co może zrobić — to wysłać kartę.",
+  "Tatuś przeanalizował wymianę 7 razy. Wynik każdej analizy: wyślij kartę.",
+  "Kristoforo kręci się jak wiatrak i jakoś wysyła. Weź przykład z tulipana.",
+  "Ponton pokazał wymiankę kotu. Kot mruknął: wyślij. Kot mądrzejszy od połowy gangu.",
+  "Joker jest na kasie w Lidlu. Zdążył potwierdzić. Zastanów się nad swoim życiem.",
+  "Szczawo wysłał między pierwszym a drugim. Chwila precyzji w morzu gorzały.",
+  "Artatuś nic nie mówi. Po prostu wysyła. Naśladować. Nie podziwiać. Wysyłać.",
+  "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystian przyjedzie z ripostą.",
+  "Kasia jest wszędzie. Zwłaszcza tutaj. Zwłaszcza teraz. Wyślij.",
+  "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
+  "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
+  "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
+  "Bastek uciekł i nie wrócił. Sonia też. Kickboxer kopie w powietrze i wysyła kartę za nich.",
+  "KaY4k nie dostaje pensji od Pontona, ale kartę wysyła. Charakter.",
 ];
 
 const TIPY=[
@@ -746,6 +843,11 @@ const TIPY=[
   "💡 Tip dnia: Podsumowanie sezonu w zakładce Walki — kto jest królem obrażeń?",
   "💡 Tip dnia: Talia zamknięta przez cały gang = nagroda dla wszystkich. Warto się starać!",
   "💡 Tip dnia: Admin może zaznaczać potwierdzenia za innych w ROZPISCE — popros jeśli nie możesz.",
+  "💡 Fallven tip: Wysoki lvl nie gwarantuje mądrości. Wysyłanie kart — tak.",
+  "💡 Tip dnia: BUBU wrócił. Teraz czas żebyś Ty wrócił do wysyłania kart.",
+  "💡 Sonny tip: Zanim zaczniesz szukać drogi do własnej głowy — potwierdź wymianę.",
+  "💡 Tip dnia: SaMaNtA ma nieograniczone ammo. Ty masz kartę do wysłania. Priorytety.",
+  "💡 Kickboxer tip: Kopiąc w powietrze nie wyślesz karty. Tutaj jest przycisk.",
 ];
 
 function LoginScreen({onLogin, czlonkowie}) {
@@ -1204,16 +1306,12 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0,limitKartOsoby={}}) {
+function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0}) {
   // czlonkowie = odbiorcy (aktywni), wszyscyCzlonkowie = dawcy (wszyscy łącznie z wyłączonymi)
   const dawcy = wszyscyCzlonkowie || czlonkowie;
   // Licznik kart przydzielonych per odbiorca (do limitu maxKartNaOsobe)
   const kartDlaosoby = {}; // osobaId -> count
-  const czyMozeDostac = (osobaId) => {
-    const ile = kartDlaosoby[osobaId] || 0;
-    if (limitKartOsoby[osobaId] !== undefined) return ile < limitKartOsoby[osobaId];
-    return maxKartNaOsobe <= 0 || ile < maxKartNaOsobe;
-  };
+  const czyMozeDostac = (osobaId) => maxKartNaOsobe <= 0 || (kartDlaosoby[osobaId]||0) < maxKartNaOsobe;
   const zaznaczDostala = (osobaId) => { kartDlaosoby[osobaId] = (kartDlaosoby[osobaId]||0) + 1; };
 
   // TRYB SPRAWIEDLIWY — oblicz "dług" każdej osoby
@@ -2084,7 +2182,6 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [wylaczoneOsoby,setWylaczoneOsoby]=useState(new Set());
   const [wylaczoneDawcy,setWylaczoneDawcy]=useState(new Set());
   const [pokazWylaczenia,setPokazWylaczenia]=useState(false);
-  const [limitKartOsoby,setLimitKartOsoby]=useState({}); // {osobaId: liczba} — indywidualny limit kart
 
   const toggleTalia=id=>setWylaczoneTalie(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const [ignorujTrudne,setIgnorujTrudne]=useState(false);
@@ -2255,7 +2352,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     }); // odbiorcy
     // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
     const aktywniDawcy=czlonkowie.filter(c=>!wylaczoneDawcy.has(c.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby}));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -2591,13 +2688,12 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 {wylaczoneOsoby.size>0&&`${wylaczoneOsoby.size}× brak odbioru`}
                 {wylaczoneOsoby.size>0&&wylaczoneDawcy.size>0&&" · "}
                 {wylaczoneDawcy.size>0&&`${wylaczoneDawcy.size}× brak dawcy`}
-                {Object.keys(limitKartOsoby).length>0&&` · ${Object.keys(limitKartOsoby).length}× limit kart`}
               </span>
             )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0||Object.keys(limitKartOsoby).length>0)&&(
-              <button onClick={e=>{e.stopPropagation();setWylaczoneOsoby(new Set());setWylaczoneDawcy(new Set());setLimitKartOsoby({});}}
+            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0)&&(
+              <button onClick={e=>{e.stopPropagation();setWylaczoneOsoby(new Set());setWylaczoneDawcy(new Set());}}
                 style={{fontSize:10,padding:"2px 8px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:4,color:"#f55",cursor:"pointer"}}>
                 Resetuj
               </button>
@@ -2647,44 +2743,21 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 const bg = obie?"rgba(180,50,50,0.15)":bezOdbioru?"rgba(255,50,50,0.12)":bezDawcy?"rgba(255,165,0,0.12)":"rgba(255,255,255,0.05)";
                 const border = obie?"1px solid #a5544488":bezOdbioru?"1px solid #f5544488":bezDawcy?"1px solid #fa055":"1px solid #2a2a3a";
 
-                const limitOsoby = limitKartOsoby[c.id];
                 return (
-                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:3}}>
-                    <button onClick={handleClick} title={
-                      obie?"Kliknij → aktywny":
-                      bezOdbioru?"Kliknij → bez dawcy":
-                      bezDawcy?"Kliknij → oba wyłączone":
-                      "Kliknij → bez odbioru"
-                    } style={{
-                      padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
-                      background:bg, border, color:kolor,
-                      textDecoration:(bezOdbioru||obie)?"line-through":"none",
-                    }}>
-                      {ikona&&<span style={{marginRight:3}}>{ikona}</span>}
-                      {c.nazwa}
-                      {(c.krag||1)>1&&<span style={{fontSize:9,color:"#da70d6",marginLeft:3}}>K{c.krag}</span>}
-                    </button>
-                    {/* Limit kart per osoba */}
-                    {!obie && !bezOdbioru && (
-                      <select value={limitOsoby ?? ""} onChange={e=>{
-                        const val = e.target.value;
-                        setLimitKartOsoby(prev=>{
-                          const n={...prev};
-                          if(val==="") delete n[c.id];
-                          else n[c.id]=parseInt(val);
-                          return n;
-                        });
-                      }} title="Max kart dla tej osoby (puste = bez limitu)" style={{
-                        padding:"2px 4px",background:"#12122a",
-                        border:`1px solid ${limitOsoby?"#fa0":"#2a2a3a"}`,
-                        borderRadius:4,color:limitOsoby?"#fa0":"#444",
-                        fontSize:10,cursor:"pointer",width:42,
-                      }}>
-                        <option value="">∞</option>
-                        {[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}
-                      </select>
-                    )}
-                  </div>
+                  <button key={c.id} onClick={handleClick} title={
+                    obie?"Kliknij → aktywny":
+                    bezOdbioru?"Kliknij → bez dawcy":
+                    bezDawcy?"Kliknij → oba wyłączone":
+                    "Kliknij → bez odbioru"
+                  } style={{
+                    padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+                    background:bg, border, color:kolor,
+                    textDecoration:(bezOdbioru||obie)?"line-through":"none",
+                  }}>
+                    {ikona&&<span style={{marginRight:3}}>{ikona}</span>}
+                    {c.nazwa}
+                    {(c.krag||1)>1&&<span style={{fontSize:9,color:"#da70d6",marginLeft:3}}>K{c.krag}</span>}
+                  </button>
                 );
               })}
             </div>
@@ -3365,6 +3438,7 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
 }
 
 function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszKarte}) {
+  const tekstRozpiski = TEKSTY_ROZPISKI[Math.floor(Date.now()/3600000)%TEKSTY_ROZPISKI.length];
   const [zamykanie,setZamykanie]=useState(false);
   const [podmienIdx,setPodmienIdx]=useState(null);
   const [streak, setStreak] = useState(0);
