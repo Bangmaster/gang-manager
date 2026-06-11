@@ -271,7 +271,131 @@ const DOMYSLNE_DANE = {
   walki: [],
 };
 
-export default function App() {
+export default const CYTATY=[
+  // Ogólne
+  "Nie pytaj co gang może zrobić dla Ciebie — pytaj komu możesz wysłać duplikat.",
+  "Witaj w gangu. Twoje karty nas interesują bardziej niż Ty.",
+  "™FAM™ — bo rodzina to ci co wysyłają karty na czas. I nie dezerterują do AnyFam.",
+  "Uwaga: admin widzi wszystko. Łącznie z tym że nie potwierdziłeś wymiany od 3 dni.",
+  "Sezon się kończy. Talie nie zamykają się same. Mamy cię na oku.",
+  "Wysłałeś kartę? Brawo. Teraz potwierdź to w apce, bo Bangmasta nie wróżbita.",
+  // SaMaNtA
+  "SaMaNtA ma nieograniczone ammo i nieograniczoną cierpliwość. Ta druga kończy się po 3 sekundach.",
+  "SaMaNtA: dentysta, sadystka, właścicielka arsenału. Nie wysyłaj kart z nieznieczulonym sumieniem.",
+  "Gdy SaMaNtA mówi 'otwórz szerzej' — nie wiadomo czy chodzi o usta czy o zakładkę DUPLIKATY.",
+  // Fallven
+  "Fallven ma flagę Hiszpanii i twarz kogoś kto nigdy Hiszpanii nie widział. Piękna rozbieżność.",
+  "Fallven: wysoki lvl, hiszpańska flaga, twarz która sugeruje inne klimaty. Zagadka sezonu.",
+  "Fallven analizuje wymianę tak długo jak Tatuś analizuje krypto. Wynik podobny.",
+  // Sonny
+  "Sonny szuka drogi do własnej głowy od 2019 roku. Aplikacja go nie znajdzie, ale kartę musi wysłać.",
+  "Sonny po cichu kocha Domcię. Domcia po cichu wzięła tabletkę i poszła do łóżka.",
+  "Sonny wyszedł na chwilę. Wrócił po 4 godzinach z uśmiechem i bez karty. Klasyk.",
+  // BUBU
+  "BUBU zdezerterował do AnyFam. Wrócił. Nikt nie pyta dlaczego. Wszyscy wiedzą dlaczego.",
+  "BUBU i Sonia — weterani AnyFam, którzy wrócili. Gang przyjął. Gang nie zapomniał.",
+  "BUBU wrócił jak pies z podkulonym ogonem. Pies jest teraz w gangu i wysyła karty. Psie.",
+  // Kickboxer
+  "Kickboxer kopie w powietrze z pełnym zaangażowaniem. Powietrze jeszcze nie złożyło skargi.",
+  "Kickboxer zakręcił się, kopnął, przewrócił i... zapomniał wysłać kartę. Znowu.",
+  "Kickboxer lubi Sonię. Sonia uciekła do AnyFam. Kickboxer kopie w powietrze z żalu.",
+  // Kristoforo
+  "Kristoforo jest wiatrakiem z Holandii. Kręci się, kręci i jakoś zawsze wysyła karty.",
+  "Kristoforo robi turnieje po 20 osób i uważa że to genialny pomysł. Nikt mu nie powiedział.",
+  "Kristoforo i Artatuś — holenderskie tulipany w gangu. Jeden mówi, drugi milczy. Razem: jeden normalny.",
+  // Artatuś
+  "Artatuś siedzi w Hadze i milczy. Mówi tylko: 'Wysłałem' i 'Napiję się'. W tej kolejności.",
+  "Artatuś potwierdza wymianę cicho. Bez fanfar. Bez komentarza. Mistrz gatunku.",
+  // CHMARSONN
+  "CHMARSONN nie ogląda telewizji. Zamiast tego bije i wysyła karty. Produktywny człowiek.",
+  "Tomeczek nie potrzebuje TV. Ma gang, ma walki, ma krypto Tatusia do analizy.",
+  // Kasia
+  "Kasia jest wszędzie i nigdzie. Cicha nimfomanka gangu — nie bije ale w każdej fotce jest.",
+  "Kasia milczy, obserwuje i wie wszystko. Najniebezpieczniejszy typ w gangu.",
+  // Krime
+  "Krime istnieje. Bije się dobrze. Reszta to tajemnica otoczona zagadką.",
+  "Nikt nie wie kim jest Krime. Krime wie kim jesteś Ty. I wie że nie wysłałeś karty.",
+  // Szczawo
+  "Szczawo ma dwa imiona: Szczawiński i Gorzała. Gorzała to nie przydomek, to styl życia.",
+  "Szczawo zatwierdził wymianę między pierwszym a drugim kieliszkiem. Precyzja czasowa.",
+  // Tatuś
+  "Tatuś przeanalizował wymianę 7 razy z każdej strony. Wynik: wyślij kartę.",
+  "Tatuś gra na giełdzie, handluje krypto i zarządza gangiem. Portfolio zróżnicowane.",
+  "Tatuś jest Bossem. Lubi żarówki i krypto. Żarówki przynajmniej się nie krasują.",
+  // Ponton i KaY4k
+  "Ponton i KaY4k — bracia w Niemczech, bracia w podcietych tylkach, bracia w kartach.",
+  "KaY4k pracuje u Pontona bez pensji. Przynajmniej wie że karta do niego trafi.",
+  "Ponton pokazał wymiankę swojemu kotu. Kot mruknął aprobująco. Kot ma rację.",
+  // Bodek
+  "Bodek: Białorusin, wieczorami zajęty. Pytasz o co? Nie pytaj o co.",
+  "Bodek wysłał kartę zanim dzieci poszły spać. Priorytety ustawione prawidłowo.",
+  // Joker
+  "Joker nigdy nie schodzi z kasy w Lidlu. Mimo to wysłał kartę. Multitasking na poziomie.",
+  "Joker zeskanował kartę, zapakował zakupy i potwierdził wymianę. Kasa numer 4 nadal czynna.",
+  // Bangmasta
+  "Bangmasta stworzył tę apkę. Jeśli coś nie działa — jego wina. Jeśli działa — jego zasługa.",
+  "Bangmasta: spec od AI, twórca apki, Pinglorz z okularami. Przystojny. Sam tak mówi.",
+  // Krystian i Domcia
+  "Krystian jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
+  "Domcia założyła gang i odeszła. Zostawiła Krystiana, tabletki i Sonny'ego z jego uczuciami.",
+  "Domcia nie gra już z nami. Specjalistka od białych proszków ma ważniejsze sprawy. Poważne.",
+  "Krystian i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
+  "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
+  // Sonia i Bastek
+  "Sonia: piękna, uciekła do AnyFam i jeszcze tam siedzi. Kickboxer kopie w powietrze z tęsknoty.",
+  "Bastek uciekł do AnyFam i tam pozostał. Niektórzy wychodzą. Niektórzy nie.",
+  "Sonia siedzi w AnyFam. BUBU wrócił. Jeden z nich podjął właściwą decyzję.",
+  // Kombinowane
+  "Holenderskie trio: Kristoforo, Artatuś, Młody. Jeden kręci, drugi milczy, trzeci szuka drogi do domu.",
+  "Sonny kocha Domcię. Domcia wzięła tabletkę. Krystian patrzy i ostrzy ripostę.",
+  "Kickboxer, Sonny i Młody to trio które razem mogłoby nie trafić do własnych mieszkań.",
+  "Ponton, KaY4k i gebelsy — historia rodziny która podcięła sobie razem.",
+  "SaMaNtA z wiertłem, Bangmasta z aplikacją, Tatuś z analizą — gang ma narzędzia. Użyjcie ich.",
+  "BUBU wrócił. Sonia i Bastek zostali w AnyFam. ™FAM™ nie dla każdego. Widać.",
+  "Kasia obserwuje, Krime milczy, Bodek topi, Joker kasuje. ™FAM™ — różnorodność to nasza siła.",
+];
+
+// Teksty do rozpiski — pokazywane przy aktywnej wymianie
+const TEKSTY_ROZPISKI = [
+  "Karta się sama nie wyśle. Sonny sprawdzał — jest gdzieś w połowie drogi do własnej głowy.",
+  "Bangmasta patrzy. Aplikacja pamięta. Kasia obserwuje. Wyślij kartę.",
+  "SaMaNtA wysłała zanim skończyła wiercić. Masz mniej wymówek niż jej pacjenci.",
+  "Kickboxer skopał powietrze i potwierdził. Powietrze nic nie zrobiło. Ty coś zrób.",
+  "BUBU wrócił po dezerterskiej przygodzie. Najmniej co może zrobić — to wysłać kartę.",
+  "Tatuś przeanalizował wymianę 7 razy. Wynik każdej analizy: wyślij kartę.",
+  "Kristoforo kręci się jak wiatrak i jakoś wysyła. Weź przykład z tulipana.",
+  "Ponton pokazał wymiankę kotu. Kot mruknął: wyślij. Kot mądrzejszy od połowy gangu.",
+  "Joker jest na kasie w Lidlu. Zdążył potwierdzić. Zastanów się nad swoim życiem.",
+  "Szczawo wysłał między pierwszym a drugim. Chwila precyzji w morzu gorzały.",
+  "Artatuś nic nie mówi. Po prostu wysyła. Naśladować. Nie podziwiać. Wysyłać.",
+  "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystian przyjedzie z ripostą.",
+  "Kasia jest wszędzie. Zwłaszcza tutaj. Zwłaszcza teraz. Wyślij.",
+  "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
+  "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
+  "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
+  "Bastek uciekł i nie wrócił. Sonia też. Kickboxer kopie w powietrze i wysyła kartę za nich.",
+  "KaY4k nie dostaje pensji od Pontona, ale kartę wysyła. Charakter.",
+];
+
+const TIPY=[
+  "💡 Tip dnia: Zakładka ROZPISKA — sprawdź czy masz coś do wysłania!",
+  "💡 Tip dnia: Duplikaty to waluta gangu. Im więcej masz tym bardziej jesteś lubiany.",
+  "💡 Tip dnia: Użyj skanera w zakładce TESTY — 15 talii w 30 sekund!",
+  "💡 Tip dnia: Złote dni i diamentowe dni — przełączaj przycisk ZŁOTE/DIAMENTOWE.",
+  "💡 Tip dnia: Jeśli karta wpadła z paczki — admin może podmienić wymianę w ROZPISCE.",
+  "💡 Tip dnia: Im szybciej potwierdzisz wymianę tym szybciej gang dostanie ammo.",
+  "💡 Tip dnia: Sprawdź zakładkę Duplikaty — może ktoś szuka karty którą masz!",
+  "💡 Tip dnia: Podsumowanie sezonu w zakładce Walki — kto jest królem obrażeń?",
+  "💡 Tip dnia: Talia zamknięta przez cały gang = nagroda dla wszystkich. Warto się starać!",
+  "💡 Tip dnia: Admin może zaznaczać potwierdzenia za innych w ROZPISCE — popros jeśli nie możesz.",
+  "💡 Fallven tip: Wysoki lvl nie gwarantuje mądrości. Wysyłanie kart — tak.",
+  "💡 Tip dnia: BUBU wrócił. Teraz czas żebyś Ty wrócił do wysyłania kart.",
+  "💡 Sonny tip: Zanim zaczniesz szukać drogi do własnej głowy — potwierdź wymianę.",
+  "💡 Tip dnia: SaMaNtA ma nieograniczone ammo. Ty masz kartę do wysłania. Priorytety.",
+  "💡 Kickboxer tip: Kopiąc w powietrze nie wyślesz karty. Tutaj jest przycisk.",
+];
+
+function App() {
   // sessionStorage = auto-wylogowanie przy zamknięciu karty/przeglądarki
   const [zalogowany, setZalogowany] = useState(() => {
     try { 
@@ -726,129 +850,11 @@ function LoadingScreen() {
   );
 }
 
-const CYTATY=[
-  // Ogólne
-  "Nie pytaj co gang może zrobić dla Ciebie — pytaj komu możesz wysłać duplikat.",
-  "Witaj w gangu. Twoje karty nas interesują bardziej niż Ty.",
-  "™FAM™ — bo rodzina to ci co wysyłają karty na czas. I nie dezerterują do AnyFam.",
-  "Uwaga: admin widzi wszystko. Łącznie z tym że nie potwierdziłeś wymiany od 3 dni.",
-  "Sezon się kończy. Talie nie zamykają się same. Mamy cię na oku.",
-  "Wysłałeś kartę? Brawo. Teraz potwierdź to w apce, bo Bangmasta nie wróżbita.",
-  // SaMaNtA
-  "SaMaNtA ma nieograniczone ammo i nieograniczoną cierpliwość. Ta druga kończy się po 3 sekundach.",
-  "SaMaNtA: dentysta, sadystka, właścicielka arsenału. Nie wysyłaj kart z nieznieczulonym sumieniem.",
-  "Gdy SaMaNtA mówi 'otwórz szerzej' — nie wiadomo czy chodzi o usta czy o zakładkę DUPLIKATY.",
-  // Fallven
-  "Fallven ma flagę Hiszpanii i twarz kogoś kto nigdy Hiszpanii nie widział. Piękna rozbieżność.",
-  "Fallven: wysoki lvl, hiszpańska flaga, twarz która sugeruje inne klimaty. Zagadka sezonu.",
-  "Fallven analizuje wymianę tak długo jak Tatuś analizuje krypto. Wynik podobny.",
-  // Sonny
-  "Sonny szuka drogi do własnej głowy od 2019 roku. Aplikacja go nie znajdzie, ale kartę musi wysłać.",
-  "Sonny po cichu kocha Domcię. Domcia po cichu wzięła tabletkę i poszła do łóżka.",
-  "Sonny wyszedł na chwilę. Wrócił po 4 godzinach z uśmiechem i bez karty. Klasyk.",
-  // BUBU
-  "BUBU zdezerterował do AnyFam. Wrócił. Nikt nie pyta dlaczego. Wszyscy wiedzą dlaczego.",
-  "BUBU i Sonia — weterani AnyFam, którzy wrócili. Gang przyjął. Gang nie zapomniał.",
-  "BUBU wrócił jak pies z podkulonym ogonem. Pies jest teraz w gangu i wysyła karty. Psie.",
-  // Kickboxer
-  "Kickboxer kopie w powietrze z pełnym zaangażowaniem. Powietrze jeszcze nie złożyło skargi.",
-  "Kickboxer zakręcił się, kopnął, przewrócił i... zapomniał wysłać kartę. Znowu.",
-  "Kickboxer lubi Sonię. Sonia uciekła do AnyFam. Kickboxer kopie w powietrze z żalu.",
-  // Kristoforo
-  "Kristoforo jest wiatrakiem z Holandii. Kręci się, kręci i jakoś zawsze wysyła karty.",
-  "Kristoforo robi turnieje po 20 osób i uważa że to genialny pomysł. Nikt mu nie powiedział.",
-  "Kristoforo i Artatuś — holenderskie tulipany w gangu. Jeden mówi, drugi milczy. Razem: jeden normalny.",
-  // Artatuś
-  "Artatuś siedzi w Hadze i milczy. Mówi tylko: 'Wysłałem' i 'Napiję się'. W tej kolejności.",
-  "Artatuś potwierdza wymianę cicho. Bez fanfar. Bez komentarza. Mistrz gatunku.",
-  // CHMARSONN
-  "CHMARSONN nie ogląda telewizji. Zamiast tego bije i wysyła karty. Produktywny człowiek.",
-  "Tomeczek nie potrzebuje TV. Ma gang, ma walki, ma krypto Tatusia do analizy.",
-  // Kasia
-  "Kasia jest wszędzie i nigdzie. Cicha nimfomanka gangu — nie bije ale w każdej fotce jest.",
-  "Kasia milczy, obserwuje i wie wszystko. Najniebezpieczniejszy typ w gangu.",
-  // Krime
-  "Krime istnieje. Bije się dobrze. Reszta to tajemnica otoczona zagadką.",
-  "Nikt nie wie kim jest Krime. Krime wie kim jesteś Ty. I wie że nie wysłałeś karty.",
-  // Szczawo
-  "Szczawo ma dwa imiona: Szczawiński i Gorzała. Gorzała to nie przydomek, to styl życia.",
-  "Szczawo zatwierdził wymianę między pierwszym a drugim kieliszkiem. Precyzja czasowa.",
-  // Tatuś
-  "Tatuś przeanalizował wymianę 7 razy z każdej strony. Wynik: wyślij kartę.",
-  "Tatuś gra na giełdzie, handluje krypto i zarządza gangiem. Portfolio zróżnicowane.",
-  "Tatuś jest Bossem. Lubi żarówki i krypto. Żarówki przynajmniej się nie krasują.",
-  // Ponton i KaY4k
-  "Ponton i KaY4k — bracia w Niemczech, bracia w podcietych tylkach, bracia w kartach.",
-  "KaY4k pracuje u Pontona bez pensji. Przynajmniej wie że karta do niego trafi.",
-  "Ponton pokazał wymiankę swojemu kotu. Kot mruknął aprobująco. Kot ma rację.",
-  // Bodek
-  "Bodek: Białorusin, wieczorami zajęty. Pytasz o co? Nie pytaj o co.",
-  "Bodek wysłał kartę zanim dzieci poszły spać. Priorytety ustawione prawidłowo.",
-  // Joker
-  "Joker nigdy nie schodzi z kasy w Lidlu. Mimo to wysłał kartę. Multitasking na poziomie.",
-  "Joker zeskanował kartę, zapakował zakupy i potwierdził wymianę. Kasa numer 4 nadal czynna.",
-  // Bangmasta
-  "Bangmasta stworzył tę apkę. Jeśli coś nie działa — jego wina. Jeśli działa — jego zasługa.",
-  "Bangmasta: spec od AI, twórca apki, Pinglorz z okularami. Przystojny. Sam tak mówi.",
-  // Krystian i Domcia
-  "Krystian jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
-  "Domcia założyła gang i odeszła. Zostawiła Krystiana, tabletki i Sonny'ego z jego uczuciami.",
-  "Domcia nie gra już z nami. Specjalistka od białych proszków ma ważniejsze sprawy. Poważne.",
-  "Krystian i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
-  "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
-  // Sonia i Bastek
-  "Sonia: piękna, uciekła do AnyFam i jeszcze tam siedzi. Kickboxer kopie w powietrze z tęsknoty.",
-  "Bastek uciekł do AnyFam i tam pozostał. Niektórzy wychodzą. Niektórzy nie.",
-  "Sonia siedzi w AnyFam. BUBU wrócił. Jeden z nich podjął właściwą decyzję.",
-  // Kombinowane
-  "Holenderskie trio: Kristoforo, Artatuś, Młody. Jeden kręci, drugi milczy, trzeci szuka drogi do domu.",
-  "Sonny kocha Domcię. Domcia wzięła tabletkę. Krystian patrzy i ostrzy ripostę.",
-  "Kickboxer, Sonny i Młody to trio które razem mogłoby nie trafić do własnych mieszkań.",
-  "Ponton, KaY4k i gebelsy — historia rodziny która podcięła sobie razem.",
-  "SaMaNtA z wiertłem, Bangmasta z aplikacją, Tatuś z analizą — gang ma narzędzia. Użyjcie ich.",
-  "BUBU wrócił. Sonia i Bastek zostali w AnyFam. ™FAM™ nie dla każdego. Widać.",
-  "Kasia obserwuje, Krime milczy, Bodek topi, Joker kasuje. ™FAM™ — różnorodność to nasza siła.",
-];
 
-// Teksty do rozpiski — pokazywane przy aktywnej wymianie
-const TEKSTY_ROZPISKI = [
-  "Karta się sama nie wyśle. Sonny sprawdzał — jest gdzieś w połowie drogi do własnej głowy.",
-  "Bangmasta patrzy. Aplikacja pamięta. Kasia obserwuje. Wyślij kartę.",
-  "SaMaNtA wysłała zanim skończyła wiercić. Masz mniej wymówek niż jej pacjenci.",
-  "Kickboxer skopał powietrze i potwierdził. Powietrze nic nie zrobiło. Ty coś zrób.",
-  "BUBU wrócił po dezerterskiej przygodzie. Najmniej co może zrobić — to wysłać kartę.",
-  "Tatuś przeanalizował wymianę 7 razy. Wynik każdej analizy: wyślij kartę.",
-  "Kristoforo kręci się jak wiatrak i jakoś wysyła. Weź przykład z tulipana.",
-  "Ponton pokazał wymiankę kotu. Kot mruknął: wyślij. Kot mądrzejszy od połowy gangu.",
-  "Joker jest na kasie w Lidlu. Zdążył potwierdzić. Zastanów się nad swoim życiem.",
-  "Szczawo wysłał między pierwszym a drugim. Chwila precyzji w morzu gorzały.",
-  "Artatuś nic nie mówi. Po prostu wysyła. Naśladować. Nie podziwiać. Wysyłać.",
-  "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystian przyjedzie z ripostą.",
-  "Kasia jest wszędzie. Zwłaszcza tutaj. Zwłaszcza teraz. Wyślij.",
-  "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
-  "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
-  "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
-  "Bastek uciekł i nie wrócił. Sonia też. Kickboxer kopie w powietrze i wysyła kartę za nich.",
-  "KaY4k nie dostaje pensji od Pontona, ale kartę wysyła. Charakter.",
-];
 
-const TIPY=[
-  "💡 Tip dnia: Zakładka ROZPISKA — sprawdź czy masz coś do wysłania!",
-  "💡 Tip dnia: Duplikaty to waluta gangu. Im więcej masz tym bardziej jesteś lubiany.",
-  "💡 Tip dnia: Użyj skanera w zakładce TESTY — 15 talii w 30 sekund!",
-  "💡 Tip dnia: Złote dni i diamentowe dni — przełączaj przycisk ZŁOTE/DIAMENTOWE.",
-  "💡 Tip dnia: Jeśli karta wpadła z paczki — admin może podmienić wymianę w ROZPISCE.",
-  "💡 Tip dnia: Im szybciej potwierdzisz wymianę tym szybciej gang dostanie ammo.",
-  "💡 Tip dnia: Sprawdź zakładkę Duplikaty — może ktoś szuka karty którą masz!",
-  "💡 Tip dnia: Podsumowanie sezonu w zakładce Walki — kto jest królem obrażeń?",
-  "💡 Tip dnia: Talia zamknięta przez cały gang = nagroda dla wszystkich. Warto się starać!",
-  "💡 Tip dnia: Admin może zaznaczać potwierdzenia za innych w ROZPISCE — popros jeśli nie możesz.",
-  "💡 Fallven tip: Wysoki lvl nie gwarantuje mądrości. Wysyłanie kart — tak.",
-  "💡 Tip dnia: BUBU wrócił. Teraz czas żebyś Ty wrócił do wysyłania kart.",
-  "💡 Sonny tip: Zanim zaczniesz szukać drogi do własnej głowy — potwierdź wymianę.",
-  "💡 Tip dnia: SaMaNtA ma nieograniczone ammo. Ty masz kartę do wysłania. Priorytety.",
-  "💡 Kickboxer tip: Kopiąc w powietrze nie wyślesz karty. Tutaj jest przycisk.",
-];
+
+
+
 
 function LoginScreen({onLogin, czlonkowie}) {
   const [krok, setKrok] = useState("nick"); // nick → pin / ustawPin
