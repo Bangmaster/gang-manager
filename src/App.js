@@ -570,10 +570,10 @@ export default function App() {
           <div style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
             <span><span style={{color:"#ffd700"}}>{zalogowany.login}</span> <span style={{color:"#888"}}>({zalogowany.rola})</span></span>
             {statusZapisu && <span style={{color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
-            {/* Tip dnia - skrócony */}
-            <span style={{fontSize:10,color:"#444",fontStyle:"italic"}}
+            {/* Tip dnia */}
+            <span style={{fontSize:10,color:"#444",fontStyle:"italic",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
               title={TIPY[Math.floor(Date.now()/43200000)%TIPY.length]}>
-              💡 {TIPY[Math.floor(Date.now()/43200000)%TIPY.length].replace("💡 Tip dnia: ","").replace("💡 ","").slice(0,40)}{TIPY[Math.floor(Date.now()/43200000)%TIPY.length].length > 50 ? "..." : ""}
+              {TIPY[Math.floor(Date.now()/43200000)%TIPY.length]}
             </span>
             {/* Wskaźnik online */}
             {(()=>{
@@ -610,11 +610,11 @@ export default function App() {
         </div>
       </div>
 
-      {/* Pasek z cytatem nad zakładkami - zmienia się co godzinę */}
+      {/* Pasek z cytatem nad zakładkami */}
       <div style={{
         background:"rgba(184,134,11,0.06)",borderBottom:"1px solid rgba(184,134,11,0.15)",
-        padding:"4px 16px",fontSize:11,color:"#555",fontStyle:"italic",
-        textAlign:"center",
+        padding:"4px 16px",fontSize:11,color:"#666",fontStyle:"italic",
+        textAlign:"center",minHeight:22,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",
       }}>
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
       </div>
@@ -793,9 +793,9 @@ const CYTATY=[
   // Krystian i Domcia
   "Krystian jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
   "Domcia założyła gang i odeszła. Zostawiła Krystiana, tabletki i Sonny'ego z jego uczuciami.",
-  "Domcia odeszła. Gang trwa. To chyba coś mówi o gangu.",
+  "Domcia nie gra już z nami. Specjalistka od białych proszków ma ważniejsze sprawy. Poważne.",
   "Krystian i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
-  "Domcia założyła gang i odeszła. Niektórzy tworzą legendy. Ona jest jedną z nich.",
+  "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
   // Sonia i Bastek
   "Sonia: piękna, uciekła do AnyFam i jeszcze tam siedzi. Kickboxer kopie w powietrze z tęsknoty.",
   "Bastek uciekł do AnyFam i tam pozostał. Niektórzy wychodzą. Niektórzy nie.",
@@ -825,7 +825,7 @@ const TEKSTY_ROZPISKI = [
   "Artatuś nic nie mówi. Po prostu wysyła. Naśladować. Nie podziwiać. Wysyłać.",
   "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystian przyjedzie z ripostą.",
   "Kasia jest wszędzie. Zwłaszcza tutaj. Zwłaszcza teraz. Wyślij.",
-  "Bodek wysłał kartę bez słowa. Mistrz klasy i skromności.",
+  "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
   "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
   "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
   "Bastek uciekł i nie wrócił. Sonia też. Kickboxer kopie w powietrze i wysyła kartę za nich.",
@@ -2182,6 +2182,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   const [wylaczoneOsoby,setWylaczoneOsoby]=useState(new Set());
   const [wylaczoneDawcy,setWylaczoneDawcy]=useState(new Set());
   const [pokazWylaczenia,setPokazWylaczenia]=useState(false);
+  const [limitKartOsoby,setLimitKartOsoby]=useState({});
 
   const toggleTalia=id=>setWylaczoneTalie(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const [ignorujTrudne,setIgnorujTrudne]=useState(false);
@@ -2352,7 +2353,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     }); // odbiorcy
     // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
     const aktywniDawcy=czlonkowie.filter(c=>!wylaczoneDawcy.has(c.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe}));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -2688,12 +2689,13 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 {wylaczoneOsoby.size>0&&`${wylaczoneOsoby.size}× brak odbioru`}
                 {wylaczoneOsoby.size>0&&wylaczoneDawcy.size>0&&" · "}
                 {wylaczoneDawcy.size>0&&`${wylaczoneDawcy.size}× brak dawcy`}
+                {Object.keys(limitKartOsoby).length>0&&` · ${Object.keys(limitKartOsoby).length}× limit kart`}
               </span>
             )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0)&&(
-              <button onClick={e=>{e.stopPropagation();setWylaczoneOsoby(new Set());setWylaczoneDawcy(new Set());}}
+            {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0||Object.keys(limitKartOsoby).length>0)&&(
+              <button onClick={e=>{e.stopPropagation();setWylaczoneOsoby(new Set());setWylaczoneDawcy(new Set());setLimitKartOsoby({});}}
                 style={{fontSize:10,padding:"2px 8px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:4,color:"#f55",cursor:"pointer"}}>
                 Resetuj
               </button>
@@ -2743,21 +2745,38 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 const bg = obie?"rgba(180,50,50,0.15)":bezOdbioru?"rgba(255,50,50,0.12)":bezDawcy?"rgba(255,165,0,0.12)":"rgba(255,255,255,0.05)";
                 const border = obie?"1px solid #a5544488":bezOdbioru?"1px solid #f5544488":bezDawcy?"1px solid #fa055":"1px solid #2a2a3a";
 
+                const limitOsoby = limitKartOsoby[c.id];
                 return (
-                  <button key={c.id} onClick={handleClick} title={
-                    obie?"Kliknij → aktywny":
-                    bezOdbioru?"Kliknij → bez dawcy":
-                    bezDawcy?"Kliknij → oba wyłączone":
-                    "Kliknij → bez odbioru"
-                  } style={{
-                    padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
-                    background:bg, border, color:kolor,
-                    textDecoration:(bezOdbioru||obie)?"line-through":"none",
-                  }}>
-                    {ikona&&<span style={{marginRight:3}}>{ikona}</span>}
-                    {c.nazwa}
-                    {(c.krag||1)>1&&<span style={{fontSize:9,color:"#da70d6",marginLeft:3}}>K{c.krag}</span>}
-                  </button>
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:3}}>
+                    <button onClick={handleClick} title={
+                      obie?"Kliknij → aktywny":
+                      bezOdbioru?"Kliknij → bez dawcy":
+                      bezDawcy?"Kliknij → oba wyłączone":
+                      "Kliknij → bez odbioru"
+                    } style={{
+                      padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+                      background:bg, border, color:kolor,
+                      textDecoration:(bezOdbioru||obie)?"line-through":"none",
+                    }}>
+                      {ikona&&<span style={{marginRight:3}}>{ikona}</span>}
+                      {c.nazwa}
+                      {(c.krag||1)>1&&<span style={{fontSize:9,color:"#da70d6",marginLeft:3}}>K{c.krag}</span>}
+                    </button>
+                    {!obie&&!bezOdbioru&&(
+                      <select value={limitOsoby??""} onChange={e=>{
+                        const val=e.target.value;
+                        setLimitKartOsoby(prev=>{const n={...prev};if(val==="")delete n[c.id];else n[c.id]=parseInt(val);return n;});
+                      }} title="Max kart dla tej osoby" style={{
+                        padding:"2px 4px",background:"#12122a",
+                        border:`1px solid ${limitOsoby?"#fa0":"#2a2a3a"}`,
+                        borderRadius:4,color:limitOsoby?"#fa0":"#444",
+                        fontSize:10,cursor:"pointer",width:42,
+                      }}>
+                        <option value="">∞</option>
+                        {[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}
+                      </select>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -3438,6 +3457,7 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
 }
 
 function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszKarte}) {
+  const tekstRozpiski = TEKSTY_ROZPISKI[Math.floor(Date.now()/3600000)%TEKSTY_ROZPISKI.length];
   const [zamykanie,setZamykanie]=useState(false);
   const [podmienIdx,setPodmienIdx]=useState(null);
   const [streak, setStreak] = useState(0);
@@ -3672,9 +3692,6 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
       </div>
 
       {/* Moja wymiana */}
-      <div style={{fontSize:11,color:"#555",fontStyle:"italic",marginBottom:8,padding:"5px 10px",background:"rgba(255,255,255,0.02)",borderRadius:5,borderLeft:"2px solid #333"}}>
-        {TEKSTY_ROZPISKI[Math.floor(Date.now()/3600000)%TEKSTY_ROZPISKI.length]}
-      </div>
       {mojePozycje?(
         <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"#ffd700"}`,borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
