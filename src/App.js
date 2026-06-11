@@ -271,7 +271,7 @@ const DOMYSLNE_DANE = {
   walki: [],
 };
 
-export default const CYTATY=[
+const CYTATY=[
   // Ogólne
   "Nie pytaj co gang może zrobić dla Ciebie — pytaj komu możesz wysłać duplikat.",
   "Witaj w gangu. Twoje karty nas interesują bardziej niż Ty.",
