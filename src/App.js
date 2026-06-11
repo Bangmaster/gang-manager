@@ -3438,7 +3438,6 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
 }
 
 function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszKarte}) {
-  const tekstRozpiski = TEKSTY_ROZPISKI[Math.floor(Date.now()/3600000)%TEKSTY_ROZPISKI.length];
   const [zamykanie,setZamykanie]=useState(false);
   const [podmienIdx,setPodmienIdx]=useState(null);
   const [streak, setStreak] = useState(0);
@@ -3673,6 +3672,9 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
       </div>
 
       {/* Moja wymiana */}
+      <div style={{fontSize:11,color:"#555",fontStyle:"italic",marginBottom:8,padding:"5px 10px",background:"rgba(255,255,255,0.02)",borderRadius:5,borderLeft:"2px solid #333"}}>
+        {TEKSTY_ROZPISKI[Math.floor(Date.now()/3600000)%TEKSTY_ROZPISKI.length]}
+      </div>
       {mojePozycje?(
         <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"#ffd700"}`,borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
