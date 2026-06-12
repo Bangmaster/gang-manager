@@ -404,6 +404,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
           ...(isAdmin ? [{ id: "ranking", label: "📤 Wgraj walkę" }] : []),
           { id: "historia", label: `📜 Historia (${(walki || []).length})` },
           { id: "sezon", label: "🏆 Podsumowanie sezonu" },
+          { id: "liga", label: "⚔️ Liga" },
           ...(archiwumWalk.length > 0 ? [{ id: "archiwum", label: `📚 Poprzednie sezony (${archiwumWalk.length})` }] : []),
         ].map(t => (
           <button key={t.id} onClick={() => { setPodglad(t.id); if (t.id === "sezon") generujPodsumowanie(); }} style={{
