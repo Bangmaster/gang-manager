@@ -7965,3 +7965,5 @@ function DupleView({czlonkowie, talie, duplikaty}) {
     </div>
   );
 }
+
+export default App;
