@@ -3463,7 +3463,6 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
 }
 
 function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszKarte}) {
-  const tekstRozpiski = TEKSTY_ROZPISKI[Math.floor(Date.now()/3600000)%TEKSTY_ROZPISKI.length];
   const [zamykanie,setZamykanie]=useState(false);
   const [podmienIdx,setPodmienIdx]=useState(null);
   const [streak, setStreak] = useState(0);
