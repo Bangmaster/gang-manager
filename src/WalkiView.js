@@ -278,8 +278,10 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
   const [analizujac, setAnalizujac] = useState(false);
   const [wyniki, setWyniki] = useState(null);
   const [nazwaWalki, setNazwaWalki] = useState("");
+  const [wynikWalki, setWynikWalki] = useState(null); // null=nieokreślony, true=wygrana, false=przegrana
   const [podglad, setPodglad] = useState("ranking");
   const [podsumowanieSezonu, setPodsumowanieSezonu] = useState(null);
+  const [podgladLigi, setPodgladLigi] = useState("ocr"); // ocr / historia
   const [edytowanyGracz, setEdytowanyGracz] = useState(null);
   const [aktywnyScreen, setAktywnyScreen] = useState(0);
   const [plikiAktywnosci, setPlikiAktywnosci] = useState([]);
@@ -374,12 +376,14 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
       nazwa: nazwaWalki.trim(),
       data: wyniki.dataAnalizy,
       gracze: wyniki.gracze,
+      wygrana: wynikWalki,
     }];
     await zapiszWalki(noweWalki);
     zapiszAutoBackup("zapis_walki");
     setWyniki(null);
     setPliki([]);
     setNazwaWalki("");
+    setWynikWalki(null);
     alert(`✓ Zapisano walkę "${nazwaWalki.trim()}"`);
   };
 
@@ -422,6 +426,22 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
           </div>
 
           <div style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 10, padding: 14, marginBottom: 14 }}>
+            {/* Wynik walki */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: "#aaa", alignSelf: "center", flexShrink: 0 }}>Wynik:</div>
+              {[
+                { val: true, label: "🏆 Wygrana", c: "#0c6", bg: "rgba(0,200,100,0.15)" },
+                { val: null, label: "⬜ Nieokreślony", c: "#555", bg: "rgba(255,255,255,0.05)" },
+                { val: false, label: "💀 Przegrana", c: "#f55", bg: "rgba(255,50,50,0.12)" },
+              ].map(opt => (
+                <button key={String(opt.val)} onClick={() => setWynikWalki(opt.val)} style={{
+                  flex: 1, padding: "6px 4px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: wynikWalki === opt.val ? "bold" : "normal",
+                  background: wynikWalki === opt.val ? opt.bg : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${wynikWalki === opt.val ? opt.c : "#2a2a3a"}`,
+                  color: wynikWalki === opt.val ? opt.c : "#444",
+                }}>{opt.label}</button>
+              ))}
+            </div>
             <input type="text" value={nazwaWalki} onChange={e => setNazwaWalki(e.target.value)}
               placeholder="Nazwa/data walki, np. Walka z 17.05.2026"
               style={{ width: "100%", padding: "8px 10px", background: "#12122a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }} />
@@ -599,6 +619,10 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
         <PodsumowanieSezonu podsumowanie={podsumowanieSezonu} zapiszWalki={zapiszWalki} walki={walki || []} />
       )}
 
+      {podglad === "liga" && (
+        <LigaView isAdmin={isAdmin} zapiszWalki={zapiszWalki} walki={walki || []} />
+      )}
+
       {podglad === "archiwum" && (
         <ArchiwumSezonow archiwum={archiwumWalk} czlonkowie={czlonkowie} />
       )}
@@ -758,6 +782,249 @@ function RankingTabela({ gracze, edytowalne, onChange }) {
   );
 }
 
+
+// Prompt OCR dla screena ligi
+function buildLigaPrompt(ileScreenow) {
+  const multi = ileScreenow > 1
+    ? `Masz ${ileScreenow} screeny połączone pionowo. Każdy gang zwróć TYLKO RAZ.`
+    : "Masz jeden screen z rankingiem ligi.";
+  return `Odczytaj ranking ligi z gry The Gang. ${multi}
+
+Każdy wiersz zawiera:
+- pozycja (#1, #2, #3...)
+- nazwa gangu (skopiuj DOKŁADNIE)
+- liczba wygranych (ikona korony, np. 5)
+- liczba punktów (ikona skrzyżowanych kijów, np. 85)
+
+Zwróć WYŁĄCZNIE JSON (bez markdown):
+{"gangi":[{"pozycja":1,"nazwa":"Ludwig Von","wygrane":5,"punkty":85},{"pozycja":3,"nazwa":"Family","wygrane":4,"punkty":70}]}
+
+Nasz gang to "Family". Zwróć wszystkie gangi które widzisz.`;
+}
+
+// OCR ligi
+async function analyzeLigaImages(files, onProgress) {
+  if (KLUCZE.length === 0) return { sukces: false, blad: "Brak klucza API", gangi: [] };
+  try {
+    onProgress?.(`📸 Scalanie ${files.length} screenu ligi...`);
+    const base64 = files.length === 1
+      ? await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(files[0]); })
+      : await scaleScreenyWalki(files);
+
+    onProgress?.("🤖 Analizuję ranking ligi...");
+    for (let proba = 0; proba < 3; proba++) {
+      try {
+        const url = pobierzURL();
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: buildLigaPrompt(files.length) }, { inline_data: { mime_type: "image/jpeg", data: base64 } }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+          }),
+        });
+        if (!response.ok) { nastepnyKlucz(); if (proba < 2) { await new Promise(r => setTimeout(r, 10000)); } continue; }
+        const data = await response.json();
+        let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+        if (text.startsWith("```json")) text = text.slice(7);
+        if (text.startsWith("```")) text = text.slice(3);
+        if (text.endsWith("```")) text = text.slice(0, -3);
+        const parsed = JSON.parse(text.trim());
+        nastepnyKlucz();
+        return { sukces: true, gangi: parsed.gangi || [] };
+      } catch (e) {
+        nastepnyKlucz();
+        if (proba < 2) { onProgress?.(`Błąd — próba ${proba + 2}/3...`); await new Promise(r => setTimeout(r, 10000)); }
+      }
+    }
+    return { sukces: false, blad: "Nie udało się po 3 próbach", gangi: [] };
+  } catch (e) {
+    return { sukces: false, blad: e.message, gangi: [] };
+  }
+}
+
+function LigaView({ isAdmin, walki, zapiszWalki }) {
+  const [tryb, setTryb] = useState("historia"); // historia / ocr
+  const [pliki, setPliki] = useState([]);
+  const [analizujac, setAnalizujac] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [wyniki, setWyniki] = useState(null);
+  const [nazwaLigi, setNazwaLigi] = useState("");
+  const [sezonLigi, setSezonLigi] = useState("");
+
+  // Historia lig z walki (zapisana per sezon)
+  const historiaLig = (walki || [])
+    .filter(w => w.ligaSnapshot)
+    .map(w => w.ligaSnapshot)
+    .filter((v, i, a) => a.findIndex(x => x.id === v.id) === i)
+    .sort((a, b) => new Date(b.data) - new Date(a.data));
+
+  const analizujLige = async () => {
+    if (pliki.length === 0) return;
+    setAnalizujac(true);
+    setProgress("");
+    const wynik = await analyzeLigaImages(pliki, setProgress);
+    if (wynik.sukces) setWyniki(wynik.gangi);
+    setAnalizujac(false);
+  };
+
+  const zapiszLige = async () => {
+    if (!wyniki || !nazwaLigi.trim()) { alert("Wpisz nazwę/sezon ligi!"); return; }
+    const snapshot = {
+      id: Date.now(),
+      nazwa: nazwaLigi.trim(),
+      sezon: sezonLigi.trim(),
+      data: new Date().toISOString(),
+      gangi: wyniki,
+    };
+    // Zapisz do pierwszej walki jako ligaSnapshot (lub osobny klucz)
+    const noweWalki = walki.length > 0
+      ? walki.map((w, i) => i === 0 ? { ...w, ligaSnapshot: snapshot } : w)
+      : walki;
+    // Właściwie lepiej trzymać w osobnej tablicy — dodajemy do walki[0] jako ligSnapshots
+    const aktWalki = walki.map((w, i) => {
+      if (i !== 0) return w;
+      const snapshots = w.ligSnapshots || [];
+      return { ...w, ligSnapshots: [...snapshots, snapshot] };
+    });
+    await zapiszWalki(aktWalki.length > 0 ? aktWalki : walki);
+    alert(`✅ Zapisano ranking ligi "${nazwaLigi.trim()}"`);
+    setWyniki(null);
+    setNazwaLigi("");
+    setPliki([]);
+    setTryb("historia");
+  };
+
+  // Zbierz wszystkie snapshoty lig z walk
+  const wszystkieSnapshoty = [];
+  (walki || []).forEach(w => {
+    if (w.ligSnapshots) wszystkieSnapshoty.push(...w.ligSnapshots);
+  });
+  wszystkieSnapshoty.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+  const naszGang = (gangi) => gangi.find(g => g.nazwa.toLowerCase().includes("family"));
+  const fmt = (g) => g ? `#${g.pozycja} · 🏆${g.wygrane} · ⚔️${g.punkty}` : "—";
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {[{ id: "historia", label: "📊 Historia ligi" }, ...(isAdmin ? [{ id: "ocr", label: "📸 Wgraj ranking" }] : [])].map(t => (
+          <button key={t.id} onClick={() => setTryb(t.id)} style={{
+            padding: "7px 14px", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: tryb === t.id ? "bold" : "normal",
+            background: tryb === t.id ? "linear-gradient(135deg,#b8860b,#ffd700)" : "rgba(255,255,255,0.05)",
+            border: tryb === t.id ? "none" : "1px solid #2a2a3a",
+            color: tryb === t.id ? "#000" : "#888",
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* OCR */}
+      {tryb === "ocr" && isAdmin && (
+        <div>
+          <div style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>
+            Wgraj screeny z rankingu ligi (scalone automatycznie). Gemini odczyta pozycje, wygrane i punkty wszystkich gangów.
+          </div>
+          <input type="file" accept="image/*" multiple onChange={e => setPliki(Array.from(e.target.files || []))}
+            style={{ width: "100%", padding: 8, background: "#12122a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontSize: 12, marginBottom: 8 }} />
+          {pliki.length > 0 && <div style={{ fontSize: 11, color: "#ffd700", marginBottom: 8 }}>Wybrano {pliki.length} {pliki.length === 1 ? "plik" : "pliki"}</div>}
+          <button onClick={analizujLige} disabled={pliki.length === 0 || analizujac} style={{
+            width: "100%", padding: 10, borderRadius: 8, border: "none", fontSize: 13, fontWeight: "bold", cursor: pliki.length === 0 || analizujac ? "not-allowed" : "pointer",
+            background: pliki.length === 0 || analizujac ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,#b8860b,#ffd700)",
+            color: pliki.length === 0 || analizujac ? "#555" : "#000",
+          }}>{analizujac ? "⏳ Analizuję..." : "🤖 Analizuj ranking ligi"}</button>
+          {progress && <div style={{ fontSize: 11, color: "#ffd700", marginTop: 6, textAlign: "center" }}>{progress}</div>}
+
+          {wyniki && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
+                Odczytano <strong style={{ color: "#ffd700" }}>{wyniki.length}</strong> gangów
+                {naszGang(wyniki) && <span style={{ color: "#0c6", marginLeft: 8 }}>· Family: {fmt(naszGang(wyniki))}</span>}
+              </div>
+              {/* Tabela */}
+              <div style={{ marginBottom: 12 }}>
+                {wyniki.map((g, i) => {
+                  const jestNasz = g.nazwa.toLowerCase().includes("family");
+                  return (
+                    <div key={i} style={{
+                      display: "flex", gap: 8, alignItems: "center", padding: "6px 10px", marginBottom: 3, borderRadius: 6,
+                      background: jestNasz ? "rgba(255,215,0,0.08)" : "rgba(255,255,255,0.02)",
+                      border: `1px solid ${jestNasz ? "#ffd70033" : "#2a2a3a"}`,
+                    }}>
+                      <span style={{ fontSize: 12, color: g.pozycja <= 3 ? "#ffd700" : "#666", width: 28, fontWeight: "bold" }}>#{g.pozycja}</span>
+                      <span style={{ flex: 1, fontSize: 11, color: jestNasz ? "#ffd700" : "#ddd" }}>{g.nazwa}</span>
+                      <span style={{ fontSize: 11, color: "#fa0" }}>🏆{g.wygrane}</span>
+                      <span style={{ fontSize: 11, color: "#87CEEB" }}>⚔️{g.punkty}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Zapis */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <input type="text" value={nazwaLigi} onChange={e => setNazwaLigi(e.target.value)} placeholder="Nazwa (np. Sezon 51 Mundial)"
+                  style={{ flex: 1, padding: "6px 10px", background: "#12122a", border: "1px solid #444", borderRadius: 6, color: "#fff", fontSize: 12 }} />
+                <input type="text" value={sezonLigi} onChange={e => setSezonLigi(e.target.value)} placeholder="Sezon"
+                  style={{ width: 70, padding: "6px 10px", background: "#12122a", border: "1px solid #444", borderRadius: 6, color: "#fff", fontSize: 12 }} />
+              </div>
+              <button onClick={zapiszLige} style={{
+                width: "100%", padding: 10, background: "linear-gradient(135deg,#0c6,#0fa)", border: "none", borderRadius: 8,
+                color: "#000", fontSize: 13, fontWeight: "bold", cursor: "pointer",
+              }}>💾 Zapisz ranking ligi</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Historia */}
+      {tryb === "historia" && (
+        <div>
+          {wszystkieSnapshoty.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#555" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>⚔️</div>
+              <div style={{ fontSize: 13 }}>Brak zapisanych rankingów ligi</div>
+              <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>Wgraj screen z rankingu ligi w zakładce "Wgraj ranking"</div>
+            </div>
+          ) : (
+            wszystkieSnapshoty.map(snap => {
+              const nasz = naszGang(snap.gangi || []);
+              return (
+                <div key={snap.id} style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 4 }}>
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13 }}>{snap.nazwa}</div>
+                      <div style={{ fontSize: 10, color: "#555" }}>{new Date(snap.data).toLocaleDateString("pl-PL")} · {snap.gangi?.length || 0} gangów</div>
+                    </div>
+                    {nasz && (
+                      <div style={{ padding: "4px 10px", background: "rgba(255,215,0,0.1)", border: "1px solid #ffd70033", borderRadius: 6, fontSize: 11, color: "#ffd700" }}>
+                        Family: #{nasz.pozycja} · 🏆{nasz.wygrane} · ⚔️{nasz.punkty}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    {(snap.gangi || []).map((g, i) => {
+                      const jestNasz = g.nazwa.toLowerCase().includes("family");
+                      return (
+                        <div key={i} style={{
+                          display: "flex", gap: 8, alignItems: "center", padding: "4px 8px", borderRadius: 4,
+                          background: jestNasz ? "rgba(255,215,0,0.06)" : "transparent",
+                        }}>
+                          <span style={{ fontSize: 11, color: g.pozycja <= 3 ? "#ffd700" : "#555", width: 24 }}>#{g.pozycja}</span>
+                          <span style={{ flex: 1, fontSize: 11, color: jestNasz ? "#ffd700" : "#888" }}>{g.nazwa}</span>
+                          <span style={{ fontSize: 10, color: "#fa0" }}>🏆{g.wygrane}</span>
+                          <span style={{ fontSize: 10, color: "#87CEEB" }}>⚔️{g.punkty}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
   const [rozwiniete, setRozwiniete] = useState(null);
   const [trybEdycji, setTrybEdycji] = useState(null); // id walki w trybie edycji obecności
@@ -796,8 +1063,12 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
         gracze: w.gracze.map(g => {
           if (g.nazwa !== graczNazwa) return g;
           const obecny = g.bylNaWalce;
-          // jeśli nie ma danych aktywności, zaczynamy od true
-          const nowa = obecny === undefined ? false : !obecny;
+          // Cykl: ⚪ nieznana → 🟢 był → 🔴 nie był → ⚠️ usprawiedliwiony → ⚪
+          let nowa;
+          if (obecny === undefined) nowa = true;
+          else if (obecny === true) nowa = false;
+          else if (obecny === false) nowa = "U"; // usprawiedliwiony
+          else nowa = undefined;
           return { ...g, bylNaWalce: nowa };
         })
       };
@@ -821,23 +1092,42 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
     <div>
       <div style={{ fontSize: 12, color: "#aaa", marginBottom: 10 }}>Zapisano <strong style={{ color: "#ffd700" }}>{walki.length}</strong> walk</div>
       {sorted.map(w => {
-        const bylaNaWalce = w.gracze.filter(g => g.bylNaWalce === true).length;
+        const bylaNaWalce = w.gracze.filter(g => g.bylNaWalce === true || g.bylNaWalce === "U").length;
         const niebylo = w.gracze.filter(g => g.bylNaWalce === false).length;
+        const usprawiedliwieni = w.gracze.filter(g => g.bylNaWalce === "U").length;
+        const wygranaInfo = w.wygrana === true ? "🏆" : w.wygrana === false ? "💀" : null;
         const maObecnosc = w.gracze.some(g => g.bylNaWalce !== undefined);
         return (
           <div key={w.id} style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 12, marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13 }}>{w.nazwa}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13 }}>{w.nazwa}</span>
+                  {wygranaInfo && <span style={{ fontSize: 14 }} title={w.wygrana ? "Wygrana" : "Przegrana"}>{wygranaInfo}</span>}
+                </div>
                 <div style={{ fontSize: 10, color: "#666", marginTop: 2 }}>
                   {new Date(w.data).toLocaleString("pl-PL")} • {w.gracze.length} graczy
                   {maObecnosc && <span style={{ marginLeft: 8 }}>
                     <span style={{ color: "#0c6" }}>🟢{bylaNaWalce}</span>
                     <span style={{ color: "#f55", marginLeft: 4 }}>🔴{niebylo}</span>
+                    {usprawiedliwieni > 0 && <span style={{ color: "#fa0", marginLeft: 4 }}>⚠️{usprawiedliwieni}</span>}
                   </span>}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 5 }}>
+                {isAdmin && (
+                  <button onClick={() => {
+                    const noweWalki = walki.map(x => x.id !== w.id ? x : {
+                      ...x, wygrana: x.wygrana === undefined ? true : x.wygrana === true ? false : undefined
+                    });
+                    zapiszWalki(noweWalki);
+                  }} style={{
+                    padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
+                    background: w.wygrana === true ? "rgba(0,200,100,0.2)" : w.wygrana === false ? "rgba(255,50,50,0.15)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${w.wygrana === true ? "#0c6" : w.wygrana === false ? "#f55" : "#333"}`,
+                    color: w.wygrana === true ? "#0c6" : w.wygrana === false ? "#f55" : "#555",
+                  }}>{w.wygrana === true ? "🏆 Wygrana" : w.wygrana === false ? "💀 Przegrana" : "⬜ Wynik"}</button>
+                )}
                 {isAdmin && (
                   <button onClick={() => otworzyjedycjeLvl(w)} style={{
                     padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
@@ -910,18 +1200,22 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                   {w.gracze.sort((a,b)=>a.nazwa.localeCompare(b.nazwa)).map(g => {
                     const byl = g.bylNaWalce;
-                    const kolor = byl === true ? "#0c6" : byl === false ? "#f55" : "#888";
-                    const bg = byl === true ? "rgba(0,200,100,0.12)" : byl === false ? "rgba(255,50,50,0.1)" : "rgba(255,255,255,0.05)";
-                    const ikona = byl === true ? "🟢" : byl === false ? "🔴" : "⚪";
+                    const kolor = byl === true ? "#0c6" : byl === false ? "#f55" : byl === "U" ? "#fa0" : "#888";
+                    const bg = byl === true ? "rgba(0,200,100,0.12)" : byl === false ? "rgba(255,50,50,0.1)" : byl === "U" ? "rgba(255,165,0,0.12)" : "rgba(255,255,255,0.05)";
+                    const ikona = byl === true ? "🟢" : byl === false ? "🔴" : byl === "U" ? "⚠️" : "⚪";
+                    const label = byl === "U" ? "USP." : g.nazwa.replace(/™FAM™|fAM™|FAM™/g, "");
                     return (
-                      <button key={g.nazwa} onClick={() => toggleObecnosc(w.id, g.nazwa)} style={{
+                      <button key={g.nazwa} onClick={() => toggleObecnosc(w.id, g.nazwa)} title={byl === "U" ? "Usprawiedliwiony" : ""} style={{
                         padding: "4px 10px", borderRadius: 16, cursor: "pointer", fontSize: 11,
                         background: bg, border: `1px solid ${kolor}44`, color: kolor,
                       }}>
-                        {ikona} {g.nazwa.replace(/™FAM™|fAM™|FAM™/g, "")}
+                        {ikona} {label}
                       </button>
                     );
                   })}
+                  <div style={{ fontSize: 10, color: "#555", marginTop: 6, width: "100%" }}>
+                    ⚪ nieznana → 🟢 był → 🔴 nie był → ⚠️ usprawiedliwiony → ⚪
+                  </div>
                 </div>
                 <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>
                   ⚪ nieznana · 🟢 był · 🔴 nie był — zmiany zapisują się automatycznie
