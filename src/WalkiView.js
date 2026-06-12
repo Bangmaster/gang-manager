@@ -281,7 +281,6 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
   const [wynikWalki, setWynikWalki] = useState(null); // null=nieokreślony, true=wygrana, false=przegrana
   const [podglad, setPodglad] = useState("ranking");
   const [podsumowanieSezonu, setPodsumowanieSezonu] = useState(null);
-  const [podgladLigi, setPodgladLigi] = useState("ocr"); // ocr / historia
   const [edytowanyGracz, setEdytowanyGracz] = useState(null);
   const [aktywnyScreen, setAktywnyScreen] = useState(0);
   const [plikiAktywnosci, setPlikiAktywnosci] = useState([]);
