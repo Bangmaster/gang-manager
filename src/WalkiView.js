@@ -852,13 +852,6 @@ function LigaView({ isAdmin, walki, zapiszWalki }) {
   const [nazwaLigi, setNazwaLigi] = useState("");
   const [sezonLigi, setSezonLigi] = useState("");
 
-  // Historia lig z walki (zapisana per sezon)
-  const historiaLig = (walki || [])
-    .filter(w => w.ligaSnapshot)
-    .map(w => w.ligaSnapshot)
-    .filter((v, i, a) => a.findIndex(x => x.id === v.id) === i)
-    .sort((a, b) => new Date(b.data) - new Date(a.data));
-
   const analizujLige = async () => {
     if (pliki.length === 0) return;
     setAnalizujac(true);
@@ -877,11 +870,6 @@ function LigaView({ isAdmin, walki, zapiszWalki }) {
       data: new Date().toISOString(),
       gangi: wyniki,
     };
-    // Zapisz do pierwszej walki jako ligaSnapshot (lub osobny klucz)
-    const noweWalki = walki.length > 0
-      ? walki.map((w, i) => i === 0 ? { ...w, ligaSnapshot: snapshot } : w)
-      : walki;
-    // Właściwie lepiej trzymać w osobnej tablicy — dodajemy do walki[0] jako ligSnapshots
     const aktWalki = walki.map((w, i) => {
       if (i !== 0) return w;
       const snapshots = w.ligSnapshots || [];
