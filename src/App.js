@@ -337,10 +337,10 @@ const CYTATY=[
   "Bangmasta stworzył tę apkę. Jeśli coś nie działa — jego wina. Jeśli działa — jego zasługa.",
   "Bangmasta: spec od AI, twórca apki, Pinglorz z okularami. Przystojny. Sam tak mówi.",
   // Krystian i Domcia
-  "Krystian jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
+  "Krystka jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
   "Domcia założyła gang i odeszła. Zostawiła Krystiana, tabletki i Sonny'ego z jego uczuciami.",
   "Domcia nie gra już z nami. Specjalistka od białych proszków ma ważniejsze sprawy. Poważne.",
-  "Krystian i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
+  "Krystka i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
   "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
   // Sonia i Bastek
   "Sonia: piękna, uciekła do AnyFam i jeszcze tam siedzi. Kickboxer kopie w powietrze z tęsknoty.",
@@ -348,12 +348,45 @@ const CYTATY=[
   "Sonia siedzi w AnyFam. BUBU wrócił. Jeden z nich podjął właściwą decyzję.",
   // Kombinowane
   "Holenderskie trio: Kristoforo, Artatuś, Młody. Jeden kręci, drugi milczy, trzeci szuka drogi do domu.",
-  "Sonny kocha Domcię. Domcia wzięła tabletkę. Krystian patrzy i ostrzy ripostę.",
+  "Sonny kocha Domcię. Domcia wzięła tabletkę. Krystka patrzy i ostrzy ripostę.",
   "Kickboxer, Sonny i Młody to trio które razem mogłoby nie trafić do własnych mieszkań.",
   "Ponton, KaY4k i gebelsy — historia rodziny która podcięła sobie razem.",
   "SaMaNtA z wiertłem, Bangmasta z aplikacją, Tatuś z analizą — gang ma narzędzia. Użyjcie ich.",
   "BUBU wrócił. Sonia i Bastek zostali w AnyFam. ™FAM™ nie dla każdego. Widać.",
   "Kasia obserwuje, Krime milczy, Bodek topi, Joker kasuje. ™FAM™ — różnorodność to nasza siła.",
+  // Więcej o CHMARSONN
+  "CHMARSONN to Tomeczek który nie ogląda TV. Zamiast tego bije. I bije dobrze. I tyle o tym.",
+  "Tomeczek powiedział kiedyś że TV to opium dla mas. Gang przytaknął i poszedł bić.",
+  "CHMARSONN na walce robi robotę bez zbędnych słów. Gdyby gang składał się z samych Tomeczków — wróg by płakał.",
+  "CHMARSONN nie oglada telewizji bo woli robić to co w niej pokazują — bić ludzi.",
+  // Więcej o Młodym
+  "Młody to nowy nabytek z Holandii. Świr ale swój. Tych dwóch przymiotników nie da się od siebie oddzielić.",
+  "Młody pali, kręci się, gubi, ale wysyła karty. Gang docenia przynajmniej ten jeden talent.",
+  "Młody, Kristoforo i Artatuś — holenderska mafia. Jeden pali, drugi kręci wiatrakiem, trzeci milczy i pije.",
+  "Holenderskie trio: Kristoforo organizuje turnieje, Artatuś milczy, Młody szuka wyjścia z pokoju.",
+  // Więcej o Bastku i Sonii
+  "Bastek uciekł do AnyFam i siedzi tam cicho. Widocznie tam kart nie wysyłają — czuje się jak w domu.",
+  "Sonia i Bastek w AnyFam. Kickboxer kopie w powietrze. Tatuś analizuje. Gang gra dalej.",
+  "Bastek i Sonia — dezerterzy pierwszej klasy. ™FAM™ wystawiło im pomnik z napisem: wróćcie.",
+  // Więcej o Szczawie
+  "Szczawo i Artatuś — obaj mają słabość do trunku. Jeden mówi o tym głośno, drugi milczy i pije.",
+  "Szczawo Szczawiński. Gorzała Gorzałowa. Dwie strony tego samego człowieka.",
+  "Szczawo wysyła karty gdy jest trzeźwy. Na szczęście trafia się to wystarczająco często.",
+  // Więcej o Krimie
+  "Krime jest zagadką owiniętą w tajemnicę i wsadzoną w grę mobilną. Ale bije się dobrze.",
+  "Nikt nie zna prawdziwej tożsamości Krime. Krime zna twoją. I wie że karta czeka na wysłanie.",
+  "Krime pojawia się na walce, bije, znika. Jak duch — tyle że z obrażeniami w statystykach.",
+  // Więcej o Kasii
+  "Kasia jest wszędzie. Nawet teraz. Zwłaszcza teraz. Widzisz ją? Ona widzi ciebie.",
+  "Cicha nimfomanka gangu — Kasia. Nie krzyczy, nie wymaga, po prostu wie wszystko o wszystkich.",
+  "Kasia milczy więcej niż Artatuś. A to jest bardzo wysoka poprzeczka.",
+  // Więcej kombinowanych
+  "Tatuś analizuje, Bangmasta koduje, SaMaNtA wierci — gang ma specjalistów od wszystkiego.",
+  "Sonny szuka Domci. Domcia wzięła tabletkę. Krystka patrzy. Kickboxer kopie. Gang gra.",
+  "Ponton, KaY4k i gebels — familijny biznes bez pensji i bez żalu. Przynajmniej jeden z dwóch.",
+  "SaMaNtA wyrwieje ząb, Szczawo to przepije, Sonny tego nie zauważy. Trójca gangowa.",
+  "Joker na kasie, Bangmasta przy kodzie, Kickboxer w powietrzu — każdy robi co umie.",
+  "BUBU wrócił, Krystka ripostuje, Tatuś analizuje, Krime milczy. Normalny dzień w FAMILY.",
 ];
 
 // Teksty do rozpiski — pokazywane przy aktywnej wymianie
@@ -369,13 +402,20 @@ const TEKSTY_ROZPISKI = [
   "Joker jest na kasie w Lidlu. Zdążył potwierdzić. Zastanów się nad swoim życiem.",
   "Szczawo wysłał między pierwszym a drugim. Chwila precyzji w morzu gorzały.",
   "Artatuś nic nie mówi. Po prostu wysyła. Naśladować. Nie podziwiać. Wysyłać.",
-  "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystian przyjedzie z ripostą.",
+  "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystka przyjedzie z ripostą.",
   "Kasia jest wszędzie. Zwłaszcza tutaj. Zwłaszcza teraz. Wyślij.",
   "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
   "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
   "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
   "Bastek uciekł i nie wrócił. Sonia też. Kickboxer kopie w powietrze i wysyła kartę za nich.",
   "KaY4k nie dostaje pensji od Pontona, ale kartę wysyła. Charakter.",
+  "CHMARSONN nie marnuje słów. Ani na pogaduszki, ani na wymówki. Wyślij kartę.",
+  "Młody jest nowy. Jeszcze się uczy. Mimo to wysłał. Ty grasz dłużej — co masz do powiedzenia?",
+  "Krystka ma ripostę gotową. Nie testuj. Po prostu wyślij kartę.",
+  "Szczawo wysłał między kieliszkami. Trzeźwy czy nie — obowiązek obowiązuje.",
+  "Krime wysłał bez słowa. Bez pytania. Bez wymówki. Weź przykład z człowieka-zagadki.",
+  "Tatuś przeanalizował Twój brak akcji. Wyniki: nieoptymalne. Rozwiązanie: wyślij kartę.",
+  "Holenderskie trio wysłało. Kristoforo kręci, Artatuś milczy, Młody szuka przycisku. Ale wysłali.",
 ];
 
 const TIPY=[
@@ -3695,6 +3735,11 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
             <div style={{height:"100%",width:`${(potwierdzonychCount/Math.max(1,wszystkichNadawcow))*100}%`,background:"linear-gradient(90deg,#0c6,#0fa)",transition:"width 0.5s",borderRadius:4}}/>
           </div>
         </div>
+      </div>
+
+      {/* Tekst rozpiski */}
+      <div style={{fontSize:11,color:"#555",fontStyle:"italic",marginBottom:8,padding:"5px 10px",background:"rgba(255,255,255,0.02)",borderRadius:5,borderLeft:"2px solid #333"}}>
+        {TEKSTY_ROZPISKI[Math.floor(Date.now()/3600000)%TEKSTY_ROZPISKI.length]}
       </div>
 
       {/* Moja wymiana */}
