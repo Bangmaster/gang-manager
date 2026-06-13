@@ -1053,10 +1053,11 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
           const obecny = g.bylNaWalce;
           // Cykl: ⚪ nieznana → 🟢 był → 🔴 nie był → ⚠️ usprawiedliwiony → ⚪
           let nowa;
-          if (obecny === undefined) nowa = true;
-          else if (obecny === true) nowa = false;
-          else if (obecny === false) nowa = "U"; // usprawiedliwiony
-          else nowa = undefined;
+          // Cykl: null/undefined → true(był) → false(nieobecny) → "U"(usprawiedliwiony) → null
+          if (!obecny && obecny !== false) nowa = true;       // null/undefined → był
+          else if (obecny === true) nowa = false;              // był → nieobecny
+          else if (obecny === false) nowa = "U";              // nieobecny → usprawiedliwiony
+          else nowa = null;                                    // usprawiedliwiony → reset
           return { ...g, bylNaWalce: nowa };
         })
       };
@@ -1084,7 +1085,8 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
         const niebylo = w.gracze.filter(g => g.bylNaWalce === false).length;
         const usprawiedliwieni = w.gracze.filter(g => g.bylNaWalce === "U").length;
         const wygranaInfo = w.wygrana === true ? "🏆" : w.wygrana === false ? "💀" : null;
-        const maObecnosc = w.gracze.some(g => g.bylNaWalce !== undefined);
+        // Uwaga: Firebase może zwrócić null zamiast undefined
+        const maObecnosc = w.gracze.some(g => g.bylNaWalce != null || g.bylNaWalce === false);
         return (
           <div key={w.id} style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 12, marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1106,7 +1108,7 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
                 {isAdmin && (
                   <button onClick={() => {
                     const noweWalki = walki.map(x => x.id !== w.id ? x : {
-                      ...x, wygrana: x.wygrana === undefined ? true : x.wygrana === true ? false : undefined
+                      ...x, wygrana: x.wygrana == null ? true : x.wygrana === true ? false : null
                     });
                     zapiszWalki(noweWalki);
                   }} style={{
