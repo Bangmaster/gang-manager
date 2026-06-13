@@ -3912,20 +3912,15 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
 
   const przyciski=[
     {id:"szybkie",label:"⚡ Szybkie"},
-    {id:"skaner",label:"📷 Skaner"},
-    {id:"screen",label:"🖥️ Screen Capture"},
     {id:"postep",label:"📊 Postęp"},
-    {id:"kalkulator",label:"🧮 Kalkulator"},
     {id:"historia",label:"📜 Historia"},
     {id:"reset",label:"🔄 Reset"},
     {id:"backup",label:"💾 Backup"},
     {id:"push",label:"🔔 Powiadomienia"},
     {id:"duple",label:"🃏 Duple"},
-    {id:"ogloszenie",label:"📢 Ogłoszenie"},
     {id:"logi",label:"🔒 Logi logowań"},
     {id:"kalendarz",label:"📅 Kalendarz"},
     {id:"dashboard",label:"📊 Dashboard"},
-    {id:"taktyka",label:"⚔️ Taktyka"},
     {id:"kalkulator_event",label:"🧮 Kalkulator eventu"},
     {id:"tracker_krecen",label:"🎯 Tracker kręceń"},
     {id:"rzadkie_karty",label:"💎 Rzadkie karty"},
@@ -3950,16 +3945,12 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       </div>
 
       {tryb==="szybkie"&&<SzybkieWprowadzanie talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsoba} setWybranaOsoba={setWybranaOsoba} wybranaTalia={wybranaTalia} setWybranaTalia={setWybranaTalia}/>}
-      {tryb==="skaner"&&<SkanerNaZywo talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte} wybranaOsoba={wybranaOsobaSkaner} setWybranaOsoba={setWybranaOsobaSkaner}/>}
-      {tryb==="screen"&&<ScreenCapture talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} zapiszKarte={zapiszKarte}/>}
       {tryb==="postep"&&<PostepSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane}/>}
-      {tryb==="kalkulator"&&<KalkulatorSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty} typWymiany={typWymiany}/>}
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana} czlonkowie={czlonkowie}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture} walki={dane.walki||[]}/>}
       {tryb==="backup"&&<BackupDanych dane={dane} zapiszStrukture={zapiszStrukture}/>}
       {tryb==="push"&&<PowiadomieniaPush/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
-      {tryb==="ogloszenie"&&<OgloszenieGenerator czlonkowie={czlonkowie} posiadane={posiadane} talie={talie}/>}
       {tryb==="logi"&&<>
         <ZarzadzajiePinami czlonkowie={czlonkowie}/>
         <LogiLogowan isAdmin={isAdmin} zablokowane={zablokowane} onZablokuj={onZablokuj} onOdblokuj={onOdblokuj}/>
@@ -3971,7 +3962,6 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
         statusOnline={statusOnline}
         zapiszStrukture={zapiszStrukture}
       />}
-      {tryb==="taktyka"&&<TaktykaSezonu zapiszStrukture={zapiszStrukture}/>}
       {tryb==="kalkulator_event"&&<KalkulatorEventu/>}
       {tryb==="tracker_krecen"&&<TrackerKrecen/>}
       {tryb==="rzadkie_karty"&&<RzadkieKarty talie={talie} czlonkowie={czlonkowie} posiadane={posiadane} duplikaty={duplikaty}/>}
