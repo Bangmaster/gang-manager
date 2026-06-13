@@ -7527,11 +7527,15 @@ function KalkulatorEventu() {
     return {...p, ammoDoProg, mozna, paczkiDoProg, kluczeDoProg, ammoDodatkowe, efektywnyKoszt, paczkiNa1000, paczkiLacznie};
   });
 
-  // Znajdź optymalny próg = najwięcej paczek na ammo (które możemy osiągnąć)
+  // Znajdź najdalszy osiągalny próg (maksymalne paczki za posiadane ammo)
   const osiagalne = analiza.filter(a => a.mozna);
-  const optymalny = osiagalne.length > 0
-    ? osiagalne.reduce((best, a) => parseFloat(a.paczkiNa1000) > parseFloat(best.paczkiNa1000) ? a : best)
-    : analiza[0];
+  // Priorytet: próg z diamentową jeśli osiągalny, inaczej najdalszy możliwy
+  const zDiamentowa = osiagalne.filter(a => a.opis && (a.opis.includes("DIAMENTOWA") || a.opis.includes("💎")));
+  const optymalny = zDiamentowa.length > 0
+    ? zDiamentowa[zDiamentowa.length - 1] // ostatnia diamentowa którą możemy osiągnąć
+    : osiagalne.length > 0
+      ? osiagalne[osiagalne.length - 1] // najdalszy osiągalny próg
+      : analiza[0];
 
   const dodajProg = () => {
     if (!nowyProg.punkty || !nowyProg.nagroda) return;
