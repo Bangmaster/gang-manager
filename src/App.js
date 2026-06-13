@@ -7406,11 +7406,67 @@ function KalkulatorEventu() {
   const [szansa2, setSzansa2] = useState(()=>localStorage.getItem("slot_s2")||"15");
   const [szansa3, setSzansa3] = useState(()=>localStorage.getItem("slot_s3")||"5");
   const [ammoMam, setAmmoMam] = useState(()=>localStorage.getItem("slot_ammo")||"5000");
+  const [paczkiMam, setPaczkiMam] = useState(()=>localStorage.getItem("slot_paczki")||"0");
   const [licz0, setLicz0] = useState(0);
   const [licz1, setLicz1] = useState(0);
   const [licz2, setLicz2] = useState(0);
   const [licz3, setLicz3] = useState(0);
   const [pokazLicznik, setPokazLicznik] = useState(false);
+  // Szablony eventów
+  const SZABLONY_EVENTOW = {
+    "Prison Break": [
+      {id:101, punkty:50,    nagroda:10,  typ:"ammo",   opis:""},
+      {id:102, punkty:100,   nagroda:15,  typ:"ammo",   opis:""},
+      {id:103, punkty:250,   nagroda:1,   typ:"klucze", opis:"+ 25 ammo"},
+      {id:104, punkty:450,   nagroda:10,  typ:"ammo",   opis:"+ 3M exp"},
+      {id:105, punkty:650,   nagroda:1,   typ:"paczki", opis:"1 karta"},
+      {id:106, punkty:850,   nagroda:25,  typ:"ammo",   opis:""},
+      {id:107, punkty:1050,  nagroda:1,   typ:"paczki", opis:"1 karta"},
+      {id:108, punkty:2000,  nagroda:1,   typ:"paczki", opis:"2 karty + 50 ammo"},
+      {id:109, punkty:2400,  nagroda:1,   typ:"klucze", opis:""},
+      {id:110, punkty:2800,  nagroda:25,  typ:"ammo",   opis:"+ 8M exp"},
+      {id:111, punkty:3200,  nagroda:1,   typ:"paczki", opis:"1 karta + 3M exp"},
+      {id:112, punkty:3600,  nagroda:50,  typ:"ammo",   opis:""},
+      {id:113, punkty:6000,  nagroda:1,   typ:"paczki", opis:"6 kart + klucz"},
+      {id:114, punkty:6500,  nagroda:1,   typ:"paczki", opis:"2 karty + 8M exp"},
+      {id:115, punkty:7300,  nagroda:1,   typ:"klucze", opis:"+ 50 ammo"},
+      {id:116, punkty:7950,  nagroda:1,   typ:"paczki", opis:"6 kart"},
+      {id:117, punkty:8600,  nagroda:50,  typ:"ammo",   opis:"+ 16M exp"},
+      {id:118, punkty:13000, nagroda:1,   typ:"paczki", opis:"🌟 NOWA ZŁOTA + 100 ammo"},
+      {id:119, punkty:14000, nagroda:1,   typ:"paczki", opis:"💎 DIAMENTOWA + 75 ammo"},
+      {id:120, punkty:15000, nagroda:1,   typ:"paczki", opis:"6 kart"},
+      {id:121, punkty:16000, nagroda:2,   typ:"klucze", opis:""},
+      {id:122, punkty:17000, nagroda:1,   typ:"paczki", opis:"6 kart + 150 ammo"},
+      {id:123, punkty:27500, nagroda:1,   typ:"paczki", opis:"💎💎 NOWA DIAMENTOWA + 555 ammo"},
+    ],
+    "Perfect Masterplan": [
+      {id:201, punkty:50,    nagroda:1,  typ:"klucze", opis:""},
+      {id:202, punkty:100,   nagroda:1,  typ:"klucze", opis:""},
+      {id:203, punkty:250,   nagroda:1,  typ:"klucze", opis:""},
+      {id:204, punkty:450,   nagroda:1,  typ:"klucze", opis:""},
+      {id:205, punkty:650,   nagroda:1,  typ:"klucze", opis:""},
+      {id:206, punkty:850,   nagroda:1,  typ:"klucze", opis:""},
+      {id:207, punkty:1050,  nagroda:1,  typ:"klucze", opis:""},
+      {id:208, punkty:2000,  nagroda:2,  typ:"klucze", opis:""},
+      {id:209, punkty:2400,  nagroda:1,  typ:"klucze", opis:""},
+      {id:210, punkty:2800,  nagroda:1,  typ:"klucze", opis:""},
+      {id:211, punkty:3200,  nagroda:1,  typ:"klucze", opis:""},
+      {id:212, punkty:3600,  nagroda:1,  typ:"klucze", opis:""},
+      {id:213, punkty:6000,  nagroda:3,  typ:"klucze", opis:""},
+      {id:214, punkty:6500,  nagroda:1,  typ:"klucze", opis:""},
+      {id:215, punkty:7300,  nagroda:1,  typ:"klucze", opis:""},
+      {id:216, punkty:7950,  nagroda:1,  typ:"klucze", opis:""},
+      {id:217, punkty:8600,  nagroda:1,  typ:"klucze", opis:""},
+      {id:218, punkty:13000, nagroda:4,  typ:"klucze", opis:""},
+      {id:219, punkty:14000, nagroda:1,  typ:"klucze", opis:""},
+      {id:220, punkty:15000, nagroda:1,  typ:"klucze", opis:""},
+      {id:221, punkty:16000, nagroda:1,  typ:"klucze", opis:""},
+      {id:222, punkty:17000, nagroda:1,  typ:"klucze", opis:""},
+      {id:223, punkty:27500, nagroda:5,  typ:"klucze", opis:""},
+    ],
+  };
+
+  const [aktywnyEvent, setAktywnyEvent] = useState(null);
   const [progi, setProgi] = useState([
     {id:1, punkty:500,   nagroda:1,  typ:"paczki", opis:""},
     {id:2, punkty:1000,  nagroda:2,  typ:"paczki", opis:""},
@@ -7425,6 +7481,7 @@ function KalkulatorEventu() {
   const [edytujSzablony] = useState(false); // eslint-disable-line no-unused-vars
 
   const m = parseFloat(mnoznik) || 1;
+  const paczkiJuzMam = parseInt(paczkiMam) || 0;
   const p1 = parseFloat(szansa1)/100 || 0;
   const p2 = parseFloat(szansa2)/100 || 0;
   const p3 = parseFloat(szansa3)/100 || 0;
@@ -7455,6 +7512,8 @@ function KalkulatorEventu() {
     const paczkiDoProg = progsSorted.slice(0, i+1)
       .filter(pp => pp.typ === "paczki")
       .reduce((s, pp) => s + (parseFloat(pp.nagroda)||0), 0);
+    // Łącznie paczek z już zebranych + z eventów
+    const paczkiLacznie = paczkiJuzMam + paczkiDoProg;
     const kluczeDoProg = progsSorted.slice(0, i+1)
       .filter(pp => pp.typ === "klucze")
       .reduce((s, pp) => s + (parseFloat(pp.nagroda)||0), 0);
@@ -7493,12 +7552,20 @@ function KalkulatorEventu() {
         </div>
       </div>
 
-      {/* AMMO */}
-      <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:8,padding:10,marginBottom:10}}>
-        <div style={{fontSize:11,color:"#fa0",marginBottom:4,fontWeight:"bold"}}>🔫 Posiadane ammo</div>
-        <input type="number" value={ammoMam} onChange={e=>{setAmmoMam(e.target.value);localStorage.setItem("slot_ammo",e.target.value);}}
-          style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #fa033",
-            borderRadius:6,color:"#fa0",fontSize:18,fontWeight:"bold",boxSizing:"border-box"}}/>
+      {/* AMMO + PACZKI */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+        <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:8,padding:10}}>
+          <div style={{fontSize:11,color:"#fa0",marginBottom:4,fontWeight:"bold"}}>🔫 Posiadane ammo</div>
+          <input type="number" value={ammoMam} onChange={e=>{setAmmoMam(e.target.value);localStorage.setItem("slot_ammo",e.target.value);}}
+            style={{width:"100%",padding:"10px 8px",background:"#12122a",border:"1px solid #fa033",
+              borderRadius:6,color:"#fa0",fontSize:18,fontWeight:"bold",boxSizing:"border-box"}}/>
+        </div>
+        <div style={{background:"rgba(135,206,235,0.06)",border:"1px solid #87CEEB33",borderRadius:8,padding:10}}>
+          <div style={{fontSize:11,color:"#87CEEB",marginBottom:4,fontWeight:"bold"}}>📦 Paczki już zebrane</div>
+          <input type="number" value={paczkiMam} onChange={e=>{setPaczkiMam(e.target.value);localStorage.setItem("slot_paczki",e.target.value);}}
+            min="0" style={{width:"100%",padding:"10px 8px",background:"#12122a",border:"1px solid #87CEEB33",
+              borderRadius:6,color:"#87CEEB",fontSize:18,fontWeight:"bold",boxSizing:"border-box"}}/>
+        </div>
       </div>
 
       {/* MNOŻNIK */}
@@ -7600,6 +7667,69 @@ function KalkulatorEventu() {
         )}
       </div>
 
+      {/* GŁÓWNY EVENT 7-DNIOWY */}
+      <div style={{background:"rgba(255,50,150,0.06)",border:"1px solid #ff328055",borderRadius:8,padding:10,marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:"bold",color:"#ff6ab0",marginBottom:4}}>🏆 Główny event 7-dniowy — progi paczek</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[
+            {prog:60, nagroda:"1 💎 nowa diamentowa", kolor:"#87CEEB"},
+            {prog:90, nagroda:"2 💎 nowe diamentowe", kolor:"#64c8ff"},
+            {prog:120, nagroda:"3 💎 nowe diamentowe", kolor:"#ffd700"},
+          ].map(p => {
+            const brakuje = Math.max(0, p.prog - paczkiJuzMam);
+            const osiagniety = paczkiJuzMam >= p.prog;
+            return (
+              <div key={p.prog} style={{flex:1,minWidth:80,padding:"8px 6px",borderRadius:6,textAlign:"center",
+                background:osiagniety?"rgba(0,200,100,0.1)":"rgba(0,0,0,0.3)",
+                border:`1px solid ${osiagniety?"#0c6":p.kolor}33`}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:osiagniety?"#0c6":p.kolor}}>{p.prog} 📦</div>
+                <div style={{fontSize:10,color:"#aaa",margin:"2px 0"}}>{p.nagroda}</div>
+                {osiagniety
+                  ? <div style={{fontSize:9,color:"#0c6"}}>✓ osiągnięty!</div>
+                  : <div style={{fontSize:10,color:"#fa0",fontWeight:"bold"}}>brakuje: {brakuje} 📦</div>
+                }
+              </div>
+            );
+          })}
+        </div>
+        <div style={{fontSize:10,color:"#555",marginTop:6}}>
+          Każda paczka z eventów pobocznych liczy się do tego licznika. Cel: 120 paczek = 3 nowe diamentowe 💎
+        </div>
+      </div>
+
+      {/* WYBÓR SZABLONU EVENTU */}
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:10,marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:"bold",color:"#aaa",marginBottom:8}}>📋 Wybierz event poboczny</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {Object.keys(SZABLONY_EVENTOW).map(nazwa => (
+            <button key={nazwa} onClick={() => {
+              setProgi(SZABLONY_EVENTOW[nazwa]);
+              setAktywnyEvent(nazwa);
+            }} style={{
+              padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:"bold",
+              background:aktywnyEvent===nazwa?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
+              border:aktywnyEvent===nazwa?"none":"1px solid #2a2a3a",
+              color:aktywnyEvent===nazwa?"#000":"#888",
+            }}>{nazwa}</button>
+          ))}
+          <button onClick={() => { setAktywnyEvent(null); }} style={{
+            padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:11,
+            background:"rgba(255,50,50,0.08)",border:"1px solid #f5544433",color:"#f5544488",
+          }}>✕ Własny</button>
+        </div>
+        {aktywnyEvent && (
+          <div style={{fontSize:10,color:"#555",marginTop:6}}>
+            Wczytano: <strong style={{color:"#ffd700"}}>{aktywnyEvent}</strong> · {progi.length} progów ·
+            Paczki łącznie: <strong style={{color:"#87CEEB"}}>
+              {progi.filter(p=>p.typ==="paczki").reduce((s,p)=>s+(parseFloat(p.nagroda)||0),0)} 📦
+            </strong>
+            {progi.some(p=>p.opis.includes("DIAMENTOWA")) && (
+              <span style={{color:"#64c8ff",marginLeft:6}}>· 💎 Zawiera diamentowe!</span>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* PROGI EVENTU */}
       <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:10,marginBottom:12}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -7649,10 +7779,16 @@ function KalkulatorEventu() {
             }}>
               <div style={{textAlign:"center"}}>
                 <div style={{fontSize:11,fontWeight:"bold",color:a.mozna?"#ddd":"#444"}}>{a.punkty.toLocaleString()}</div>
-                {a.opis&&<div style={{fontSize:8,color:"#ffd700"}}>{a.opis}</div>}
+                {a.opis&&<div style={{fontSize:8,color:
+                  a.opis.includes("DIAMENTOWA")||a.opis.includes("💎")?"#64c8ff":
+                  a.opis.includes("ZŁOTA")||a.opis.includes("🌟")?"#ffd700":"#666"
+                }}>{a.opis}</div>}
               </div>
               <div style={{textAlign:"center"}}>
-                <span style={{fontSize:11,color:typInfo.kolor,fontWeight:"bold"}}>{a.nagroda} {typInfo.label.split(" ")[0]}</span>
+                <span style={{fontSize:11,fontWeight:"bold",color:
+                  a.opis.includes("DIAMENTOWA")||a.opis.includes("💎")?"#64c8ff":
+                  a.opis.includes("ZŁOTA")||a.opis.includes("🌟")?"#ffd700":typInfo.kolor
+                }}>{a.nagroda} {typInfo.label.split(" ")[0]}</span>
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{fontSize:11,color:a.mozna?"#fa0":"#555",fontWeight:"bold"}}>{a.ammoDoProg.toLocaleString()}</div>
@@ -7660,6 +7796,7 @@ function KalkulatorEventu() {
               </div>
               <div style={{textAlign:"center"}}>
                 <span style={{fontSize:12,fontWeight:"bold",color:"#87CEEB"}}>{a.paczkiDoProg}</span>
+                {paczkiJuzMam>0&&<span style={{fontSize:9,color:"#0c6",marginLeft:2}}>={a.paczkiLacznie}📦</span>}
                 {a.kluczeDoProg>0&&<span style={{fontSize:9,color:"#ffd700",marginLeft:3}}>+{a.kluczeDoProg}🗝️</span>}
               </div>
               <div style={{textAlign:"center"}}>
@@ -7688,7 +7825,8 @@ function KalkulatorEventu() {
               {!optymalny.mozna&&<span style={{color:"#f55"}}> ❌ brakuje {(optymalny.ammoDoProg-ammo).toLocaleString()}</span>}
               {optymalny.ammoDodatkowe>0&&<span style={{color:"#0c6",marginLeft:4}}>(odzyskasz {optymalny.ammoDodatkowe} z nagród)</span>}
             </div>
-            <div>Zbierzesz: <strong style={{color:"#87CEEB"}}>{optymalny.paczkiDoProg} 📦 paczek</strong>
+            <div>Zbierzesz z eventu: <strong style={{color:"#87CEEB"}}>{optymalny.paczkiDoProg} 📦 paczek</strong>
+              {paczkiJuzMam>0&&<span style={{color:"#0c6"}}> → łącznie {optymalny.paczkiLacznie} 📦</span>}
               {optymalny.kluczeDoProg>0&&<span style={{color:"#ffd700"}}> + {optymalny.kluczeDoProg} 🗝️ kluczy</span>}
             </div>
             <div>Efektywność: <strong style={{color:"#0c6"}}>{optymalny.paczkiNa1000} paczek / 1000 ammo</strong></div>
