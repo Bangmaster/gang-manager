@@ -7524,7 +7524,7 @@ function KalkulatorEventu() {
     const efektywnyKoszt = Math.max(0, ammoDoProg - ammoDodatkowe);
     // Paczki na 1000 ammo efektywnego
     const paczkiNa1000 = efektywnyKoszt > 0 ? (paczkiDoProg / efektywnyKoszt * 1000).toFixed(1) : "∞";
-    return {...p, ammoDoProg, mozna, paczkiDoProg, kluczeDoProg, ammoDodatkowe, efektywnyKoszt, paczkiNa1000};
+    return {...p, ammoDoProg, mozna, paczkiDoProg, kluczeDoProg, ammoDodatkowe, efektywnyKoszt, paczkiNa1000, paczkiLacznie};
   });
 
   // Znajdź optymalny próg = najwięcej paczek na ammo (które możemy osiągnąć)
