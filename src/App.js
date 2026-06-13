@@ -3907,7 +3907,6 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={}}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
-  const [wybranaOsobaSkaner,setWybranaOsobaSkaner]=useState(0);
   const [wybranaTalia,setWybranaTalia]=useState(0);
 
   const przyciski=[
@@ -4191,6 +4190,7 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
   );
 }
 
+// eslint-disable-next-line no-unused-vars
 function SkanerNaZywo({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,wybranaOsoba,setWybranaOsoba}) {
   const videoRef=useRef(null);
   const canvasRef=useRef(null);
@@ -4627,6 +4627,7 @@ function PostepSezonu({talie,czlonkowie,posiadane}) {
 // ============================================================
 // KALKULATOR SEZONU
 // ============================================================
+// eslint-disable-next-line no-unused-vars
 function KalkulatorSezonu({talie,czlonkowie,posiadane,duplikaty,typWymiany}) {
   const typ=typWymiany==="złote"?"złota":"diamentowa";
 
@@ -5503,6 +5504,7 @@ function KalendarzEventow() {
 // ============================================================
 // SCREEN CAPTURE — auto-wykrywanie talii z ekranu gry
 // ============================================================
+// eslint-disable-next-line no-unused-vars
 function ScreenCapture({talie,czlonkowie,posiadane,duplikaty,zapiszKarte}) {
   const videoRef=useRef(null);
   const canvasRef=useRef(null);
@@ -5922,6 +5924,7 @@ Zwróć WYŁĄCZNIE JSON:
 // ============================================================
 // GENERATOR OGŁOSZENIA REKRUTACYJNEGO — HTML
 // ============================================================
+// eslint-disable-next-line no-unused-vars
 function OgloszenieGenerator({czlonkowie, posiadane, talie}) {
   const [ileMiejsc, setIleMiejsc] = useState(2);
   const [poziomy, setPoziomy] = useState({});
@@ -6771,6 +6774,7 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
 // ============================================================
 // TAKTYKA SEZONU — notatki, sojusze, plany
 // ============================================================
+// eslint-disable-next-line no-unused-vars
 function TaktykaSezonu({zapiszStrukture}) {
   const [dane, setDane] = useState(null);
   const [zapisywanie, setZapisywanie] = useState(false);
