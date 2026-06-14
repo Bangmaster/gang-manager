@@ -1895,6 +1895,62 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
     // Gdy brak wolnego dawcy — sprawdź czy zajęty dawca ma alternatywę
     // i jeśli tak, podmień go tam gdzie jest mniej ważny
 
+    // ============================================================
+    // TRYB 7-9 — priorytetowo obsługuje talie z kręgów 7, 8, 9
+    // ============================================================
+    if (tryb === "krag79") {
+      const priorytet79 = (st) => {
+        const brakT = st.brakT.length;
+        const brakO = st.brakO.length;
+        let grupa;
+        if (brakT === 1 && brakO === 0) grupa = 1;
+        else if (brakT === 2 && brakO === 0) grupa = 2;
+        else if (brakT === 1 && brakO === 1) grupa = 3;
+        else if ((brakT === 2 && brakO === 1) || (brakT === 1 && brakO === 2)) grupa = 4;
+        else if (brakT === 2 && brakO === 2) grupa = 5;
+        else return null; // 3+ brakujących → normalna pętla
+        return grupa * 1000000 - st.nagroda;
+      };
+
+      const stany79 = staneTalii
+        .filter(st => [7,8,9].includes(st.talia.numer) && priorytet79(st) !== null)
+        .sort((a, b) => priorytet79(a) - priorytet79(b));
+
+      for (const st of stany79) {
+        if (!czyMozeDostac(st.osoba.id)) continue;
+        const karta = st.brakT[0];
+        if (!karta) continue;
+        let dawca = null;
+        let dawcaFallback = null;
+        for (const o2 of dawcy) {
+          if (o2.id === st.osoba.id || wysylajacy.has(o2.id)) continue;
+          if (!duplikaty[`${o2.id}_${st.talia.id}_${karta.nazwa}`]) continue;
+          if (dawcaRezerwowany(o2.id, st.nagroda)) {
+            if (!dawcaFallback) dawcaFallback = o2;
+            continue;
+          }
+          dawca = o2; break;
+        }
+        if (!dawca) dawca = dawcaFallback;
+        if (!dawca) continue;
+        wysylajacy.add(dawca.id);
+        zaznaczDostala(st.osoba.id);
+        planoweWymiany.push({
+          od: dawca.nazwa, do: st.osoba.nazwa,
+          karta: karta.nazwa, talia: st.talia.nazwa,
+          nagroda: st.nagroda,
+          faza: obliczFaze(st.brakT.length, st.brakO.length, typWymiany),
+          brakTCount: st.brakT.length, brakOCount: st.brakO.length,
+          trudna: st.trudna,
+        });
+      }
+
+      // Talie 7-9 z 3+ brakującymi pozostają w staneTalii dla normalnej pętli
+      // Usuń ze staneTalii te które już obsłużyliśmy (zostały wysłane)
+
+      // staneTalii zostaje niezmienione — normalna pętla obsłuży resztę
+    }
+
     const priorytetFazy = (faza) => {
       const kolejnosc = [10,20,11,21,12,22,30,31,32,41,42,51,52];
       const idx = kolejnosc.indexOf(faza);
