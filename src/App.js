@@ -2435,6 +2435,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           {id:"vip",label:"👑 VIP — dobij jedną osobę"},
           {id:"celowany",label:"🎯 Celowany — wybierz osoby"},
           {id:"wylacz110",label:"🚫 Wyłącz 110-120"},
+          {id:"krag79",label:"7️⃣ Tryb 7-9"},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTrybWymiany(t.id)} style={{
             padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
