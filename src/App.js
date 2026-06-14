@@ -445,6 +445,7 @@ const AVATARY = {
   "kickboxer": "🥋",      // sztuki walki
   "kristoforo": "🌷🌀",   // tulipan + wiatrak
   "artatuś": "🍺🤫",     // piwo + cisza
+  "artatuś": "🍺🤫",
   "chmarsonn": "📺❌",    // brak TV
   "kasia": "👀",          // obserwuje wszystkich
   "krime": "❓🥷",        // tajemniczy
