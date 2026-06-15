@@ -436,6 +436,47 @@ const TIPY=[
   "💡 Kickboxer tip: Kopiąc w powietrze nie wyślesz karty. Tutaj jest przycisk.",
 ];
 
+// Mapa avatarów członków gangu
+const AVATARY = {
+  "samanta": "🦷",        // dentysta sadystka
+  "fallven": "🇪🇸🤨",     // hiszpańska flaga + zdezorientowany
+  "sonny": "🚬😵‍💫",      // dymek + zagubiony
+  "bubu": "🔄",           // powrót do gangu
+  "kickboxer": "🥋",      // sztuki walki
+  "kristoforo": "🌷🌀",   // tulipan + wiatrak
+  "artatuś": "🍺🤫",     // piwo + cisza
+  "chmarsonn": "📺❌",    // brak TV
+  "kasia": "👀",          // obserwuje wszystkich
+  "krime": "❓🥷",        // tajemniczy
+  "szczawo": "🥃",        // gorzała
+  "tatuś": "💡📊",        // żarówki + analiza
+  "ponton": "🐱🇩🇪",     // kot + Niemcy
+  "bodek": "🇧🇾",         // Białorusin
+  "joker": "🛒",          // kasa Lidla
+  "krystian": "👨‍🦲",    // łysy z brodą
+  "bangmasta": "🤓",      // okulary
+  "kay4k": "💸❌",        // brak pensji
+  "młody": "🇳🇱🚬",      // Holandia + dymek
+  "domcia": "💊",         // tabletki
+  "sonia": "🏃‍♀️",       // uciekła
+  "bastek": "🏃",         // uciekł
+  "leonidas": "⚔️",       // nowy member
+};
+
+function getAvatar(nazwa) {
+  if (!nazwa) return "";
+  const key = nazwa.toLowerCase()
+    .replace(/™fam™|fam™|™fam/gi, "")
+    .replace(/\s+/g, "")
+    .trim();
+  // Szukaj po kluczu lub częściowym dopasowaniu
+  if (AVATARY[key]) return AVATARY[key];
+  for (const [k, v] of Object.entries(AVATARY)) {
+    if (key.includes(k) || k.includes(key)) return v;
+  }
+  return "👤";
+}
+
 function App() {
   // sessionStorage = auto-wylogowanie przy zamknięciu karty/przeglądarki
   const [zalogowany, setZalogowany] = useState(() => {
@@ -1353,12 +1394,17 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0}) {
+function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0,limitKartOsoby={}) {
   // czlonkowie = odbiorcy (aktywni), wszyscyCzlonkowie = dawcy (wszyscy łącznie z wyłączonymi)
   const dawcy = wszyscyCzlonkowie || czlonkowie;
   // Licznik kart przydzielonych per odbiorca (do limitu maxKartNaOsobe)
   const kartDlaosoby = {}; // osobaId -> count
-  const czyMozeDostac = (osobaId) => maxKartNaOsobe <= 0 || (kartDlaosoby[osobaId]||0) < maxKartNaOsobe;
+  const czyMozeDostac = (osobaId) => {
+    const ile = kartDlaosoby[osobaId] || 0;
+    // Indywidualny limit per osoba — priorytet nad globalnym
+    if (limitKartOsoby[osobaId] !== undefined) return ile < limitKartOsoby[osobaId];
+    return maxKartNaOsobe <= 0 || ile < maxKartNaOsobe;
+  };
   const zaznaczDostala = (osobaId) => { kartDlaosoby[osobaId] = (kartDlaosoby[osobaId]||0) + 1; };
 
   // TRYB SPRAWIEDLIWY — oblicz "dług" każdej osoby
@@ -2583,7 +2629,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   border:zaznaczona?"1px solid #ffd70033":"1px solid #1a1a2e",
                   borderRadius:6,
                 }}>
-                  <span style={{flex:1,fontSize:12,color:zaznaczona?"#ddd":"#666"}}>{c.nazwa}</span>
+                  <span style={{flex:1,fontSize:12,color:zaznaczona?"#ddd":"#666"}}><span style={{marginRight:3}}>{getAvatar(c.nazwa)}</span>{c.nazwa}</span>
                   {[0,1,2,3].map(n=>(
                     <button key={n} onClick={()=>setCelowaKolejka(prev=>({...prev,[c.id]:n}))} style={{
                       padding:"3px 10px",borderRadius:5,cursor:"pointer",fontSize:12,
@@ -3384,7 +3430,7 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
               </>
             ):(
               <>
-                <span style={{flex:1,fontSize:13,color:"#ddd"}}>{c.nazwa}</span>
+                <span style={{flex:1,fontSize:13,color:"#ddd"}}><span style={{marginRight:4}}>{getAvatar(c.nazwa)}</span>{c.nazwa}</span>
                 {(c.krag||1) > 1 && (
                   <span style={{fontSize:10,padding:"1px 6px",background:"rgba(138,43,226,0.2)",border:"1px solid #8a2be255",borderRadius:10,color:"#da70d6",fontWeight:"bold"}}>
                     K{c.krag||1}
@@ -3821,7 +3867,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           </div>
           {mojePozycje.map((w,i)=>(
             <div key={i} style={{fontSize:13,color:"#ddd",padding:"5px 0",borderBottom:"1px solid #12122a"}}>
-              Wyślij <strong style={{color:"#ffd700"}}>{w.karta}</strong> do <strong style={{color:"#0c6"}}>{w.do}</strong>
+              Wyślij <strong style={{color:"#ffd700"}}>{w.karta}</strong> do <strong style={{color:"#0c6"}}>{getAvatar(w.do)} {w.do}</strong>
               <span style={{fontSize:11,color:"#666",marginLeft:6}}>[{w.talia}]</span>
             </div>
           ))}
@@ -3888,7 +3934,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                       <span style={{fontSize:12,color:"#ddd",flex:1}}>
                         <strong style={{color:"#ffd700"}}>{w.karta}</strong>
                         <span style={{color:"#888",fontSize:11}}> do </span>
-                        <strong>{w.do}</strong>
+                        <strong>{getAvatar(w.do)} {w.do}</strong>
                         <span style={{fontSize:10,color:"#555",marginLeft:6}}>[{w.talia}]</span>
                       </span>
                       {isAdmin&&(
@@ -6732,7 +6778,7 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
             }}>
               <span style={{fontSize:11,color:"#555",width:18,textAlign:"right"}}>{i+1}.</span>
               <div style={{width:6,height:6,borderRadius:"50%",background:isOnline?"#0c6":"#333",flexShrink:0,boxShadow:isOnline?"0 0 4px #0c6":"none"}}/>
-              <span style={{flex:1,fontSize:12,color:i===0?"#ffd700":"#ddd"}}>{s.c.nazwa}</span>
+              <span style={{flex:1,fontSize:12,color:i===0?"#ffd700":"#ddd"}}><span style={{marginRight:3}}>{getAvatar(s.c.nazwa)}</span>{s.c.nazwa}</span>
               {s.c.krag > 1 && <span style={{fontSize:9,color:"#da70d6"}}>K{s.c.krag}</span>}
               <span style={{fontSize:10,color:"#555"}}>{s.zamkniete}/{talie.length} talii</span>
               <div style={{width:60,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
@@ -6758,7 +6804,7 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
           return (
             <div key={r.c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",marginBottom:2,borderRadius:5}}>
               <div style={{width:6,height:6,borderRadius:"50%",background:isOnline?"#0c6":"#333",flexShrink:0}}/>
-              <span style={{flex:1,fontSize:12,color:"#ddd"}}>{r.c.nazwa}</span>
+              <span style={{flex:1,fontSize:12,color:"#ddd"}}><span style={{marginRight:3}}>{getAvatar(r.c.nazwa)}</span>{r.c.nazwa}</span>
               <span style={{fontSize:10,color:"#555",width:60,textAlign:"right"}}>{r.ostatnia ? dataTemu(r.ostatnia) : "brak"}</span>
               <div style={{width:80,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${pct}%`,background:kolor,borderRadius:3}}/>
