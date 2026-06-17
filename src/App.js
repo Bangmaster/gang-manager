@@ -463,6 +463,7 @@ const AVATARY = {
   "leonidas": "⚔️",       // nowy member
 };
 
+// eslint-disable-next-line no-unused-vars
 function getAvatar(nazwa) {
   if (!nazwa) return "";
   const key = nazwa.toLowerCase()
