@@ -1301,20 +1301,22 @@ function obliczOdznaki(wszyscy, walki, lacznaWalka) {
       : 0;
 
     // 👑 Król sezonu
-    if (poz === 1) dodaj(g.nazwa, "👑", "Król sezonu", "Najwięcej obrażeń w całym sezonie");
+    if (poz === 1) dodaj(g.nazwa, "👑", "Król sezonu", "Najwięcej obrażeń w całym sezonie. Gang kłania się w pas. Lub udaje że kłania.");
 
-    // ⚔️ Walczący dla gangu — top 3
-    if (poz <= 3 && poz > 1) dodaj(g.nazwa, "⚔️", "Walczący dla gangu", `Top ${poz} w rankingu obrażeń`);
+    // Podium
+    if (poz === 2) dodaj(g.nazwa, "🥈", "Wicemistrz", "Drugie miejsce. Tak blisko tronu. Tak daleko od niego.");
+    if (poz === 3) dodaj(g.nazwa, "🥉", "Brązowy wojownik", "Trzecia pozycja. Podium jest podium. Nikt nie mówi że to złote.");
+    if (poz <= 5 && poz > 3) dodaj(g.nazwa, "⚔️", "Walczący dla gangu", `Top ${poz} w rankingu. Solidnie. Bez fajerwerków, ale solidnie.`);
 
     // 🎯 Niezawodny — 100% frekwencja (min 2 walki)
-    if (frekw === 100 && lacznaWalka >= 2) dodaj(g.nazwa, "🎯", "Niezawodny", "Był na każdej walce sezonu");
+    if (frekw === 100 && lacznaWalka >= 2) dodaj(g.nazwa, "🎯", "Niezawodny", "Był na każdej walce sezonu. Albo nie ma życia poza gangiem, albo życie poza gangiem jest gorsze. Nie pytamy.");
 
     // 💀 Duch — mniej niż 30% frekwencja
-    if (frekw < 30 && lacznaWalka >= 3) dodaj(g.nazwa, "💀", "Duch", `Tylko ${frekw}% frekwencja — prawie go nie było`);
+    if (frekw < 30 && lacznaWalka >= 3) dodaj(g.nazwa, "💀", "Duch gangu", `${frekw}% frekwencja. Oficjalnie jest w gangu. Nieoficjalnie — legenda miejska.`);
 
     // 🛡️ Tarcza — najwięcej tarcz
     const maxTarcze = Math.max(...wszyscy.map(x => x.tarczeLacznie));
-    if (g.tarczeLacznie === maxTarcze && maxTarcze > 0) dodaj(g.nazwa, "🛡️", "Mur obronny", `${g.tarczeLacznie} tarcz w sezonie — więcej niż ktokolwiek`);
+    if (g.tarczeLacznie === maxTarcze && maxTarcze > 0) dodaj(g.nazwa, "🛡️", "Mur obronny", `${g.tarczeLacznie} tarcz w sezonie. Stał jak ściana. Dosłownie.`);
 
     // 🪱 Pasożyt eventu — wysoki lvl, niskie obrażenia
     const histLvl = g.historiaPoziomow || [];
@@ -1326,25 +1328,27 @@ function obliczOdznaki(wszyscy, walki, lacznaWalka) {
       const median = medianLvl[Math.floor(medianLvl.length/2)] || 0;
       const lvlAkt = histLvl[histLvl.length-1].poziom;
       if (przyrost >= 10 && g.obrazeniaLacznie < srednia * 0.4 && lvlAkt > median)
-        dodaj(g.nazwa, "🪱", "Pasożyt eventu", `+${przyrost} lvl, ale tylko ${Math.round(g.obrazeniaLacznie/1000)}k obrażeń — grał dla siebie`);
+        dodaj(g.nazwa, "🪱", "Pasożyt eventu", `+${przyrost} lvl w sezonie, ale tylko ${Math.round(g.obrazeniaLacznie/1000)}k obrażeń. Aktywny gracz. Dla siebie.`);
     }
 
-    // 🚀 Rakieta — największy awans formy (trend pozycji)
-    // 📉 Kamień — największy spadek (obsługiwane niżej przez trend)
+    // 🧊 Zimna krew — najmniej obrażeń wśród aktywnych
+    const aktywni = wszyscy.filter(x => x.uczestnictwa > 0);
+    const minObr = Math.min(...aktywni.map(x => x.obrazeniaLacznie));
+    if (g.obrazeniaLacznie === minObr && g.uczestnictwa > 0 && aktywni.length > 1)
+      dodaj(g.nazwa, "🧊", "Zimna krew", `${Math.round(g.obrazeniaLacznie/1000)}k obrażeń — najmniej w gangu. Może oszczędzał amunicję. Na pewno.`);
 
-    // 💎 Kolekcjoner — najwięcej zamkniętych talii (z historii wymian)
-    // — pomijamy bo nie mamy tych danych per osoba bezpośrednio
+    // 💥 Berserker — rekord obrażeń w jednej walce
+    const maxJednWalka = Math.max(...(g.historiaObr||[]).map(h => h.obr), 0);
+    const maxGangowy = Math.max(...wszyscy.map(x => Math.max(...(x.historiaObr||[{obr:0}]).map(h => h.obr), 0)));
+    if (maxJednWalka > 0 && maxJednWalka === maxGangowy)
+      dodaj(g.nazwa, "💥", "Berserker", `${formatLiczby(maxJednWalka)} obrażeń w jednej walce. Rekord gangu. Coś musiało go wkurzyć.`);
 
-    // 🥈🥉 Podium
-    if (poz === 2) dodaj(g.nazwa, "🥈", "Wicemistrz", "Drugie miejsce w rankingu obrażeń");
-    if (poz === 3) dodaj(g.nazwa, "🥉", "Trzecie miejsce", "Trzecia pozycja w rankingu obrażeń");
-
-    // ⚠️ Usprawiedliwiony — był usprawiedliwiony co najmniej raz
+    // ⚠️ Usprawiedliwiony
     const ileUsp = (walki || []).reduce((s, w) => {
       const gracz = w.gracze.find(x => x.nazwa === g.nazwa);
       return s + (gracz?.bylNaWalce === "U" ? 1 : 0);
     }, 0);
-    if (ileUsp > 0) dodaj(g.nazwa, "⚠️", "Usprawiedliwiony", `${ileUsp}x nieobecny z powodu`);
+    if (ileUsp > 0) dodaj(g.nazwa, "⚠️", "Z powodem nieobecny", `${ileUsp}x usprawiedliwiony. Gang zrozumiał. Tym razem.`);
   });
 
   // 🚀 Rakieta i 📉 Kamień — na podstawie pozycji w końcowym rankingu sezonu (łączne obrażenia)
