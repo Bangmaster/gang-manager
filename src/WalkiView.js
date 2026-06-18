@@ -1347,30 +1347,45 @@ function obliczOdznaki(wszyscy, walki, lacznaWalka) {
     if (ileUsp > 0) dodaj(g.nazwa, "⚠️", "Usprawiedliwiony", `${ileUsp}x nieobecny z powodu`);
   });
 
-  // 🚀 Rakieta i 📉 Kamień — na podstawie trendu pozycji
-  if (walki && walki.length >= 3) {
+  // 🚀 Rakieta i 📉 Kamień — na podstawie pozycji w końcowym rankingu sezonu (łączne obrażenia)
+  // Porównujemy pozycję w 1. połowie sezonu vs 2. połowie
+  if (walki && walki.length >= 4) {
     const walkiSort = [...walki].sort((a,b) => new Date(a.data)-new Date(b.data));
-    const trendy = {};
-    walkiSort.forEach(w => {
-      const sorted = [...w.gracze].sort((a,b) => b.obrazenia-a.obrazenia);
-      sorted.forEach((g,i) => {
-        if (!trendy[g.nazwa]) trendy[g.nazwa] = [];
-        trendy[g.nazwa].push(i+1);
-      });
+    const pol = Math.floor(walkiSort.length / 2);
+    const pierwszaPol = walkiSort.slice(0, pol);
+    const drugaPol = walkiSort.slice(pol);
+
+    // Ranking łącznych obrażeń per gracz w każdej połowie
+    const obliczRanking = (walkiArr) => {
+      const suma = {};
+      walkiArr.forEach(w => w.gracze.forEach(g => {
+        suma[g.nazwa] = (suma[g.nazwa] || 0) + g.obrazenia;
+      }));
+      return Object.entries(suma)
+        .sort((a,b) => b[1]-a[1])
+        .map(([nazwa], i) => ({ nazwa, poz: i+1 }));
+    };
+
+    const rank1 = obliczRanking(pierwszaPol);
+    const rank2 = obliczRanking(drugaPol);
+
+    const zmiany = [];
+    rank2.forEach(r2 => {
+      const r1 = rank1.find(x => x.nazwa === r2.nazwa);
+      if (!r1) return;
+      const zmiana = r1.poz - r2.poz; // + = awans w 2. połowie
+      zmiany.push({ nazwa: r2.nazwa, zmiana, poz1: r1.poz, poz2: r2.poz });
     });
-    let maxAwans = null, maxSpadek = null;
-    Object.entries(trendy).forEach(([nazwa, pozycje]) => {
-      if (pozycje.length < 2) return;
-      const delty = [];
-      for (let i=1; i<pozycje.length; i++) delty.push(pozycje[i-1]-pozycje[i]);
-      const sr = delty.reduce((s,v)=>s+v,0)/delty.length;
-      if (!maxAwans || sr > maxAwans.sr) maxAwans = { nazwa, sr };
-      if (!maxSpadek || sr < maxSpadek.sr) maxSpadek = { nazwa, sr };
-    });
-    if (maxAwans && maxAwans.sr > 0.5)
-      dodaj(maxAwans.nazwa, "🚀", "Forma rosnąca", `Średnio +${maxAwans.sr.toFixed(1)} miejsca/walkę w górę`);
-    if (maxSpadek && maxSpadek.sr < -0.5)
-      dodaj(maxSpadek.nazwa, "📉", "Forma spadkowa", `Średnio ${maxSpadek.sr.toFixed(1)} miejsca/walkę w dół`);
+
+    const najAwans = zmiany.sort((a,b) => b.zmiana-a.zmiana)[0];
+    const najSpadek = zmiany.sort((a,b) => a.zmiana-b.zmiana)[0];
+
+    if (najAwans && najAwans.zmiana >= 2)
+      dodaj(najAwans.nazwa, "🚀", "Gracz drugiej połowy",
+        `Awans z #${najAwans.poz1} na #${najAwans.poz2} w rankingu między 1. a 2. połową sezonu. Rozgrzewał się wolno.`);
+    if (najSpadek && najSpadek.zmiana <= -2)
+      dodaj(najSpadek.nazwa, "📉", "Wypalony na finiszu",
+        `Spadek z #${najSpadek.poz1} na #${najSpadek.poz2} między 1. a 2. połową sezonu. Zaczął mocno, skończył słabiej.`);
   }
 
   return odznaki;
