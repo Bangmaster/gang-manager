@@ -1529,80 +1529,44 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     }
   }
 
-  // 3b. Trend pozycji — średnia zmiana miejsca między kolejnymi walkami
-  if (lacznaWalka >= 3) {
-    const walkiSort = [...walki].sort((a, b) => new Date(a.data) - new Date(b.data));
-
-    // Dla każdego gracza zbierz pozycje per walka
-    const trendy = {};
-    walkiSort.forEach(w => {
-      const sorted = [...w.gracze].sort((a, b) => b.obrazenia - a.obrazenia);
-      sorted.forEach((g, i) => {
-        if (!trendy[g.nazwa]) trendy[g.nazwa] = [];
-        trendy[g.nazwa].push({ poz: i + 1, walka: w.nazwa });
-      });
-    });
-
-    // Oblicz średnią zmianę pozycji między kolejnymi walkami
-    const zmiany = [];
-    Object.entries(trendy).forEach(([nazwa, pozycje]) => {
-      if (pozycje.length < 2) return;
-      // Zmiana per walka (różnica między kolejnymi)
-      const delty = [];
-      for (let i = 1; i < pozycje.length; i++) {
-        delty.push(pozycje[i-1].poz - pozycje[i].poz); // + = awans, - = spadek
-      }
-      const srZmiana = delty.reduce((s, v) => s + v, 0) / delty.length;
-      const ostatniaPoz = pozycje[pozycje.length - 1].poz;
-      const przedostatniaPoz = pozycje[pozycje.length - 2].poz;
-      const ostatniaZmiana = przedostatniaPoz - ostatniaPoz; // zmiana w ostatniej walce
-      zmiany.push({ nazwa, srZmiana, ostatniaZmiana, pozycje, delty });
-    });
-
-    const awanse = zmiany.filter(z => z.srZmiana > 0.3).sort((a, b) => b.srZmiana - a.srZmiana);
-    const spadki = zmiany.filter(z => z.srZmiana < -0.3).sort((a, b) => a.srZmiana - b.srZmiana);
-
-    if (awanse.length > 0) {
-      const a = awanse[0];
-      const ostatniaPoz = a.pozycje[a.pozycje.length - 1].poz;
-      ciekawostki.push({
-        ikona: "🚀",
-        tytul: "Najlepsza forma sezonu",
-        opis: `${a.nazwa} — średnio +${a.srZmiana.toFixed(1)} miejsca/walkę, aktualnie #${ostatniaPoz}`
-      });
+  // 3b. Forma sezonu — porównanie rankingu 1. vs 2. połowy (łączne obrażenia)
+  if (lacznaWalka >= 4) {
+    const walkiSort2 = [...walki].sort((a, b) => new Date(a.data) - new Date(b.data));
+    const pol = Math.floor(walkiSort2.length / 2);
+    const obliczRank = (arr) => {
+      const suma = {};
+      arr.forEach(w => w.gracze.forEach(g => { suma[g.nazwa] = (suma[g.nazwa]||0) + g.obrazenia; }));
+      return Object.entries(suma).sort((a,b)=>b[1]-a[1]).map(([nazwa],i)=>({nazwa,poz:i+1}));
+    };
+    const rank1 = obliczRank(walkiSort2.slice(0, pol));
+    const rank2 = obliczRank(walkiSort2.slice(pol));
+    const zmianyPol = rank2.map(r2 => {
+      const r1 = rank1.find(x=>x.nazwa===r2.nazwa);
+      return r1 ? { nazwa:r2.nazwa, zmiana:r1.poz-r2.poz, poz1:r1.poz, poz2:r2.poz } : null;
+    }).filter(Boolean);
+    const najAwansPol = [...zmianyPol].sort((a,b)=>b.zmiana-a.zmiana)[0];
+    const najSpadekPol = [...zmianyPol].sort((a,b)=>a.zmiana-b.zmiana)[0];
+    if (najAwansPol && najAwansPol.zmiana >= 2) {
+      ciekawostki.push({ ikona: "🚀", tytul: "Najlepsza forma sezonu",
+        opis: `${najAwansPol.nazwa} — z #${najAwansPol.poz1} na #${najAwansPol.poz2} w końcowym rankingu między 1. a 2. połową sezonu` });
     }
-    if (spadki.length > 0) {
-      const s = spadki[0];
-      const ostatniaPoz = s.pozycje[s.pozycje.length - 1].poz;
-      ciekawostki.push({
-        ikona: "📉",
-        tytul: "Najgorsza forma sezonu",
-        opis: `${s.nazwa} — średnio ${s.srZmiana.toFixed(1)} miejsca/walkę, aktualnie #${ostatniaPoz}`
-      });
+    if (najSpadekPol && najSpadekPol.zmiana <= -2) {
+      ciekawostki.push({ ikona: "📉", tytul: "Najgorsza forma sezonu",
+        opis: `${najSpadekPol.nazwa} — z #${najSpadekPol.poz1} na #${najSpadekPol.poz2} w końcowym rankingu między 1. a 2. połową sezonu` });
     }
-
-    // Lista wszystkich z trendem wzrostowym/spadkowym
-    if (awanse.length > 1) {
-      const lista = awanse.slice(1, 5)
-        .map(a => `${a.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")} ↑${a.srZmiana.toFixed(1)}/walkę`)
-        .join(", ");
-      ciekawostki.push({
-        ikona: "⬆️",
-        tytul: "Gracze w formie wzrostowej",
-        opis: lista
-      });
+    // Lista pozostałych
+    const awansePol = zmianyPol.filter(z=>z.zmiana>=2).sort((a,b)=>b.zmiana-a.zmiana);
+    const spadkiPol = zmianyPol.filter(z=>z.zmiana<=-2).sort((a,b)=>a.zmiana-b.zmiana);
+    if (awansePol.length > 1) {
+      ciekawostki.push({ ikona: "⬆️", tytul: "Gracze w formie wzrostowej",
+        opis: awansePol.slice(1,5).map(a=>`${a.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")} +${a.zmiana}`).join(", ") });
     }
-    if (spadki.length > 1) {
-      const lista = spadki.slice(1, 5)
-        .map(s => `${s.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")} ↓${Math.abs(s.srZmiana).toFixed(1)}/walkę`)
-        .join(", ");
-      ciekawostki.push({
-        ikona: "⬇️",
-        tytul: "Gracze w formie spadkowej",
-        opis: lista
-      });
+    if (spadkiPol.length > 1) {
+      ciekawostki.push({ ikona: "⬇️", tytul: "Gracze w formie spadkowej",
+        opis: spadkiPol.slice(1,5).map(s=>`${s.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")} ${s.zmiana}`).join(", ") });
     }
   }
+
 
   // 4. Najaktywniejszy — używaj bylNaWalce jeśli dostępne
   const sortWgAktywnosci = [...wszyscy].sort((a, b) => {
@@ -1882,7 +1846,7 @@ function GraczRaport({ g, i, linie, kolor, total, odznaki }) {
           {mojeOdznaki.length > 0 && (
             <span style={{ marginLeft: 6 }}>
               {mojeOdznaki.map((o,idx) => (
-                <span key={idx} title={`${o.tytul}: ${o.opis}`} style={{ fontSize: 14, cursor: "help" }}>{o.ikona}</span>
+                <span key={idx} style={{ fontSize: 14 }}>{o.ikona}</span>
               ))}
             </span>
           )}
@@ -2207,18 +2171,24 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
       {Object.keys(odznakiSezonu).length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>🏅 Odznaki sezonu</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {wszyscy.map(g => {
               const odzn = odznakiSezonu[g.nazwa] || [];
               if (odzn.length === 0) return null;
               return (
-                <div key={g.nazwa} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 7, background: "rgba(0,0,0,0.2)", border: "1px solid #2a2a3a" }}>
-                  <span style={{ fontSize: 11, color: "#aaa", minWidth: 90 }}>{g.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")}</span>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                <div key={g.nazwa} style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid #2a2a3a" }}>
+                  <div style={{ fontSize: 11, color: "#ffd700", fontWeight: "bold", marginBottom: 6 }}>
+                    {g.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     {odzn.map((o, i) => (
-                      <span key={i} title={`${o.tytul}: ${o.opis}`} style={{
-                        fontSize: 18, cursor: "help",
-                      }}>{o.ikona}</span>
+                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                        <span style={{ fontSize: 18, flexShrink: 0 }}>{o.ikona}</span>
+                        <div>
+                          <div style={{ fontSize: 11, color: "#ddd", fontWeight: "bold" }}>{o.tytul}</div>
+                          <div style={{ fontSize: 10, color: "#777", lineHeight: 1.4 }}>{o.opis}</div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
