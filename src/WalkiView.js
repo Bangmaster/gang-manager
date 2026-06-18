@@ -1280,6 +1280,102 @@ function ArchiwumSezonow({ archiwum, czlonkowie }) {
   );
 }
 
+function obliczOdznaki(wszyscy, walki, lacznaWalka) {
+  if (!wszyscy || wszyscy.length === 0) return {};
+  const odznaki = {}; // {nazwa: [{ikona, tytul, opis}]}
+
+  const dodaj = (nazwa, ikona, tytul, opis) => {
+    if (!odznaki[nazwa]) odznaki[nazwa] = [];
+    odznaki[nazwa].push({ ikona, tytul, opis });
+  };
+
+  const sortObr = [...wszyscy].sort((a, b) => b.obrazeniaLacznie - a.obrazeniaLacznie);
+  const srednia = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0) / Math.max(wszyscy.length, 1);
+
+  wszyscy.forEach((g, idx) => {
+    const poz = sortObr.findIndex(x => x.nazwa === g.nazwa) + 1;
+    const frekw = lacznaWalka > 0
+      ? g.maObecnoscDane
+        ? Math.round((g.obecnosciLacznie || 0) / lacznaWalka * 100)
+        : Math.round(g.uczestnictwa / lacznaWalka * 100)
+      : 0;
+
+    // 👑 Król sezonu
+    if (poz === 1) dodaj(g.nazwa, "👑", "Król sezonu", "Najwięcej obrażeń w całym sezonie");
+
+    // ⚔️ Walczący dla gangu — top 3
+    if (poz <= 3 && poz > 1) dodaj(g.nazwa, "⚔️", "Walczący dla gangu", `Top ${poz} w rankingu obrażeń`);
+
+    // 🎯 Niezawodny — 100% frekwencja (min 2 walki)
+    if (frekw === 100 && lacznaWalka >= 2) dodaj(g.nazwa, "🎯", "Niezawodny", "Był na każdej walce sezonu");
+
+    // 💀 Duch — mniej niż 30% frekwencja
+    if (frekw < 30 && lacznaWalka >= 3) dodaj(g.nazwa, "💀", "Duch", `Tylko ${frekw}% frekwencja — prawie go nie było`);
+
+    // 🛡️ Tarcza — najwięcej tarcz
+    const maxTarcze = Math.max(...wszyscy.map(x => x.tarczeLacznie));
+    if (g.tarczeLacznie === maxTarcze && maxTarcze > 0) dodaj(g.nazwa, "🛡️", "Mur obronny", `${g.tarczeLacznie} tarcz w sezonie — więcej niż ktokolwiek`);
+
+    // 🪱 Pasożyt eventu — wysoki lvl, niskie obrażenia
+    const histLvl = g.historiaPoziomow || [];
+    if (histLvl.length >= 2) {
+      const przyrost = histLvl[histLvl.length-1].poziom - histLvl[0].poziom;
+      const medianLvl = [...wszyscy]
+        .map(x => (x.historiaPoziomow||[]).slice(-1)[0]?.poziom || 0)
+        .filter(l=>l>0).sort((a,b)=>a-b);
+      const median = medianLvl[Math.floor(medianLvl.length/2)] || 0;
+      const lvlAkt = histLvl[histLvl.length-1].poziom;
+      if (przyrost >= 10 && g.obrazeniaLacznie < srednia * 0.4 && lvlAkt > median)
+        dodaj(g.nazwa, "🪱", "Pasożyt eventu", `+${przyrost} lvl, ale tylko ${Math.round(g.obrazeniaLacznie/1000)}k obrażeń — grał dla siebie`);
+    }
+
+    // 🚀 Rakieta — największy awans formy (trend pozycji)
+    // 📉 Kamień — największy spadek (obsługiwane niżej przez trend)
+
+    // 💎 Kolekcjoner — najwięcej zamkniętych talii (z historii wymian)
+    // — pomijamy bo nie mamy tych danych per osoba bezpośrednio
+
+    // 🥈🥉 Podium
+    if (poz === 2) dodaj(g.nazwa, "🥈", "Wicemistrz", "Drugie miejsce w rankingu obrażeń");
+    if (poz === 3) dodaj(g.nazwa, "🥉", "Trzecie miejsce", "Trzecia pozycja w rankingu obrażeń");
+
+    // ⚠️ Usprawiedliwiony — był usprawiedliwiony co najmniej raz
+    const ileUsp = (walki || []).reduce((s, w) => {
+      const gracz = w.gracze.find(x => x.nazwa === g.nazwa);
+      return s + (gracz?.bylNaWalce === "U" ? 1 : 0);
+    }, 0);
+    if (ileUsp > 0) dodaj(g.nazwa, "⚠️", "Usprawiedliwiony", `${ileUsp}x nieobecny z powodu`);
+  });
+
+  // 🚀 Rakieta i 📉 Kamień — na podstawie trendu pozycji
+  if (walki && walki.length >= 3) {
+    const walkiSort = [...walki].sort((a,b) => new Date(a.data)-new Date(b.data));
+    const trendy = {};
+    walkiSort.forEach(w => {
+      const sorted = [...w.gracze].sort((a,b) => b.obrazenia-a.obrazenia);
+      sorted.forEach((g,i) => {
+        if (!trendy[g.nazwa]) trendy[g.nazwa] = [];
+        trendy[g.nazwa].push(i+1);
+      });
+    });
+    let maxAwans = null, maxSpadek = null;
+    Object.entries(trendy).forEach(([nazwa, pozycje]) => {
+      if (pozycje.length < 2) return;
+      const delty = [];
+      for (let i=1; i<pozycje.length; i++) delty.push(pozycje[i-1]-pozycje[i]);
+      const sr = delty.reduce((s,v)=>s+v,0)/delty.length;
+      if (!maxAwans || sr > maxAwans.sr) maxAwans = { nazwa, sr };
+      if (!maxSpadek || sr < maxSpadek.sr) maxSpadek = { nazwa, sr };
+    });
+    if (maxAwans && maxAwans.sr > 0.5)
+      dodaj(maxAwans.nazwa, "🚀", "Forma rosnąca", `Średnio +${maxAwans.sr.toFixed(1)} miejsca/walkę w górę`);
+    if (maxSpadek && maxSpadek.sr < -0.5)
+      dodaj(maxSpadek.nazwa, "📉", "Forma spadkowa", `Średnio ${maxSpadek.sr.toFixed(1)} miejsca/walkę w dół`);
+  }
+
+  return odznaki;
+}
+
 function obliczPodsumowanieSezonu(walki, czlonkowie) {
   if (walki.length === 0) return null;
 
@@ -1414,71 +1510,78 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     }
   }
 
-  // 3b. Awanse i spadki pozycji w rankingu między 1. a ostatnią walką
-  if (lacznaWalka >= 2) {
+  // 3b. Trend pozycji — średnia zmiana miejsca między kolejnymi walkami
+  if (lacznaWalka >= 3) {
     const walkiSort = [...walki].sort((a, b) => new Date(a.data) - new Date(b.data));
-    const pierwszaWalka = walkiSort[0];
-    const ostatniaWalka = walkiSort[walkiSort.length - 1];
 
-    // Ranking w pierwszej walce
-    const rankPierwsza = [...pierwszaWalka.gracze]
-      .sort((a, b) => b.obrazenia - a.obrazenia)
-      .map((g, i) => ({ nazwa: g.nazwa, poz: i + 1 }));
-
-    // Ranking w ostatniej walce
-    const rankOstatnia = [...ostatniaWalka.gracze]
-      .sort((a, b) => b.obrazenia - a.obrazenia)
-      .map((g, i) => ({ nazwa: g.nazwa, poz: i + 1 }));
-
-    // Oblicz zmianę pozycji dla każdego gracza
-    const zmianyPozycji = [];
-    rankOstatnia.forEach(ro => {
-      const rp = rankPierwsza.find(r => r.nazwa === ro.nazwa);
-      if (!rp) return;
-      const zmiana = rp.poz - ro.poz; // dodatnia = awans (był wyżej numerycznie = gorzej)
-      if (Math.abs(zmiana) >= 2) {
-        zmianyPozycji.push({ nazwa: ro.nazwa, zmiana, pozPierwsza: rp.poz, pozOstatnia: ro.poz });
-      }
+    // Dla każdego gracza zbierz pozycje per walka
+    const trendy = {};
+    walkiSort.forEach(w => {
+      const sorted = [...w.gracze].sort((a, b) => b.obrazenia - a.obrazenia);
+      sorted.forEach((g, i) => {
+        if (!trendy[g.nazwa]) trendy[g.nazwa] = [];
+        trendy[g.nazwa].push({ poz: i + 1, walka: w.nazwa });
+      });
     });
 
-    if (zmianyPozycji.length > 0) {
-      const awanse = zmianyPozycji.filter(z => z.zmiana > 0).sort((a, b) => b.zmiana - a.zmiana);
-      const spadki = zmianyPozycji.filter(z => z.zmiana < 0).sort((a, b) => a.zmiana - b.zmiana);
+    // Oblicz średnią zmianę pozycji między kolejnymi walkami
+    const zmiany = [];
+    Object.entries(trendy).forEach(([nazwa, pozycje]) => {
+      if (pozycje.length < 2) return;
+      // Zmiana per walka (różnica między kolejnymi)
+      const delty = [];
+      for (let i = 1; i < pozycje.length; i++) {
+        delty.push(pozycje[i-1].poz - pozycje[i].poz); // + = awans, - = spadek
+      }
+      const srZmiana = delty.reduce((s, v) => s + v, 0) / delty.length;
+      const ostatniaPoz = pozycje[pozycje.length - 1].poz;
+      const przedostatniaPoz = pozycje[pozycje.length - 2].poz;
+      const ostatniaZmiana = przedostatniaPoz - ostatniaPoz; // zmiana w ostatniej walce
+      zmiany.push({ nazwa, srZmiana, ostatniaZmiana, pozycje, delty });
+    });
 
-      if (awanse.length > 0) {
-        const a = awanse[0];
-        ciekawostki.push({
-          ikona: "🚀",
-          tytul: "Największy awans sezonu",
-          opis: `${a.nazwa} — z #${a.pozPierwsza} na #${a.pozOstatnia} (+${a.zmiana} miejsc między 1. a ostatnią walką)`
-        });
-      }
-      if (spadki.length > 0) {
-        const s = spadki[0];
-        ciekawostki.push({
-          ikona: "📉",
-          tytul: "Największy spadek sezonu",
-          opis: `${s.nazwa} — z #${s.pozPierwsza} na #${s.pozOstatnia} (${s.zmiana} miejsc między 1. a ostatnią walką)`
-        });
-      }
+    const awanse = zmiany.filter(z => z.srZmiana > 0.3).sort((a, b) => b.srZmiana - a.srZmiana);
+    const spadki = zmiany.filter(z => z.srZmiana < -0.3).sort((a, b) => a.srZmiana - b.srZmiana);
 
-      // Wszyscy co awansowali/spadli — krótka lista
-      if (awanse.length > 1) {
-        const lista = awanse.slice(1, 4).map(a => `${a.nazwa} +${a.zmiana}`).join(", ");
-        ciekawostki.push({
-          ikona: "⬆️",
-          tytul: "Gracze w formie wzrostowej",
-          opis: `${lista}${awanse.length > 4 ? ` i ${awanse.length - 4} innych` : ""}`
-        });
-      }
-      if (spadki.length > 1) {
-        const lista = spadki.slice(1, 4).map(s => `${s.nazwa} ${s.zmiana}`).join(", ");
-        ciekawostki.push({
-          ikona: "⬇️",
-          tytul: "Gracze w formie spadkowej",
-          opis: `${lista}${spadki.length > 4 ? ` i ${spadki.length - 4} innych` : ""}`
-        });
-      }
+    if (awanse.length > 0) {
+      const a = awanse[0];
+      const ostatniaPoz = a.pozycje[a.pozycje.length - 1].poz;
+      ciekawostki.push({
+        ikona: "🚀",
+        tytul: "Najlepsza forma sezonu",
+        opis: `${a.nazwa} — średnio +${a.srZmiana.toFixed(1)} miejsca/walkę, aktualnie #${ostatniaPoz}`
+      });
+    }
+    if (spadki.length > 0) {
+      const s = spadki[0];
+      const ostatniaPoz = s.pozycje[s.pozycje.length - 1].poz;
+      ciekawostki.push({
+        ikona: "📉",
+        tytul: "Najgorsza forma sezonu",
+        opis: `${s.nazwa} — średnio ${s.srZmiana.toFixed(1)} miejsca/walkę, aktualnie #${ostatniaPoz}`
+      });
+    }
+
+    // Lista wszystkich z trendem wzrostowym/spadkowym
+    if (awanse.length > 1) {
+      const lista = awanse.slice(1, 5)
+        .map(a => `${a.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")} ↑${a.srZmiana.toFixed(1)}/walkę`)
+        .join(", ");
+      ciekawostki.push({
+        ikona: "⬆️",
+        tytul: "Gracze w formie wzrostowej",
+        opis: lista
+      });
+    }
+    if (spadki.length > 1) {
+      const lista = spadki.slice(1, 5)
+        .map(s => `${s.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")} ↓${Math.abs(s.srZmiana).toFixed(1)}/walkę`)
+        .join(", ");
+      ciekawostki.push({
+        ikona: "⬇️",
+        tytul: "Gracze w formie spadkowej",
+        opis: lista
+      });
     }
   }
 
@@ -1742,8 +1845,9 @@ function formatLiczby(n) {
   return n.toString();
 }
 
-function GraczRaport({ g, i, linie, kolor, total }) {
+function GraczRaport({ g, i, linie, kolor, total, odznaki }) {
   const [rozwiniety, setRozwiniety] = useState(false);
+  const mojeOdznaki = odznaki?.[g.nazwa] || [];
   return (
     <div style={{ marginBottom: 8, borderRadius: 8, overflow: "hidden", border: `1px solid ${kolor}33`, background: "rgba(0,0,0,0.2)" }}>
       <div onClick={() => setRozwiniety(p=>!p)} style={{
@@ -1756,6 +1860,13 @@ function GraczRaport({ g, i, linie, kolor, total }) {
         </div>
         <div style={{ flex: 1 }}>
           <span style={{ fontSize: 13, fontWeight: "bold", color: kolor }}>{g.nazwa}</span>
+          {mojeOdznaki.length > 0 && (
+            <span style={{ marginLeft: 6 }}>
+              {mojeOdznaki.map((o,idx) => (
+                <span key={idx} title={`${o.tytul}: ${o.opis}`} style={{ fontSize: 14, cursor: "help" }}>{o.ikona}</span>
+              ))}
+            </span>
+          )}
           <span style={{ fontSize: 10, color: "#555", marginLeft: 8 }}>
             #{g.pozycjaSezonu} · {formatLiczby(g.obrazeniaLacznie)} obrażeń · {g.uczestnictwa} walk
           </span>
@@ -1979,6 +2090,7 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
   }
 
   const { wszyscy, ciekawostki, lacznaWalka } = podsumowanie;
+  const odznakiSezonu = obliczOdznaki(wszyscy, walki, lacznaWalka);
 
   // Scal wszystkie wystąpienia starego nicku na nowy we wszystkich walkach
   const scalajNick = async (staryNick, nowyNickVal) => {
@@ -2072,6 +2184,31 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
         </div>
       )}
 
+      {/* Odznaki sezonu */}
+      {Object.keys(odznakiSezonu).length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>🏅 Odznaki sezonu</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {wszyscy.map(g => {
+              const odzn = odznakiSezonu[g.nazwa] || [];
+              if (odzn.length === 0) return null;
+              return (
+                <div key={g.nazwa} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 7, background: "rgba(0,0,0,0.2)", border: "1px solid #2a2a3a" }}>
+                  <span style={{ fontSize: 11, color: "#aaa", minWidth: 90 }}>{g.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")}</span>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {odzn.map((o, i) => (
+                      <span key={i} title={`${o.tytul}: ${o.opis}`} style={{
+                        fontSize: 18, cursor: "help",
+                      }}>{o.ikona}</span>
+                    ))}
+                  </div>
+                </div>
+              );
+            }).filter(Boolean)}
+          </div>
+        </div>
+      )}
+
       {/* Osobiste podsumowania */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: "bold", color: "#ffd700", marginBottom: 10 }}>📋 Raporty osobiste</div>
@@ -2079,7 +2216,7 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
         {wszyscy.map((g, i) => {
           const linie = generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka);
           const kolor = i===0?"#ffd700":i===1?"#c0c0c0":i===2?"#cd7f32":i>=wszyscy.length-2?"#f55":"#888";
-          return <GraczRaport key={g.nazwa} g={g} i={i} linie={linie} kolor={kolor} />;
+          return <GraczRaport key={g.nazwa} g={g} i={i} linie={linie} kolor={kolor} odznaki={odznakiSezonu} />;
         })}
       </div>
 
