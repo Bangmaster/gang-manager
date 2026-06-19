@@ -8229,6 +8229,30 @@ function KalkulatorEventu() {
           ⬆️ Ustaw szanse losowania żeby zobaczyć obliczenia
         </div>
       )}
+
+      {/* DOLNY PASEK NAWIGACJI */}
+      {wyglad.uklad==="bottom"&&(
+        <>
+          <div style={{height:64}}/>
+          <div style={{
+            position:"fixed",bottom:0,left:0,right:0,zIndex:200,
+            display:"flex",background:motyw.bgDeep,
+            borderTop:`1px solid ${motyw.border}`,
+            padding:"6px 0 10px",
+          }}>
+            {tabs.slice(0,5).map(t=>(
+              <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
+                flex:1,border:"none",background:"transparent",cursor:"pointer",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 0",
+              }}>
+                <span style={{fontSize:22}}>{t.label.split(" ")[0]}</span>
+                <span style={{fontSize:9,color:zakładka===t.id?motyw.accent:motyw.muted,fontWeight:zakładka===t.id?"bold":"normal"}}>{t.label.split(" ").slice(1).join(" ").slice(0,8)}</span>
+                {zakładka===t.id&&<div style={{width:4,height:4,borderRadius:2,background:motyw.accent}}/>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -8508,29 +8532,6 @@ function DupleView({czlonkowie, talie, duplikaty}) {
         </div>
       )}
 
-      {/* DOLNY PASEK */}
-      {wyglad.uklad==="bottom"&&(
-        <>
-          <div style={{height:64}}/>{/* spacer */}
-          <div style={{
-            position:"fixed",bottom:0,left:0,right:0,zIndex:100,
-            display:"flex",background:motyw.bgDeep,
-            borderTop:`1px solid ${motyw.border}`,
-            padding:"6px 0 10px",
-          }}>
-            {tabs.slice(0,5).map(t=>(
-              <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
-                flex:1,border:"none",background:"transparent",cursor:"pointer",
-                display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 0",
-              }}>
-                <span style={{fontSize:22}}>{t.label.split(" ")[0]}</span>
-                <span style={{fontSize:9,color:zakładka===t.id?motyw.accent:motyw.muted,fontWeight:zakładka===t.id?"bold":"normal"}}>{t.label.replace(/^[^\s]+\s/,"").slice(0,8)}</span>
-                {zakładka===t.id&&<div style={{width:4,height:4,borderRadius:2,background:motyw.accent}}/>}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 }
