@@ -478,6 +478,108 @@ function getAvatar(nazwa) {
   return "👤";
 }
 
+// ============================================================
+// SYSTEM MOTYWÓW
+// ============================================================
+const MOTYWY = {
+  gold: {
+    nazwa: "Gold & Black", emoji: "🥇",
+    bg: "#0a0a12", bgCard: "rgba(255,255,255,0.04)", bgDeep: "#050510",
+    border: "rgba(255,215,0,0.15)", borderStrong: "rgba(255,215,0,0.4)",
+    accent: "#ffd700", accent2: "#b8860b", accentText: "#000",
+    text: "#f0e6d3", muted: "#666", mutedLight: "#888",
+    headerBg: "linear-gradient(135deg,#1a0a00,#2a1500)",
+    tabBg: "rgba(0,0,0,0.5)", btnPrimary: "linear-gradient(135deg,#b8860b,#ffd700)",
+    font: "'Georgia',serif",
+  },
+  gangster: {
+    nazwa: "Gangster / Mafia", emoji: "🔴",
+    bg: "#0d0000", bgCard: "rgba(40,0,0,0.5)", bgDeep: "#080000",
+    border: "rgba(180,0,0,0.35)", borderStrong: "rgba(200,0,0,0.6)",
+    accent: "#cc0000", accent2: "#8a0000", accentText: "#fff",
+    text: "#f5e6d0", muted: "#6a4a4a", mutedLight: "#8a6a6a",
+    headerBg: "linear-gradient(135deg,#3a0000,#8a0000)",
+    tabBg: "rgba(10,0,0,0.6)", btnPrimary: "linear-gradient(135deg,#8a0000,#cc0000)",
+    font: "'Georgia',serif",
+  },
+  cyberpunk: {
+    nazwa: "Cyberpunk / Neon", emoji: "🔵",
+    bg: "#050510", bgCard: "rgba(0,10,40,0.6)", bgDeep: "#020208",
+    border: "rgba(0,200,255,0.2)", borderStrong: "rgba(0,200,255,0.5)",
+    accent: "#00c8ff", accent2: "#0066cc", accentText: "#000",
+    text: "#e0f0ff", muted: "#3a5a7a", mutedLight: "#5a7a9a",
+    headerBg: "linear-gradient(135deg,#000a2a,#001a4a)",
+    tabBg: "rgba(0,5,20,0.7)", btnPrimary: "linear-gradient(135deg,#003366,#00c8ff)",
+    font: "'Courier New',monospace",
+  },
+  purple: {
+    nazwa: "Purple Crime", emoji: "🟣",
+    bg: "#0a0010", bgCard: "rgba(20,0,40,0.55)", bgDeep: "#060008",
+    border: "rgba(150,0,255,0.25)", borderStrong: "rgba(180,0,255,0.5)",
+    accent: "#aa00ff", accent2: "#6600cc", accentText: "#fff",
+    text: "#f0e0ff", muted: "#5a3a7a", mutedLight: "#7a5a9a",
+    headerBg: "linear-gradient(135deg,#1a0030,#4a0080)",
+    tabBg: "rgba(5,0,15,0.7)", btnPrimary: "linear-gradient(135deg,#4a0080,#aa00ff)",
+    font: "'Georgia',serif",
+  },
+  military: {
+    nazwa: "Military / Tactical", emoji: "🟢",
+    bg: "#080c08", bgCard: "rgba(20,30,20,0.6)", bgDeep: "#050805",
+    border: "rgba(80,120,40,0.35)", borderStrong: "rgba(100,160,50,0.6)",
+    accent: "#6aa020", accent2: "#3a6010", accentText: "#fff",
+    text: "#d0e0c0", muted: "#3a5030", mutedLight: "#5a7050",
+    headerBg: "linear-gradient(135deg,#0a1408,#1a2a10)",
+    tabBg: "rgba(5,8,5,0.7)", btnPrimary: "linear-gradient(135deg,#3a6010,#6aa020)",
+    font: "'Courier New',monospace",
+  },
+  minimal: {
+    nazwa: "Minimalist Dark", emoji: "⚫",
+    bg: "#0f0f0f", bgCard: "rgba(255,255,255,0.03)", bgDeep: "#080808",
+    border: "rgba(255,255,255,0.08)", borderStrong: "rgba(255,255,255,0.2)",
+    accent: "#ffffff", accent2: "#aaaaaa", accentText: "#000",
+    text: "#e8e8e8", muted: "#444", mutedLight: "#666",
+    headerBg: "linear-gradient(135deg,#161616,#0f0f0f)",
+    tabBg: "rgba(0,0,0,0.5)", btnPrimary: "linear-gradient(135deg,#333,#fff)",
+    font: "'Arial',sans-serif",
+  },
+  vice: {
+    nazwa: "Vice City", emoji: "🌴",
+    bg: "#080014", bgCard: "rgba(20,0,30,0.6)", bgDeep: "#050010",
+    border: "rgba(255,50,180,0.2)", borderStrong: "rgba(255,100,200,0.5)",
+    accent: "#ff3eb5", accent2: "#00eeff", accentText: "#000",
+    text: "#ffe0f5", muted: "#6a3a5a", mutedLight: "#9a5a8a",
+    headerBg: "linear-gradient(135deg,#1a0028,#3a0050)",
+    tabBg: "rgba(5,0,12,0.7)", btnPrimary: "linear-gradient(135deg,#aa0080,#ff3eb5)",
+    font: "'Georgia',serif",
+  },
+};
+
+const UKŁADY = {
+  top: "Zakładki na górze",
+  bottom: "Dolny pasek",
+  pills: "Pigułki w headerze",
+  grid: "Siatka kart",
+  drawer: "Menu hamburger",
+};
+
+const ROZMIARY = { mały: 11, normalny: 13, duży: 15 };
+
+function useWyglad(userId) {
+  const key = `wyglad_${userId||"default"}`;
+  const [wyglad, setWygladState] = useState(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : { motyw: "gold", uklad: "top", rozmiar: "normalny" };
+    } catch { return { motyw: "gold", uklad: "top", rozmiar: "normalny" }; }
+  });
+  const setWyglad = (nowy) => {
+    const merged = { ...wyglad, ...nowy };
+    setWygladState(merged);
+    localStorage.setItem(key, JSON.stringify(merged));
+  };
+  return [wyglad, setWyglad, MOTYWY[wyglad.motyw] || MOTYWY.gold];
+}
+
 function App() {
   // sessionStorage = auto-wylogowanie przy zamknięciu karty/przeglądarki
   const [zalogowany, setZalogowany] = useState(() => {
@@ -497,6 +599,9 @@ function App() {
       return null;
     } catch { return null; }
   });
+  const [wyglad, setWyglad, motyw] = useWyglad(null);
+  const rozmiarFnt = ROZMIARY[wyglad.rozmiar] || 13;
+
   const [dane, setDane] = useState(null); // null = loading
   const [zakładka, setZakładka] = useState(() => {
     // Jeśli jest aktywna wymiana — otwórz od razu rozpiskę
@@ -714,12 +819,12 @@ function App() {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"#0a0a12",fontFamily:"'Georgia',serif",color:"#f0e6d3",position:"relative",overflow:"hidden"}}>
+    <div style={{minHeight:"100vh",background:motyw.bg,fontFamily:motyw.font,color:motyw.text,position:"relative",overflow:"hidden",fontSize:rozmiarFnt}}>
 
-      {/* Tło — scalony w jeden element dla lepszej wydajności */}
+      {/* Tło */}
       <div style={{
         position:"fixed",top:0,left:0,right:0,bottom:0,
-        background:"#0a0a16",
+        background:motyw.bgDeep,
         zIndex:0,pointerEvents:"none",
         transform:"translateZ(0)",
       }}/>
@@ -826,7 +931,7 @@ function App() {
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
       </div>
 
-      <div style={{display:"flex",background:"linear-gradient(180deg,rgba(0,0,0,0.7),rgba(5,5,20,0.9))",borderBottom:"1px solid rgba(255,215,0,0.12)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+      <div style={{display:"flex",background:motyw.tabBg,borderBottom:`1px solid ${motyw.border}`,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
             padding:"10px 16px",background:"transparent",border:"none",
@@ -848,6 +953,7 @@ function App() {
       </div>
 
       <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
+        {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={czlonkowieMemo}
           posiadane={posiadaneMemo} duplikaty={duplikatyMemo}
@@ -1098,6 +1204,97 @@ function LoginScreen({onLogin, czlonkowie}) {
           <div style={{fontSize:11,color:"#666",lineHeight:1.5}}>{tip}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+function WygladView({ wyglad, setWyglad, motyw }) {
+  return (
+    <div style={{ padding: 16 }}>
+      <div style={{ fontSize: 16, fontWeight: "bold", color: motyw.accent, marginBottom: 4 }}>⚙️ Wygląd aplikacji</div>
+      <div style={{ fontSize: 11, color: motyw.muted, marginBottom: 20 }}>Personalizacja widoczna tylko dla Ciebie — zapisuje się automatycznie.</div>
+
+      {/* MOTYWY */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: "bold", color: motyw.mutedLight, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>🎨 Motyw kolorystyczny</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {Object.entries(MOTYWY).map(([id, m]) => (
+            <button key={id} onClick={() => setWyglad({ motyw: id })} style={{
+              padding: "12px 10px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+              background: wyglad.motyw === id ? `${m.accent}22` : m.bgCard || "rgba(255,255,255,0.04)",
+              border: `2px solid ${wyglad.motyw === id ? m.accent : m.border}`,
+              transition: "all 0.2s",
+            }}>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>{m.emoji}</div>
+              <div style={{ fontSize: 12, fontWeight: "bold", color: m.accent }}>{m.nazwa}</div>
+              {/* Mini podgląd kolorów */}
+              <div style={{ display: "flex", gap: 3, marginTop: 6 }}>
+                {[m.bg, m.accent, m.accent2, m.text].map((c,i) => (
+                  <div key={i} style={{ width: 14, height: 14, borderRadius: 3, background: c, border: "1px solid rgba(255,255,255,0.1)" }}/>
+                ))}
+              </div>
+              {wyglad.motyw === id && <div style={{ fontSize: 9, color: m.accent, marginTop: 4 }}>✓ aktywny</div>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* UKŁADY NAWIGACJI */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: "bold", color: motyw.mutedLight, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>📐 Układ nawigacji</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {Object.entries(UKŁADY).map(([id, nazwa]) => (
+            <button key={id} onClick={() => setWyglad({ uklad: id })} style={{
+              padding: "10px 14px", borderRadius: 8, cursor: "pointer", textAlign: "left",
+              background: wyglad.uklad === id ? `${motyw.accent}18` : "rgba(255,255,255,0.03)",
+              border: `1px solid ${wyglad.uklad === id ? motyw.accent : motyw.border}`,
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <span style={{ fontSize: 18 }}>
+                {id==="top"?"📱":id==="bottom"?"⬇️":id==="pills"?"💊":id==="grid"?"⊞":id==="drawer"?"☰":"📱"}
+              </span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: "bold", color: wyglad.uklad === id ? motyw.accent : motyw.text }}>{nazwa}</div>
+                <div style={{ fontSize: 10, color: motyw.muted }}>
+                  {id==="top"?"Zakładki poziomo, przewijane — obecny układ":
+                   id==="bottom"?"Główne zakładki na dole ekranu — wygodne kciukiem":
+                   id==="pills"?"Zaokrąglone przyciski w headerze":
+                   id==="grid"?"Siatka ikon na górze — szybki dostęp":
+                   "Ikonka ☰ otwiera boczne menu z zakładkami"}
+                </div>
+              </div>
+              {wyglad.uklad === id && <span style={{ marginLeft: "auto", color: motyw.accent, fontSize: 14 }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ROZMIAR CZCIONKI */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: "bold", color: motyw.mutedLight, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>🔤 Rozmiar tekstu</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {Object.entries(ROZMIARY).map(([id, size]) => (
+            <button key={id} onClick={() => setWyglad({ rozmiar: id })} style={{
+              flex: 1, padding: "12px 8px", borderRadius: 8, cursor: "pointer",
+              background: wyglad.rozmiar === id ? `${motyw.accent}22` : "rgba(255,255,255,0.04)",
+              border: `1px solid ${wyglad.rozmiar === id ? motyw.accent : motyw.border}`,
+              color: wyglad.rozmiar === id ? motyw.accent : motyw.muted,
+              fontSize: size, fontWeight: "bold",
+            }}>
+              {id === "mały" ? "Aa" : id === "normalny" ? "Aa" : "Aa"}
+              <div style={{ fontSize: 9, marginTop: 2, fontWeight: "normal" }}>{id}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Reset */}
+      <button onClick={() => setWyglad({ motyw: "gold", uklad: "top", rozmiar: "normalny" })} style={{
+        width: "100%", padding: 10, borderRadius: 8, cursor: "pointer",
+        background: "rgba(255,50,50,0.08)", border: "1px solid rgba(255,50,50,0.2)",
+        color: "#f5544488", fontSize: 11,
+      }}>↺ Przywróć domyślny wygląd</button>
     </div>
   );
 }
