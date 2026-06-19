@@ -918,6 +918,13 @@ function App() {
             background:typWymiany==="złote"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)",
             color:typWymiany==="złote"?"#000":"#fff",
           }}>{typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}</button>
+          <button onClick={()=>setZakładka("wyglad")} style={{
+            padding:"5px 10px",
+            background:zakładka==="wyglad"?`${motyw.accent}22`:"rgba(255,255,255,0.05)",
+            border:`1px solid ${zakładka==="wyglad"?motyw.accent:"rgba(255,255,255,0.15)"}`,
+            borderRadius:6,color:zakładka==="wyglad"?motyw.accent:"#888",
+            fontSize:16,cursor:"pointer",lineHeight:1,
+          }}>⚙️</button>
           <button onClick={()=>setZalogowany(null)} style={{padding:"5px 10px",background:"rgba(255,50,50,0.2)",border:"1px solid #f55",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>Wyloguj</button>
         </div>
       </div>
