@@ -819,7 +819,7 @@ function App() {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:motyw.bg,fontFamily:motyw.font,color:motyw.text,position:"relative",overflow:"hidden",fontSize:rozmiarFnt}}>
+    <div style={{minHeight:"100vh",background:motyw.bg,fontFamily:motyw.font,color:motyw.text,position:"relative",overflow:"hidden",fontSize:`${rozmiarFnt}px`}}>
 
       {/* Tło */}
       <div style={{
@@ -938,18 +938,20 @@ function App() {
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
       </div>
 
+      {/* NAWIGACJA — zależy od wybranego układu */}
+      {(wyglad.uklad==="top"||wyglad.uklad==="pills"||wyglad.uklad==="drawer"||wyglad.uklad==="grid")&&wyglad.uklad!=="bottom"&&wyglad.uklad!=="pills"&&wyglad.uklad!=="grid"&&(
       <div style={{display:"flex",background:motyw.tabBg,borderBottom:`1px solid ${motyw.border}`,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
             padding:"10px 16px",background:"transparent",border:"none",
-            borderBottom:zakładka===t.id?"2px solid #ffd700":"2px solid transparent",
-            borderTop:zakładka===t.id?"2px solid rgba(184,134,11,0.3)":"2px solid transparent",
-            color:zakładka===t.id?"#ffd700":"#555",cursor:"pointer",fontSize:12,
+            borderBottom:zakładka===t.id?`2px solid ${motyw.accent}`:"2px solid transparent",
+            borderTop:zakładka===t.id?`2px solid ${motyw.accent}44`:"2px solid transparent",
+            color:zakładka===t.id?motyw.accent:motyw.muted,cursor:"pointer",
+            fontSize:rozmiarFnt,
             fontWeight:zakładka===t.id?"bold":"normal",whiteSpace:"nowrap",
             letterSpacing:zakładka===t.id?1:0,
-            textShadow:zakładka===t.id?"0 0 12px rgba(255,215,0,0.5)":"none",
-            transition:"all 0.15s",
-            position:"relative",
+            textShadow:zakładka===t.id?`0 0 12px ${motyw.accent}88`:"none",
+            transition:"all 0.15s",position:"relative",
           }}>
             {t.id==="aktywna"&&dane?.aktywnaWymiana&&(
               <span style={{position:"absolute",top:6,right:4,width:6,height:6,background:"#f55",borderRadius:"50%",boxShadow:"0 0 5px #f55"}}/>
@@ -958,6 +960,60 @@ function App() {
           </button>
         ))}
       </div>
+      )}
+
+      {/* PILLS — pigułki w headerze (renderowane wyżej w headerze) */}
+      {wyglad.uklad==="pills"&&(
+        <div style={{display:"flex",gap:6,overflowX:"auto",padding:"8px 12px",background:motyw.tabBg,borderBottom:`1px solid ${motyw.border}`}}>
+          {tabs.map(t=>(
+            <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
+              padding:"5px 12px",borderRadius:20,border:"none",flexShrink:0,
+              background:zakładka===t.id?motyw.accent:"rgba(255,255,255,0.08)",
+              color:zakładka===t.id?motyw.accentText:motyw.muted,
+              fontSize:rozmiarFnt-1,fontWeight:zakładka===t.id?"bold":"normal",cursor:"pointer",whiteSpace:"nowrap",
+            }}>{t.label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* GRID — siatka ikon */}
+      {wyglad.uklad==="grid"&&(
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,padding:"8px 10px",background:motyw.tabBg,borderBottom:`1px solid ${motyw.border}`}}>
+          {tabs.slice(0,8).map(t=>(
+            <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
+              padding:"8px 4px",borderRadius:8,border:`1px solid ${zakładka===t.id?motyw.accent:motyw.border}`,
+              background:zakładka===t.id?`${motyw.accent}18`:"rgba(255,255,255,0.03)",
+              cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+              color:zakładka===t.id?motyw.accent:motyw.muted,fontSize:rozmiarFnt-2,
+            }}>
+              <span style={{fontSize:18}}>{t.label.split(" ")[0]}</span>
+              <span>{t.label.replace(/^[^\s]+\s/,"").slice(0,6)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* TOP — domyślny poziomy scroll */}
+      {(wyglad.uklad==="top"||wyglad.uklad==="drawer")&&(
+        <div style={{display:"flex",background:motyw.tabBg,borderBottom:`1px solid ${motyw.border}`,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+          {tabs.map(t=>(
+            <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
+              padding:"10px 16px",background:"transparent",border:"none",
+              borderBottom:zakładka===t.id?`2px solid ${motyw.accent}`:"2px solid transparent",
+              borderTop:zakładka===t.id?`2px solid ${motyw.accent}44`:"2px solid transparent",
+              color:zakładka===t.id?motyw.accent:motyw.muted,cursor:"pointer",
+              fontSize:rozmiarFnt,
+              fontWeight:zakładka===t.id?"bold":"normal",whiteSpace:"nowrap",
+              transition:"all 0.15s",position:"relative",
+            }}>
+              {t.id==="aktywna"&&dane?.aktywnaWymiana&&(
+                <span style={{position:"absolute",top:6,right:4,width:6,height:6,background:"#f55",borderRadius:"50%",boxShadow:"0 0 5px #f55"}}/>
+              )}
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
@@ -8450,6 +8506,30 @@ function DupleView({czlonkowie, talie, duplikaty}) {
         <div style={{textAlign:"center",padding:30,color:"#555",fontSize:13}}>
           Brak duplikatów dla wybranych filtrów
         </div>
+      )}
+
+      {/* DOLNY PASEK */}
+      {wyglad.uklad==="bottom"&&(
+        <>
+          <div style={{height:64}}/>{/* spacer */}
+          <div style={{
+            position:"fixed",bottom:0,left:0,right:0,zIndex:100,
+            display:"flex",background:motyw.bgDeep,
+            borderTop:`1px solid ${motyw.border}`,
+            padding:"6px 0 10px",
+          }}>
+            {tabs.slice(0,5).map(t=>(
+              <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
+                flex:1,border:"none",background:"transparent",cursor:"pointer",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 0",
+              }}>
+                <span style={{fontSize:22}}>{t.label.split(" ")[0]}</span>
+                <span style={{fontSize:9,color:zakładka===t.id?motyw.accent:motyw.muted,fontWeight:zakładka===t.id?"bold":"normal"}}>{t.label.replace(/^[^\s]+\s/,"").slice(0,8)}</span>
+                {zakładka===t.id&&<div style={{width:4,height:4,borderRadius:2,background:motyw.accent}}/>}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
