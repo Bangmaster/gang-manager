@@ -8254,6 +8254,7 @@ function KalkulatorEventu() {
         </div>
       )}
 
+    </div>
   );
 }
 
