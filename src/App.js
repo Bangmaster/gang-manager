@@ -979,10 +979,7 @@ function App() {
         />}
       </div>
       </div>
-    </div>
-
-
-      {/* DOLNY PASEK NAWIGACJI */}
+      {/* DOLNY PASEK */}
       {wyglad.uklad==="bottom"&&(
         <>
           <div style={{height:60}}/>
@@ -999,6 +996,9 @@ function App() {
           </nav>
         </>
       )}
+    </div>
+
+
   );
 }
 
