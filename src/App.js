@@ -482,13 +482,13 @@ function getAvatar(nazwa) {
 // SYSTEM MOTYWÓW
 // ============================================================
 const MOTYWY = {
-  gold:     { nazwa:"Gold & Black",  emoji:"🥇", bg:"#0a0a12", card:"rgba(255,215,0,0.06)", border:"rgba(255,215,0,0.18)", accent:"#ffd700", accent2:"#b8860b", text:"#f0e6d3", muted:"#666", header:"linear-gradient(135deg,#1a0a00,#2a1500)", btn:"linear-gradient(135deg,#b8860b,#ffd700)", btnText:"#000" },
-  gangster: { nazwa:"Gangster",      emoji:"🔴", bg:"#0d0000", card:"rgba(180,0,0,0.08)",   border:"rgba(180,0,0,0.3)",   accent:"#cc0000", accent2:"#8a0000", text:"#f5e6d0", muted:"#7a5a5a", header:"linear-gradient(135deg,#2a0000,#8a0000)", btn:"linear-gradient(135deg,#8a0000,#cc0000)", btnText:"#fff" },
-  cyberpunk:{ nazwa:"Cyberpunk",     emoji:"🔵", bg:"#050510", card:"rgba(0,200,255,0.05)",  border:"rgba(0,200,255,0.2)", accent:"#00c8ff", accent2:"#0066cc", text:"#e0f0ff", muted:"#3a6a8a", header:"linear-gradient(135deg,#000a2a,#001a4a)", btn:"linear-gradient(135deg,#0044aa,#00c8ff)", btnText:"#000" },
-  purple:   { nazwa:"Purple Crime",  emoji:"🟣", bg:"#0a0010", card:"rgba(150,0,255,0.06)", border:"rgba(150,0,255,0.22)",accent:"#aa00ff", accent2:"#6600cc", text:"#f0e0ff", muted:"#6a4a8a", header:"linear-gradient(135deg,#1a0030,#4a0080)", btn:"linear-gradient(135deg,#4a0080,#aa00ff)", btnText:"#fff" },
-  military: { nazwa:"Military",      emoji:"🟢", bg:"#080c08", card:"rgba(80,120,40,0.07)", border:"rgba(80,120,40,0.28)",accent:"#6aa020", accent2:"#3a6010", text:"#d0e0c0", muted:"#4a6040", header:"linear-gradient(135deg,#0a1408,#1a2a10)", btn:"linear-gradient(135deg,#3a6010,#6aa020)", btnText:"#fff" },
-  minimal:  { nazwa:"Minimalist",    emoji:"⚫", bg:"#0f0f0f", card:"rgba(255,255,255,0.03)",border:"rgba(255,255,255,0.1)",accent:"#ffffff",accent2:"#aaaaaa", text:"#e8e8e8", muted:"#555",   header:"linear-gradient(135deg,#1a1a1a,#0f0f0f)", btn:"linear-gradient(135deg,#444,#fff)", btnText:"#000" },
-  vice:     { nazwa:"Vice City",     emoji:"🌴", bg:"#080014", card:"rgba(255,50,180,0.05)",border:"rgba(255,50,180,0.18)",accent:"#ff3eb5",accent2:"#00eeff", text:"#ffe0f5", muted:"#7a4a6a", header:"linear-gradient(135deg,#1a0028,#3a0050)", btn:"linear-gradient(135deg,#aa0080,#ff3eb5)", btnText:"#000" },
+  gold:     { nazwa:"Gold & Black",  emoji:"🥇", bg:"#0a0a12", card:"rgba(255,215,0,0.06)", border:"rgba(255,215,0,0.18)", accent:"#ffd700", accent2:"#b8860b", text:"#f0e6d3", muted:"#666", header:"linear-gradient(135deg,#1a0a00,#2a1500)", btn:"linear-gradient(135deg,#b8860b,#ffd700)", btnText:"#000", font:"'Georgia',serif" },
+  gangster: { nazwa:"Gangster",      emoji:"🔴", bg:"#0d0000", card:"rgba(180,0,0,0.08)",   border:"rgba(180,0,0,0.3)",   accent:"#cc0000", accent2:"#8a0000", text:"#f5e6d0", muted:"#7a5a5a", header:"linear-gradient(135deg,#2a0000,#8a0000)", btn:"linear-gradient(135deg,#8a0000,#cc0000)", btnText:"#fff" , font:"'Georgia',serif" },
+  cyberpunk:{ nazwa:"Cyberpunk",     emoji:"🔵", bg:"#050510", card:"rgba(0,200,255,0.05)",  border:"rgba(0,200,255,0.2)", accent:"#00c8ff", accent2:"#0066cc", text:"#e0f0ff", muted:"#3a6a8a", header:"linear-gradient(135deg,#000a2a,#001a4a)", btn:"linear-gradient(135deg,#0044aa,#00c8ff)", btnText:"#000" , font:"'Courier New',monospace" },
+  purple:   { nazwa:"Purple Crime",  emoji:"🟣", bg:"#0a0010", card:"rgba(150,0,255,0.06)", border:"rgba(150,0,255,0.22)",accent:"#aa00ff", accent2:"#6600cc", text:"#f0e0ff", muted:"#6a4a8a", header:"linear-gradient(135deg,#1a0030,#4a0080)", btn:"linear-gradient(135deg,#4a0080,#aa00ff)", btnText:"#fff" , font:"'Georgia',serif" },
+  military: { nazwa:"Military",      emoji:"🟢", bg:"#080c08", card:"rgba(80,120,40,0.07)", border:"rgba(80,120,40,0.28)",accent:"#6aa020", accent2:"#3a6010", text:"#d0e0c0", muted:"#4a6040", header:"linear-gradient(135deg,#0a1408,#1a2a10)", btn:"linear-gradient(135deg,#3a6010,#6aa020)", btnText:"#fff" , font:"'Courier New',monospace" },
+  minimal:  { nazwa:"Minimalist",    emoji:"⚫", bg:"#0f0f0f", card:"rgba(255,255,255,0.03)",border:"rgba(255,255,255,0.1)",accent:"#ffffff",accent2:"#aaaaaa", text:"#e8e8e8", muted:"#555",   header:"linear-gradient(135deg,#1a1a1a,#0f0f0f)", btn:"linear-gradient(135deg,#444,#fff)", btnText:"#000" , font:"'Arial',sans-serif" },
+  vice:     { nazwa:"Vice City",     emoji:"🌴", bg:"#080014", card:"rgba(255,50,180,0.05)",border:"rgba(255,50,180,0.18)",accent:"#ff3eb5",accent2:"#00eeff", text:"#ffe0f5", muted:"#7a4a6a", header:"linear-gradient(135deg,#1a0028,#3a0050)", btn:"linear-gradient(135deg,#aa0080,#ff3eb5)", btnText:"#000" , font:"'Georgia',serif" },
 };
 
 const ROZMIARY = { mały: 12, normalny: 14, duży: 16 };
@@ -511,62 +511,34 @@ function useWyglad() {
 // Wstrzykuje CSS zmienne dla aktywnego motywu
 function MotywStyle({ motyw, rozmiar }) {
   const r = ROZMIARY[rozmiar] || 14;
-  const css = `
-    :root {
-      --bg: ${motyw.bg};
-      --card: ${motyw.card};
-      --border: ${motyw.border};
-      --accent: ${motyw.accent};
-      --accent2: ${motyw.accent2};
-      --text: ${motyw.text};
-      --muted: ${motyw.muted};
-      --btn: ${motyw.btn};
-      --btn-text: ${motyw.btnText};
-      --fnt: ${r}px;
-      --card-solid: color-mix(in srgb, ${motyw.bg} 85%, white 15%);
-    }
-    /* Globalny reset kolorów apki */
-    body, #root {
-      background: ${motyw.bg} !important;
-      color: ${motyw.text} !important;
-      font-size: ${r}px !important;
-    }
-    /* Karty i kontenery */
-    [style*="background:#0a0a12"],
-    [style*="background: #0a0a12"],
-    [style*="background:var(--card-solid)"],
-    [style*="background: #12122a"],
-    [style*="background:#050510"],
-    [style*="background:#0d0000"] {
-      background: ${motyw.bg} !important;
-    }
-    /* Złote akcenty -> kolor motywu */
-    [style*="color:#ffd700"],
-    [style*="color: #ffd700"] {
-      color: ${motyw.accent} !important;
-    }
-    /* Ramki */
-    [style*="border:1px solid #2a2a3a"],
-    [style*="border: 1px solid #2a2a3a"],
-    [style*="borderColor:#2a2a3a"] {
-      border-color: ${motyw.border} !important;
-    }
-    /* Input / textarea */
-    input, textarea, select {
-      background: ${motyw.bg} !important;
-      color: ${motyw.text} !important;
-      border-color: ${motyw.border} !important;
-      font-size: ${r}px !important;
-    }
-    input::placeholder, textarea::placeholder {
-      color: ${motyw.muted} !important;
-    }
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: ${motyw.bg}; }
-    ::-webkit-scrollbar-thumb { background: ${motyw.border}; border-radius: 2px; }
-  `;
-  return <style>{css}</style>;
+  const fnt = motyw.font || "'Georgia',serif";
+  const parts = [
+    ":root{",
+    "--bg:"+motyw.bg+";",
+    "--card:"+motyw.card+";",
+    "--border:"+motyw.border+";",
+    "--accent:"+motyw.accent+";",
+    "--accent2:"+motyw.accent2+";",
+    "--text:"+motyw.text+";",
+    "--muted:"+motyw.muted+";",
+    "--btn:"+motyw.btn+";",
+    "--btn-text:"+motyw.btnText+";",
+    "--fnt:"+r+"px;",
+    "--font:"+fnt+";",
+    "--card-solid:color-mix(in srgb,"+motyw.bg+" 80%,white 20%);",
+    "}",
+    "html{font-size:"+r+"px!important}",
+    "body,#root{background:"+motyw.bg+"!important;color:"+motyw.text+"!important;font-family:"+fnt+"!important;font-size:"+r+"px!important}",
+    "div,span,p,label,li{font-family:"+fnt+"!important}",
+    "button{font-family:"+fnt+"!important;font-size:"+r+"px}",
+    "input,textarea,select{background:color-mix(in srgb,"+motyw.bg+" 85%,white 15%)!important;color:"+motyw.text+"!important;border-color:"+motyw.border+"!important;font-family:"+fnt+"!important;font-size:"+r+"px!important}",
+    "input::placeholder,textarea::placeholder{color:"+motyw.muted+"!important;opacity:1!important}",
+    "::-webkit-scrollbar{width:3px;height:3px}",
+    "::-webkit-scrollbar-track{background:"+motyw.bg+"}",
+    "::-webkit-scrollbar-thumb{background:"+motyw.border+";border-radius:2px}",
+    "::selection{background:"+motyw.accent+"44;color:"+motyw.text+"}",
+  ].join("");
+  return <style>{parts}</style>;
 }
 
 function App() {
@@ -1019,19 +991,20 @@ function App() {
         />}
       </div>
       </div>
-      {/* DOLNY PASEK - sticky, scrolluje razem z contentem */}
+      {/* DOLNY PASEK - fixed, zawsze na dole ekranu */}
       {wyglad.uklad==="bottom"&&(
         <>
+          <div style={{height:72}}/>
           <nav style={{
-            position:"sticky",
-            bottom:0,
-            zIndex:200,
+            position:"fixed",
+            bottom:0,left:0,right:0,
+            zIndex:9999,
             display:"flex",
             overflowX:"auto",
             WebkitOverflowScrolling:"touch",
             background:"var(--bg)",
             borderTop:"2px solid var(--border)",
-            boxShadow:"0 -2px 16px rgba(0,0,0,0.6)",
+            boxShadow:"0 -4px 20px rgba(0,0,0,0.7)",
             padding:"6px 4px 12px",
           }}>
             {tabs.map(t=>(
