@@ -72,7 +72,7 @@ function playSound(type) {
 
 // Konfetti — złote cząsteczki
 function launchConfetti(duration = 2500) {
-  const colors = ["#ffd700","#ffaa00","#fff8dc","#b8860b","#0c6","#87CEEB","#da70d6"];
+  const colors = ["var(--accent)","#ffaa00","#fff8dc","#b8860b","#0c6","#87CEEB","#da70d6"];
   const container = document.createElement("div");
   container.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:99999;overflow:hidden";
   document.body.appendChild(container);
@@ -523,6 +523,7 @@ function MotywStyle({ motyw, rozmiar }) {
       --btn: ${motyw.btn};
       --btn-text: ${motyw.btnText};
       --fnt: ${r}px;
+      --card-solid: color-mix(in srgb, ${motyw.bg} 85%, white 15%);
     }
     /* Globalny reset kolorów apki */
     body, #root {
@@ -533,7 +534,7 @@ function MotywStyle({ motyw, rozmiar }) {
     /* Karty i kontenery */
     [style*="background:#0a0a12"],
     [style*="background: #0a0a12"],
-    [style*="background:#12122a"],
+    [style*="background:var(--card-solid)"],
     [style*="background: #12122a"],
     [style*="background:#050510"],
     [style*="background:#0d0000"] {
@@ -867,8 +868,8 @@ function App() {
             background:"linear-gradient(90deg,#ffd700,#fff8dc,#ffd700)",
             WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
           }}>⚔ FAMILY — MENADŻER</div>
-          <div style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
-            <span><span style={{color:"#ffd700"}}>{zalogowany.login}</span> <span style={{color:"#888"}}>({zalogowany.rola})</span></span>
+          <div style={{fontSize:11,color:"var(--muted)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
+            <span><span style={{color:"var(--accent)"}}>{zalogowany.login}</span> <span style={{color:"var(--muted)"}}>({zalogowany.rola})</span></span>
             {statusZapisu && <span style={{color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
             {/* Tip dnia */}
             <span style={{fontSize:10,color:"#444",fontStyle:"italic",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
@@ -908,9 +909,9 @@ function App() {
           }}>{typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}</button>
           <button onClick={()=>setZakładka("wyglad")} style={{
             padding:"5px 10px",
-            background:zakładka==="wyglad"?`${motyw.accent}22`:"rgba(255,255,255,0.05)",
+            background:zakładka==="wyglad"?`${motyw.accent}22`:"var(--card)",
             border:`1px solid ${zakładka==="wyglad"?motyw.accent:"rgba(255,255,255,0.15)"}`,
-            borderRadius:6,color:zakładka==="wyglad"?motyw.accent:"#888",
+            borderRadius:6,color:zakładka==="wyglad"?motyw.accent:"var(--muted)",
             fontSize:16,cursor:"pointer",lineHeight:1,
           }}>⚙️</button>
           <button onClick={()=>setZalogowany(null)} style={{padding:"5px 10px",background:"rgba(255,50,50,0.2)",border:"1px solid #f55",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>Wyloguj</button>
@@ -920,7 +921,7 @@ function App() {
       {/* Pasek z cytatem nad zakładkami */}
       <div style={{
         background:"rgba(184,134,11,0.06)",borderBottom:"1px solid rgba(184,134,11,0.15)",
-        padding:"4px 16px",fontSize:11,color:"#666",fontStyle:"italic",
+        padding:"4px 16px",fontSize:11,color:"var(--muted)",fontStyle:"italic",
         textAlign:"center",minHeight:22,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",
       }}>
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
@@ -932,7 +933,7 @@ function App() {
             padding:"10px 16px",background:"transparent",border:"none",
             borderBottom:zakładka===t.id?"2px solid #ffd700":"2px solid transparent",
             borderTop:zakładka===t.id?"2px solid rgba(184,134,11,0.3)":"2px solid transparent",
-            color:zakładka===t.id?"#ffd700":"#555",cursor:"pointer",fontSize:12,
+            color:zakładka===t.id?"var(--accent)":"#555",cursor:"pointer",fontSize:12,
             fontWeight:zakładka===t.id?"bold":"normal",whiteSpace:"nowrap",
             letterSpacing:zakładka===t.id?1:0,
             textShadow:zakładka===t.id?"0 0 12px rgba(255,215,0,0.5)":"none",
@@ -947,7 +948,7 @@ function App() {
         ))}
       </div>)}
 
-      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
+      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto",paddingBottom:wyglad.uklad==="bottom"?90:14}}>
         {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={czlonkowieMemo}
@@ -1023,14 +1024,18 @@ function App() {
         <>
           <div style={{height:72}}/>
           <nav style={{
-            position:"fixed",bottom:0,left:0,right:0,zIndex:999,
+            position:"fixed",
+            bottom:0,left:0,right:0,
+            zIndex:9999,
             display:"flex",
             overflowX:"auto",
             WebkitOverflowScrolling:"touch",
             background:"var(--bg)",
             borderTop:"2px solid var(--border)",
-            boxShadow:"0 -4px 20px rgba(0,0,0,0.5)",
-            padding:"6px 4px 10px",
+            boxShadow:"0 -4px 20px rgba(0,0,0,0.7)",
+            padding:"6px 4px env(safe-area-inset-bottom,10px)",
+            WebkitBackdropFilter:"blur(10px)",
+            backdropFilter:"blur(10px)",
           }}>
             {tabs.map(t=>(
               <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
@@ -1076,11 +1081,11 @@ function App() {
 
 function LoadingScreen() {
   return (
-    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at center,#0d0820 0%,#0a0a12 100%)",display:"flex",alignItems:"center",justifyContent:"center",color:"#ffd700",fontFamily:"'Georgia',serif"}}>
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at center,#0d0820 0%,#0a0a12 100%)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",fontFamily:"'Georgia',serif"}}>
       <div style={{textAlign:"center"}}>
         <div style={{fontSize:44,marginBottom:10}}>🃏</div>
         <div style={{fontSize:16}}>Ładowanie danych gangu...</div>
-        <div style={{fontSize:11,color:"#666",marginTop:8}}>Łączenie z bazą Firebase</div>
+        <div style={{fontSize:11,color:"var(--muted)",marginTop:8}}>Łączenie z bazą Firebase</div>
       </div>
     </div>
   );
@@ -1166,7 +1171,7 @@ function LoginScreen({onLogin, czlonkowie}) {
     onLogin({ login: oryginalny.nazwa, rola:"czlonek" });
   };
 
-  const inputStyle = {width:"100%",padding:"12px 14px",background:"#12122a",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:16,boxSizing:"border-box",textAlign:"center",letterSpacing:2};
+  const inputStyle = {width:"100%",padding:"12px 14px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:8,color:"#fff",fontSize:16,boxSizing:"border-box",textAlign:"center",letterSpacing:2};
   const btnStyle = {width:"100%",padding:13,background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:8,fontWeight:"bold",fontSize:15,cursor:"pointer",color:"#000"};
 
   return (
@@ -1205,7 +1210,7 @@ function LoginScreen({onLogin, czlonkowie}) {
           {/* KROK 2a: wpisz PIN */}
           {krok==="pin"&&(
             <>
-              <div style={{fontSize:13,color:"#ffd700",marginBottom:16}}>👤 {login}</div>
+              <div style={{fontSize:13,color:"var(--accent)",marginBottom:16}}>👤 {login}</div>
               <div style={{fontSize:12,color:"#aaa",marginBottom:10}}>🔐 Wpisz swój PIN</div>
               <input value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
                 type="password" inputMode="numeric" placeholder="••••"
@@ -1227,7 +1232,7 @@ function LoginScreen({onLogin, czlonkowie}) {
           {/* KROK 2b: ustaw nowy PIN */}
           {krok==="ustawPin"&&(
             <>
-              <div style={{fontSize:13,color:"#ffd700",marginBottom:8}}>👤 {login}</div>
+              <div style={{fontSize:13,color:"var(--accent)",marginBottom:8}}>👤 {login}</div>
               <div style={{fontSize:12,color:"#0c6",marginBottom:4}}>🔐 Pierwsze logowanie — ustaw swój PIN</div>
               <div style={{fontSize:10,color:"#555",marginBottom:14}}>PIN będzie wymagany przy każdym logowaniu.<br/>Zapamiętaj go!</div>
               <input value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
@@ -1247,8 +1252,8 @@ function LoginScreen({onLogin, czlonkowie}) {
           )}
         </div>
 
-        <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a3a",borderRadius:8,padding:"10px 14px",textAlign:"center"}}>
-          <div style={{fontSize:11,color:"#666",lineHeight:1.5}}>{tip}</div>
+        <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 14px",textAlign:"center"}}>
+          <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.5}}>{tip}</div>
         </div>
       </div>
     </div>
@@ -1318,7 +1323,7 @@ function WygladView({ wyglad, setWyglad, motyw }) {
           {Object.entries(ROZMIARY).map(([id, size]) => (
             <button key={id} onClick={() => setWyglad({ rozmiar: id })} style={{
               flex: 1, padding: "12px 8px", borderRadius: 8, cursor: "pointer",
-              background: wyglad.rozmiar === id ? "var(--card)" : "rgba(255,255,255,0.03)",
+              background: wyglad.rozmiar === id ? "var(--card)" : "var(--card)",
               border: `1px solid ${wyglad.rozmiar === id ? "var(--accent)" : "var(--border)"}`,
               color: wyglad.rozmiar === id ? "var(--accent)" : "var(--muted)",
               fontSize: size, fontWeight: "bold",
@@ -1378,9 +1383,9 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
         ].map(f=>(
           <button key={f.id} onClick={()=>setFiltrTyp(f.id)} style={{
             padding:"5px 12px",borderRadius:6,cursor:"pointer",fontSize:12,
-            background:filtrTyp===f.id?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
-            border:filtrTyp===f.id?"1px solid #ffd700":"1px solid #2a2a3a",
-            color:filtrTyp===f.id?"#ffd700":"#666",
+            background:filtrTyp===f.id?"rgba(255,215,0,0.15)":"var(--card)",
+            border:filtrTyp===f.id?"1px solid #ffd700":"1px solid var(--border)",
+            color:filtrTyp===f.id?"var(--accent)":"var(--muted)",
           }}>{f.label}</button>
         ))}
         {!isAdmin && <span style={{fontSize:11,color:"#555",alignSelf:"center",marginLeft:4}}>🔒 tylko podgląd</span>}
@@ -1398,7 +1403,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
             style={{
               padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:12,
               background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":swoja?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.07)",
-              border:wybranaOsoba===i?"none":swoja?"1px solid #0c655":"1px solid #2a2a3a",
+              border:wybranaOsoba===i?"none":swoja?"1px solid #0c655":"1px solid var(--border)",
               color:wybranaOsoba===i?"#000":swoja?"#0c6":"#aaa",fontWeight:wybranaOsoba===i?"bold":"normal",
             }}>{swoja?"⭐ ":""}{c.nazwa}</button>
           );
@@ -1406,8 +1411,8 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
       </div>
 
       {osoba&&(
-        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
-          <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:14}}>
+          <div style={{fontSize:15,fontWeight:"bold",color:"var(--accent)",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
             <span>✏️ {osoba.nazwa}</span>
             {!mozeEdytowac && <span style={{fontSize:11,color:"#f55",fontWeight:"normal"}}>🔒 tylko podgląd</span>}
           </div>
@@ -1449,8 +1454,8 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                         style={{
                           padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
                           maxWidth:90,textAlign:"center",lineHeight:1.2,
-                          background:ma?(karta.typ==="złota"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)"):"rgba(255,255,255,0.04)",
-                          border:ma?"none":(!ma&&czlonkowie.some(c=>c.id!==osoba.id&&duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]))?"1px solid #0c633":"1px solid #2a2a3a",
+                          background:ma?(karta.typ==="złota"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)"):"var(--card)",
+                          border:ma?"none":(!ma&&czlonkowie.some(c=>c.id!==osoba.id&&duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]))?"1px solid #0c633":"1px solid var(--border)",
                           color:ma?(karta.typ==="złota"?"#000":"#fff"):"#444",
                           fontWeight:ma?"bold":"normal",opacity:mozeEdytowac?1:0.7,
                         }}>{karta.nazwa}</button>
@@ -1476,16 +1481,16 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:10,background:trudna?"rgba(255,50,50,0.18)":"rgba(255,215,0,0.1)",border:`1px solid ${trudna?"#f55":"#b8860b"}`,borderRadius:4,padding:"1px 5px",color:trudna?"#f55":"#b8860b"}}>#{talia.numer}</span>
                     <span style={{fontWeight:"bold",fontSize:13}}>{talia.nazwa}</span>
-                    <span style={{fontSize:11,color:"#666"}}>🎯{talia.nagroda_amunicja?.toLocaleString()}</span>
+                    <span style={{fontSize:11,color:"var(--muted)"}}>🎯{talia.nagroda_amunicja?.toLocaleString()}</span>
                   </div>
                   <div style={{fontSize:12}}>
-                    <span style={{color:brak===0?"#0c6":"#ffd700"}}>{posC}/{kartyAll.length}</span>
+                    <span style={{color:brak===0?"#0c6":"var(--accent)"}}>{posC}/{kartyAll.length}</span>
                     {dupC>0&&<span style={{color:"#87CEEB",marginLeft:6}}>+{dupC}dup</span>}
                     {brak===0&&<span style={{color:"#0c6",marginLeft:8}}>✓</span>}
                     {brak>0&&brak<=2&&<span style={{color:"#fa0",marginLeft:8}}>⚡{brak} brak</span>}
                   </div>
                 </div>
-                <div style={{height:3,background:"#12122a",borderRadius:2,marginBottom:8}}>
+                <div style={{height:3,background:"var(--card-solid)",borderRadius:2,marginBottom:8}}>
                   <div style={{height:"100%",width:`${kartyAll.length?(posC/kartyAll.length)*100:0}%`,background:brak===0?"#0c6":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:2}}/>
                 </div>
 
@@ -1548,17 +1553,17 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                 }}>
                   {os.nazwa[0]?.toUpperCase()}
                 </div>
-                <div style={{fontSize:20,fontWeight:"bold",color:"#ffd700",letterSpacing:1}}>{os.nazwa}</div>
+                <div style={{fontSize:20,fontWeight:"bold",color:"var(--accent)",letterSpacing:1}}>{os.nazwa}</div>
                 {krag>1&&<div style={{fontSize:11,color:"#da70d6",marginTop:2}}>💜 Krąg {krag}</div>}
               </div>
 
               {/* Pasek postępu */}
               <div style={{marginBottom:16}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#888",marginBottom:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--muted)",marginBottom:4}}>
                   <span>Postęp kolekcji</span>
-                  <span style={{color:"#ffd700",fontWeight:"bold"}}>{pct}%</span>
+                  <span style={{color:"var(--accent)",fontWeight:"bold"}}>{pct}%</span>
                 </div>
-                <div style={{height:8,background:"#12122a",borderRadius:4,overflow:"hidden"}}>
+                <div style={{height:8,background:"var(--card-solid)",borderRadius:4,overflow:"hidden"}}>
                   <div style={{
                     height:"100%",width:`${pct}%`,borderRadius:4,
                     background:"linear-gradient(90deg,#b8860b,#ffd700)",
@@ -1570,7 +1575,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
               {/* Statystyki */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
                 {[
-                  {label:"Kart zebranych",val:`${posKarty}/${totalKarty}`,color:"#ffd700"},
+                  {label:"Kart zebranych",val:`${posKarty}/${totalKarty}`,color:"var(--accent)"},
                   {label:"Talie zamknięte",val:`${zamkniete.length}/${talie.length}`,color:"#0c6"},
                   {label:"Duplikaty",val:dupCount,color:"#87CEEB"},
                   {label:"Amunicja zdobyta",val:ammo.toLocaleString()+" 💰",color:"#fa0"},
@@ -1584,10 +1589,10 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
 
               {/* Osiągnięcia */}
               <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,color:"#888",marginBottom:6}}>🏆 Osiągnięcia:</div>
+                <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>🏆 Osiągnięcia:</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                  {zamkniete.length>=10&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b55",borderRadius:10,color:"#ffd700"}}>👑 Mega Kolekcjoner</span>}
-                  {zamkniete.length>=5&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b33",borderRadius:10,color:"#ffd700"}}>🏆 Kolekcjoner</span>}
+                  {zamkniete.length>=10&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b55",borderRadius:10,color:"var(--accent)"}}>👑 Mega Kolekcjoner</span>}
+                  {zamkniete.length>=5&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b33",borderRadius:10,color:"var(--accent)"}}>🏆 Kolekcjoner</span>}
                   {dupCount>=10&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(135,206,235,0.1)",border:"1px solid #87CEEB33",borderRadius:10,color:"#87CEEB"}}>📦 Magazynier</span>}
                   {pct>=90&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(0,200,100,0.1)",border:"1px solid #0c633",borderRadius:10,color:"#0c6"}}>💎 Perfekcjonista</span>}
                   {zamkniete.length===0&&posKarty===0&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:10,color:"#f55"}}>🐣 Nowicjusz</span>}
@@ -1596,7 +1601,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
 
               <button onClick={()=>setPokazProfil(null)} style={{
                 width:"100%",padding:10,background:"rgba(255,215,0,0.1)",
-                border:"1px solid #b8860b55",borderRadius:8,color:"#ffd700",
+                border:"1px solid #b8860b55",borderRadius:8,color:"var(--accent)",
                 cursor:"pointer",fontSize:12,
               }}>Zamknij</button>
             </div>
@@ -1620,10 +1625,10 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
           maxWidth:210,
           fontFamily:"Georgia,serif",
         }}>
-          <div style={{fontSize:11,color:"#ffd700",fontWeight:"bold",marginBottom:3}}>💎 Kto ma duplikat:</div>
+          <div style={{fontSize:11,color:"var(--accent)",fontWeight:"bold",marginBottom:3}}>💎 Kto ma duplikat:</div>
           <div style={{fontSize:10,color:"#555",marginBottom:4,fontStyle:"italic"}}>{tooltip.kartaNazwa}</div>
           {tooltip.dawcy.length===0
-            ?<div style={{fontSize:11,color:"#888"}}>Nikt nie ma duplikatu</div>
+            ?<div style={{fontSize:11,color:"var(--muted)"}}>Nikt nie ma duplikatu</div>
             :tooltip.dawcy.map(d=><div key={d} style={{fontSize:12,color:"#0c6",padding:"1px 0"}}>✓ {d}</div>)
           }
         </div>,
@@ -2762,7 +2767,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     32:{t:"🔵 FAZA 8 — Brakuje 3 kart + 2 innych typów",k:"#6af"},
     100:{t:"🔓 ZAMKNIE TALIĘ — pakiet kart na zamknięcie talii",k:"#bb88ff"},
     110:{t:"🔓 Dodatkowo — wysyłamy bo nie ma lepszych",k:"#888bff"},
-    200:{t:"👑 VIP — karty dla wybranej osoby priorytetowej",k:"#ffd700"},
+    200:{t:"👑 VIP — karty dla wybranej osoby priorytetowej",k:"var(--accent)"},
     210:{t:"👥 Reszta gangu — pozostali dawcy po obsłudze VIP-a",k:"#aaa"},
   };
 
@@ -2780,9 +2785,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         ].map(t=>(
           <button key={t.id} onClick={()=>setTrybWymiany(t.id)} style={{
             padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
-            background:trybWymiany===t.id?"rgba(255,215,0,0.14)":"rgba(255,255,255,0.05)",
-            border:trybWymiany===t.id?"1px solid #ffd700":"1px solid #2a2a3a",
-            color:trybWymiany===t.id?"#ffd700":"#666",
+            background:trybWymiany===t.id?"rgba(255,215,0,0.14)":"var(--card)",
+            border:trybWymiany===t.id?"1px solid #ffd700":"1px solid var(--border)",
+            color:trybWymiany===t.id?"var(--accent)":"var(--muted)",
           }}>{t.label}</button>
         ))}
       </div>
@@ -2791,39 +2796,39 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       <div style={{marginBottom:12,display:"flex",gap:8,flexWrap:"wrap"}}>
         <button onClick={()=>setIgnorujTrudne(p=>!p)} style={{
           padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
-          background:ignorujTrudne?"rgba(255,100,0,0.2)":"rgba(255,255,255,0.05)",
-          border:ignorujTrudne?"1px solid #ff6400":"1px solid #2a2a3a",
+          background:ignorujTrudne?"rgba(255,100,0,0.2)":"var(--card)",
+          border:ignorujTrudne?"1px solid #ff6400":"1px solid var(--border)",
           color:ignorujTrudne?"#ff6400":"#555",
         }}>
           {ignorujTrudne?"🔥 Trudne = zwykłe (wł.)":"⚠️ Ignoruj trudne talie"}
         </button>
         <button onClick={()=>setSprawiedliwe(p=>!p)} style={{
           padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
-          background:sprawiedliwe?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.05)",
-          border:sprawiedliwe?"1px solid #0c6":"1px solid #2a2a3a",
+          background:sprawiedliwe?"rgba(0,200,100,0.15)":"var(--card)",
+          border:sprawiedliwe?"1px solid #0c6":"1px solid var(--border)",
           color:sprawiedliwe?"#0c6":"#555",
         }}>
           {sprawiedliwe?"⚖️ Sprawiedliwe wymiany (wł.)":"⚖️ Sprawiedliwe wymiany"}
         </button>
       </div>
       {sprawiedliwe&&(
-        <div style={{fontSize:11,color:"#888",marginBottom:10,padding:"6px 10px",background:"rgba(0,200,100,0.05)",border:"1px solid #0c633",borderRadius:6}}>
+        <div style={{fontSize:11,color:"var(--muted)",marginBottom:10,padding:"6px 10px",background:"rgba(0,200,100,0.05)",border:"1px solid #0c633",borderRadius:6}}>
           ⚖️ <strong style={{color:"#0c6"}}>Jak działa tryb sprawiedliwy:</strong><br/>
           Gdy kilka osób chce tę samą kartę (1 duplikat, 3 chętnych) — wygrywa osoba która <strong>najrzadziej dostawała karty</strong> w poprzednich wymianach. Liczone jako odchylenie od średniej gangu — kto jest poniżej średniej, ma wyższy priorytet. Wymaga zarchiwizowanej historii.
         </div>
       )}
 
       {/* Max kart na osobę */}
-      <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8}}>
+      <div style={{marginBottom:14,padding:"10px 14px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:maxKartNaOsobe>0?8:0}}>
           <span style={{fontSize:12,color:"#aaa",flex:1}}>🃏 Max kart na osobę:</span>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {[0,1,2,3,4,5].map(v=>(
               <button key={v} onClick={()=>setMaxKartNaOsobe(v)} style={{
                 padding:"4px 10px",borderRadius:6,cursor:"pointer",fontSize:12,
-                background:maxKartNaOsobe===v?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
-                border:maxKartNaOsobe===v?"none":"1px solid #2a2a3a",
-                color:maxKartNaOsobe===v?"#000":"#666",
+                background:maxKartNaOsobe===v?"linear-gradient(135deg,#b8860b,#ffd700)":"var(--card)",
+                border:maxKartNaOsobe===v?"none":"1px solid var(--border)",
+                color:maxKartNaOsobe===v?"#000":"var(--muted)",
                 fontWeight:maxKartNaOsobe===v?"bold":"normal",
               }}>{v===0?"∞":v}</button>
             ))}
@@ -2850,11 +2855,11 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       )}
 
       {trybWymiany==="celowany"&&(
-        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>
             🎯 Celowany — wybierz osoby i ile kart mają dostać
           </div>
-          <div style={{fontSize:11,color:"#888",marginBottom:10}}>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:10}}>
             Zaznaczone osoby dostaną priorytetowo podaną liczbę kart. Reszta gangu dostaje normalnie według faz.
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -2868,14 +2873,14 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   border:zaznaczona?"1px solid #ffd70033":"1px solid #1a1a2e",
                   borderRadius:6,
                 }}>
-                  <span style={{flex:1,fontSize:12,color:zaznaczona?"#ddd":"#666"}}>{c.nazwa}</span>
+                  <span style={{flex:1,fontSize:12,color:zaznaczona?"var(--text)":"var(--muted)"}}>{c.nazwa}</span>
                   {[0,1,2,3].map(n=>(
                     <button key={n} onClick={()=>setCelowaKolejka(prev=>({...prev,[c.id]:n}))} style={{
                       padding:"3px 10px",borderRadius:5,cursor:"pointer",fontSize:12,
                       background:ile===n
-                        ? n===0?"rgba(255,255,255,0.05)":"linear-gradient(135deg,#b8860b,#ffd700)"
-                        : "rgba(255,255,255,0.04)",
-                      border:ile===n&&n>0?"none":"1px solid #2a2a3a",
+                        ? n===0?"var(--card)":"linear-gradient(135deg,#b8860b,#ffd700)"
+                        : "var(--card)",
+                      border:ile===n&&n>0?"none":"1px solid var(--border)",
                       color:ile===n&&n>0?"#000":ile===n?"#555":"#555",
                       fontWeight:ile===n&&n>0?"bold":"normal",
                     }}>{n===0?"✕":n}</button>
@@ -2894,10 +2899,10 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
 
       {trybWymiany==="vip"&&(
         <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70044",borderRadius:10,padding:12,marginBottom:12}}>
-          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"var(--accent)",marginBottom:4}}>
             👑 Kolejka priorytetów — zaznacz osoby i ustaw kolejność
           </div>
-          <div style={{fontSize:11,color:"#888",marginBottom:10}}>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:10}}>
             Pierwsza osoba dostaje ile możliwe, potem druga, potem trzecia... Reszta dawców idzie do gangu normalnie.
           </div>
 
@@ -2909,9 +2914,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
               return (
                 <button key={c.id} onClick={()=>toggleVip(c.id)} style={{
                   padding:"6px 12px",borderRadius:20,fontSize:12,cursor:"pointer",
-                  background:wKolejce?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
-                  border:wKolejce?"none":"1px solid #2a2a3a",
-                  color:wKolejce?"#000":"#888",
+                  background:wKolejce?"linear-gradient(135deg,#b8860b,#ffd700)":"var(--card)",
+                  border:wKolejce?"none":"1px solid var(--border)",
+                  color:wKolejce?"#000":"var(--muted)",
                   fontWeight:wKolejce?"bold":"normal",
                 }}>
                   {wKolejce&&<span style={{marginRight:4,background:"rgba(0,0,0,0.3)",borderRadius:"50%",padding:"0 5px",fontSize:10}}>{pos+1}</span>}
@@ -2924,7 +2929,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           {/* Kolejka z możliwością przestawienia */}
           {vipKolejka.length>0&&(
             <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:10}}>
-              <div style={{fontSize:11,color:"#ffd700",marginBottom:6}}>📋 Kolejność obsługi:</div>
+              <div style={{fontSize:11,color:"var(--accent)",marginBottom:6}}>📋 Kolejność obsługi:</div>
               {vipKolejka.map((id,idx)=>{
                 const osoba=czlonkowie.find(c=>c.id===id);
                 const typ=typWymiany==="złote"?"złota":"diamentowa";
@@ -2955,8 +2960,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   <div key={id} style={{padding:"8px 10px",background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70022",borderRadius:8,marginBottom:6}}>
                     {/* Nagłówek */}
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                      <span style={{fontSize:14,fontWeight:"bold",color:"#ffd700",width:20}}>{idx+1}.</span>
-                      <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"#ddd"}}>{osoba?.nazwa}</span>
+                      <span style={{fontSize:14,fontWeight:"bold",color:"var(--accent)",width:20}}>{idx+1}.</span>
+                      <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"var(--text)"}}>{osoba?.nazwa}</span>
                       {(osoba?.krag||1)>1&&(
                         <span style={{fontSize:10,padding:"1px 6px",background:"rgba(138,43,226,0.2)",border:"1px solid #da70d655",borderRadius:10,color:"#da70d6",fontWeight:"bold"}}>
                           Krąg {osoba?.krag}
@@ -3028,9 +3033,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
       )}
 
       {/* Panel wyłączania talii */}
-      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700"}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"var(--accent)"}}>
             🚫 Wyłącz talie z generowania
             {wylaczoneTalie.size>0&&<span style={{marginLeft:8,fontSize:11,color:"#fa0"}}>({wylaczoneTalie.size} wyłączone)</span>}
           </div>
@@ -3046,9 +3051,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
             return (
               <button key={t.id} onClick={()=>toggleTalia(t.id)} style={{
                 padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
-                background:wylaczona?"rgba(255,50,50,0.15)":"rgba(255,255,255,0.05)",
-                border:wylaczona?"1px solid #f5544488":"1px solid #2a2a3a",
-                color:wylaczona?"#f55":"#888",
+                background:wylaczona?"rgba(255,50,50,0.15)":"var(--card)",
+                border:wylaczona?"1px solid #f5544488":"1px solid var(--border)",
+                color:wylaczona?"#f55":"var(--muted)",
                 textDecoration:wylaczona?"line-through":"none",
               }}>
                 {wylaczona?"🚫 ":""}{t.nazwa}
@@ -3057,21 +3062,21 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           })}
         </div>
         {wylaczoneTalie.size>0&&(
-          <div style={{fontSize:10,color:"#666",marginTop:6}}>
+          <div style={{fontSize:10,color:"var(--muted)",marginTop:6}}>
             Wyłączone talie są ignorowane przy generowaniu wymian.
           </div>
         )}
       </div>
 
       {/* Wyłącz osoby — rozwijane menu */}
-      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",borderRadius:8,marginBottom:12,overflow:"hidden"}}>
+      <div style={{background:"var(--card)",border:"1px solid #1a1a2e",borderRadius:8,marginBottom:12,overflow:"hidden"}}>
         {/* Nagłówek — klikalny */}
         <div onClick={()=>setPokazWylaczenia(p=>!p)} style={{
           display:"flex",justifyContent:"space-between",alignItems:"center",
           padding:"10px 12px",cursor:"pointer",
           background:pokazWylaczenia?"rgba(255,215,0,0.04)":"transparent",
         }}>
-          <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"var(--accent)",display:"flex",alignItems:"center",gap:8}}>
             🚫 Wyłącz graczy
             {(wylaczoneOsoby.size>0||wylaczoneDawcy.size>0)&&(
               <span style={{fontSize:10,color:"#fa0",fontWeight:"normal"}}>
@@ -3099,7 +3104,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
             {/* Legenda */}
             <div style={{display:"flex",gap:10,marginBottom:8,marginTop:8,fontSize:10,color:"#555"}}>
               <span>Kliknij żeby zmienić tryb wyłączenia:</span>
-              <span style={{color:"#888"}}>⬜ aktywny</span>
+              <span style={{color:"var(--muted)"}}>⬜ aktywny</span>
               <span style={{color:"#f55"}}>🚫 bez odbioru</span>
               <span style={{color:"#fa0"}}>📤 bez dawcy</span>
               <span style={{color:"#a55"}}>⛔ oba</span>
@@ -3130,9 +3135,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 };
 
                 const ikona = obie?"⛔":bezOdbioru?"🚫":bezDawcy?"📤":"";
-                const kolor = obie?"#a55":bezOdbioru?"#f55":bezDawcy?"#fa0":"#888";
-                const bg = obie?"rgba(180,50,50,0.15)":bezOdbioru?"rgba(255,50,50,0.12)":bezDawcy?"rgba(255,165,0,0.12)":"rgba(255,255,255,0.05)";
-                const border = obie?"1px solid #a5544488":bezOdbioru?"1px solid #f5544488":bezDawcy?"1px solid #fa055":"1px solid #2a2a3a";
+                const kolor = obie?"#a55":bezOdbioru?"#f55":bezDawcy?"#fa0":"var(--muted)";
+                const bg = obie?"rgba(180,50,50,0.15)":bezOdbioru?"rgba(255,50,50,0.12)":bezDawcy?"rgba(255,165,0,0.12)":"var(--card)";
+                const border = obie?"1px solid #a5544488":bezOdbioru?"1px solid #f5544488":bezDawcy?"1px solid #fa055":"1px solid var(--border)";
 
                 const limitOsoby = limitKartOsoby[c.id];
                 return (
@@ -3156,8 +3161,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                         const val=e.target.value;
                         setLimitKartOsoby(prev=>{const n={...prev};if(val==="")delete n[c.id];else n[c.id]=parseInt(val);return n;});
                       }} title="Max kart dla tej osoby" style={{
-                        padding:"2px 4px",background:"#12122a",
-                        border:`1px solid ${limitOsoby?"#fa0":"#2a2a3a"}`,
+                        padding:"2px 4px",background:"var(--card-solid)",
+                        border:`1px solid ${limitOsoby?"#fa0":"var(--border)"}`,
                         borderRadius:4,color:limitOsoby?"#fa0":"#444",
                         fontSize:10,cursor:"pointer",width:42,
                       }}>
@@ -3190,7 +3195,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
             <div style={{fontWeight:"bold",color:"#0c6",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
             {wynik.zamknieciaInfo.map((z,i)=>(
               <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #12122a",animation:`slideInUp 0.3s ${i*0.05}s both`}}>
-                🎉 <strong style={{color:"#ffd700"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
+                🎉 <strong style={{color:"var(--accent)"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
                 <span style={{color:"#0c6",marginLeft:6,animation:"countUp 0.4s ease both"}}>+{z.nagroda?.toLocaleString()} 💰</span>
                 {z.nowyProg&&(
                   <span style={{marginLeft:8,background:"rgba(255,165,0,0.2)",border:"1px solid #fa0",borderRadius:6,padding:"1px 6px",fontSize:11,color:"#fa0"}}>
@@ -3219,22 +3224,22 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           </div>
         )}
 
-        <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
-            <div style={{fontWeight:"bold",color:"#ffd700",fontSize:13}}>📋 Tekst na Messengera</div>
+            <div style={{fontWeight:"bold",color:"var(--accent)",fontSize:13}}>📋 Tekst na Messengera</div>
             <button onClick={kopiuj} style={{
               padding:"5px 14px",background:skopiowano?"rgba(0,200,100,0.2)":"rgba(255,215,0,0.12)",
               border:`1px solid ${skopiowano?"#0c6":"#b8860b"}`,borderRadius:6,
-              color:skopiowano?"#0c6":"#ffd700",cursor:"pointer",fontSize:11,fontWeight:"bold",
+              color:skopiowano?"#0c6":"var(--accent)",cursor:"pointer",fontSize:11,fontWeight:"bold",
             }}>{skopiowano?"✓ Skopiowano!":"📋 Kopiuj"}</button>
           </div>
-          <pre style={{fontSize:13,color:"#ddd",whiteSpace:"pre-wrap",margin:0,fontFamily:"monospace",lineHeight:2,background:"rgba(0,0,0,0.2)",padding:10,borderRadius:6,overflow:"auto"}}>
+          <pre style={{fontSize:13,color:"var(--text)",whiteSpace:"pre-wrap",margin:0,fontFamily:"monospace",lineHeight:2,background:"rgba(0,0,0,0.2)",padding:10,borderRadius:6,overflow:"auto"}}>
             {tekstMessenger||"Brak wymian"}
           </pre>
         </div>
 
-        <div style={{fontSize:12,color:"#888",marginBottom:10}}>
-          Zaplanowane wymiany: <strong style={{color:"#ffd700"}}>{wynik.planoweWymiany.length}</strong>
+        <div style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>
+          Zaplanowane wymiany: <strong style={{color:"var(--accent)"}}>{wynik.planoweWymiany.length}</strong>
           {wynik.nieobsluzone.length>0&&<span style={{color:"#fa0",marginLeft:12}}>⚠️ {wynik.nieobsluzone.length} bez dawcy</span>}
           <button onClick={async()=>{
             setPublikowanie(true);
@@ -3272,10 +3277,10 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   return (
                     <div key={i}>
                       <div style={{padding:"8px 14px",borderBottom:(!pokazujPodmien&&i<w.length-1)?"1px solid #12122a":"none",display:"flex",flexWrap:"wrap",alignItems:"center",gap:8}}>
-                        <span style={{background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b",padding:"2px 8px",borderRadius:20,fontSize:12,color:"#ffd700",fontWeight:"bold"}}>{x.od}</span>
+                        <span style={{background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b",padding:"2px 8px",borderRadius:20,fontSize:12,color:"var(--accent)",fontWeight:"bold"}}>{x.od}</span>
                         <span style={{color:"#444"}}>→</span>
                         <span style={{background:`${e.k}18`,border:`1px solid ${e.k}`,padding:"2px 8px",borderRadius:20,fontSize:12,color:e.k,fontWeight:"bold"}}>{x.do}</span>
-                        <span style={{fontSize:12,color:"#ddd"}}><strong>{x.karta}</strong></span>
+                        <span style={{fontSize:12,color:"var(--text)"}}><strong>{x.karta}</strong></span>
                         <span style={{fontSize:11,color:"#555"}}>[{x.talia}]</span>
                         {x.brakOCount>0&&<span style={{fontSize:10,color:"#87CEEB",background:"rgba(65,105,225,0.12)",padding:"1px 6px",borderRadius:10}}>jeszcze brak {x.brakOCount} {typWymiany==="złote"?"💎":"⭐"}</span>}
                         {x.trudna&&<span style={{fontSize:10,color:"#f55"}}>⚠️trudna</span>}
@@ -3284,8 +3289,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                         <div style={{marginLeft:"auto",display:"flex",gap:4}}>
                           <button onClick={()=>setPodmienDawce(pokazujPodmien?null:{globalIdx,dawca:x.od})} style={{
                             padding:"2px 8px",background:pokazujPodmien?"rgba(255,215,0,0.2)":"rgba(255,165,0,0.1)",
-                            border:`1px solid ${pokazujPodmien?"#ffd700":"#fa055"}`,borderRadius:4,
-                            color:pokazujPodmien?"#ffd700":"#fa0",cursor:"pointer",fontSize:10,
+                            border:`1px solid ${pokazujPodmien?"var(--accent)":"#fa055"}`,borderRadius:4,
+                            color:pokazujPodmien?"var(--accent)":"#fa0",cursor:"pointer",fontSize:10,
                           }}>🔄 Podmień</button>
                           <button onClick={()=>usunWymiane(globalIdx)} style={{
                             padding:"2px 6px",background:"rgba(255,50,50,0.1)",border:"none",
@@ -3299,7 +3304,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                             🔄 Alternatywne wymiany dla <strong>{x.od}</strong> — karta wpadła odbiorcy z paczki?
                           </div>
                           {alternatywy.length===0?(
-                            <div style={{fontSize:11,color:"#666"}}>Brak alternatyw — {x.od} nie ma innych duplikatów które ktoś potrzebuje (faza ≤20)</div>
+                            <div style={{fontSize:11,color:"var(--muted)"}}>Brak alternatyw — {x.od} nie ma innych duplikatów które ktoś potrzebuje (faza ≤20)</div>
                           ):alternatywy.map((alt,ai)=>{
                             const zamknieTalie = alt.faza===1 && alt.brakOCount===0;
                             const progInfo = alt.nastepnyProg ? ` 🎯+${alt.ammoProg?.toLocaleString()} próg!` : "";
@@ -3316,8 +3321,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                             }}>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginBottom:2}}>
-                                  <strong style={{fontSize:12,color:"#ddd"}}>{alt.do}</strong>
-                                  <span style={{fontSize:10,color:"#666"}}>← {alt.karta}</span>
+                                  <strong style={{fontSize:12,color:"var(--text)"}}>{alt.do}</strong>
+                                  <span style={{fontSize:10,color:"var(--muted)"}}>← {alt.karta}</span>
                                   <span style={{fontSize:10,color:"#555"}}>[{alt.talia}]</span>
                                 </div>
                                 <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
@@ -3339,7 +3344,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                                       </span>
                                     );
                                   })()}
-                                  {!zamknieTalie&&<span style={{fontSize:10,color:"#666"}}>💰{alt.nagroda?.toLocaleString()}</span>}
+                                  {!zamknieTalie&&<span style={{fontSize:10,color:"var(--muted)"}}>💰{alt.nagroda?.toLocaleString()}</span>}
                                   {progInfo&&<span style={{fontSize:10,color:"#fa0",fontWeight:"bold"}}>{progInfo}</span>}
                                 </div>
                               </div>
@@ -3367,8 +3372,8 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
             <div style={{fontWeight:"bold",color:"#fa0",marginBottom:8,fontSize:13}}>⚠️ Potrzeby bez dawcy (brak duplikatów):</div>
             {wynik.nieobsluzone.map((p,i)=>(
               <div key={i} style={{fontSize:12,color:"#aaa",padding:"3px 0",borderBottom:"1px solid #12122a"}}>
-                <span style={{color:"#ffd700"}}>{p.osoba.nazwa}</span> potrzebuje <strong style={{color:"#ddd"}}>{p.karta.nazwa}</strong> z <em>{p.talia.nazwa}</em>
-                <span style={{color:"#666",marginLeft:6}}>(brakuje {p.brakTCount})</span>
+                <span style={{color:"var(--accent)"}}>{p.osoba.nazwa}</span> potrzebuje <strong style={{color:"var(--text)"}}>{p.karta.nazwa}</strong> z <em>{p.talia.nazwa}</em>
+                <span style={{color:"var(--muted)",marginLeft:6}}>(brakuje {p.brakTCount})</span>
               </div>
             ))}
           </div>
@@ -3462,9 +3467,9 @@ function EdycjaTalii({talie,zapisz}) {
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700"}}>⚙️ Talie ({talie.length})</div>
+        <div style={{fontSize:14,fontWeight:"bold",color:"var(--accent)"}}>⚙️ Talie ({talie.length})</div>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>{setOcrMode(!ocrMode);setOcrWynik(null);}} style={{padding:"6px 14px",background:ocrMode?"rgba(255,215,0,0.15)":"rgba(255,165,0,0.1)",border:`1px solid ${ocrMode?"#ffd700":"#fa055"}`,borderRadius:8,color:ocrMode?"#ffd700":"#fa0",cursor:"pointer",fontSize:12}}>📸 OCR nowej talii</button>
+          <button onClick={()=>{setOcrMode(!ocrMode);setOcrWynik(null);}} style={{padding:"6px 14px",background:ocrMode?"rgba(255,215,0,0.15)":"rgba(255,165,0,0.1)",border:`1px solid ${ocrMode?"var(--accent)":"#fa055"}`,borderRadius:8,color:ocrMode?"var(--accent)":"#fa0",cursor:"pointer",fontSize:12}}>📸 OCR nowej talii</button>
           <button onClick={()=>setNowyModal(true)} style={{padding:"6px 14px",background:"rgba(0,200,100,0.12)",border:"1px solid #0c655",borderRadius:8,color:"#0c6",cursor:"pointer",fontSize:12}}>+ Ręcznie</button>
         </div>
       </div>
@@ -3473,35 +3478,35 @@ function EdycjaTalii({talie,zapisz}) {
       {ocrMode&&(
         <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:"bold",color:"#fa0",marginBottom:8}}>📸 OCR nowej talii — wgraj screen z ekranu talii</div>
-          <div style={{fontSize:11,color:"#888",marginBottom:10}}>AI rozpozna nazwę talii i wszystkie 9 kart automatycznie. Potem ustawisz numer i nagrodę.</div>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:10}}>AI rozpozna nazwę talii i wszystkie 9 kart automatycznie. Potem ustawisz numer i nagrodę.</div>
 
           <input type="file" accept="image/*" onChange={analizujScreenTalii} disabled={ocrAnalizuje}
-            style={{width:"100%",padding:8,background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,marginBottom:8,boxSizing:"border-box"}}/>
+            style={{width:"100%",padding:8,background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,marginBottom:8,boxSizing:"border-box"}}/>
 
           {ocrAnalizuje&&<div style={{textAlign:"center",padding:12,color:"#fa0",fontSize:12}}>🤖 Analizuję screen...</div>}
 
           {ocrWynik&&(
             <div style={{marginTop:10}}>
-              <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>
+              <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>
                 ✅ Rozpoznano: <span style={{color:"#0c6"}}>{ocrWynik.talia}</span>
               </div>
               <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                 <label style={{fontSize:11,color:"#aaa"}}>Numer talii:
                   <input type="number" value={ocrNumer} onChange={e=>setOcrNumer(e.target.value)} placeholder="np. 8"
-                    style={{display:"block",marginTop:4,width:70,padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
+                    style={{display:"block",marginTop:4,width:70,padding:"5px 8px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
                 </label>
                 <label style={{fontSize:11,color:"#aaa"}}>Nagroda (amunicja):
                   <input type="number" value={ocrNagroda} onChange={e=>setOcrNagroda(e.target.value)} placeholder="np. 3500"
-                    style={{display:"block",marginTop:4,width:90,padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
+                    style={{display:"block",marginTop:4,width:90,padding:"5px 8px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
                 </label>
               </div>
               <div style={{marginBottom:10}}>
                 {ocrWynik.karty.map((k,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid #12122a"}}>
-                    <span style={{fontSize:10,color:k.typ==="złota"?"#ffd700":"#87CEEB"}}>{k.typ==="złota"?"⭐":"💎"}</span>
-                    <span style={{flex:1,fontSize:12,color:"#ddd"}}>{k.nazwa}</span>
+                    <span style={{fontSize:10,color:k.typ==="złota"?"var(--accent)":"#87CEEB"}}>{k.typ==="złota"?"⭐":"💎"}</span>
+                    <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{k.nazwa}</span>
                     <select value={k.typ} onChange={e=>{const n=[...ocrWynik.karty];n[i]={...n[i],typ:e.target.value};setOcrWynik({...ocrWynik,karty:n});}}
-                      style={{padding:"2px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:k.typ==="złota"?"#ffd700":"#87CEEB",fontSize:11}}>
+                      style={{padding:"2px 5px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:k.typ==="złota"?"var(--accent)":"#87CEEB",fontSize:11}}>
                       <option value="złota">⭐ Złota</option>
                       <option value="diamentowa">💎 Diamentowa</option>
                     </select>
@@ -3521,7 +3526,7 @@ function EdycjaTalii({talie,zapisz}) {
           <div style={{fontWeight:"bold",color:"#0c6",marginBottom:10}}>Nowa talia</div>
           {[{p:"nazwa",l:"Nazwa"},{p:"numer",l:"Numer"},{p:"nagroda_amunicja",l:"Nagroda K1 (amunicja)"},{p:"nagroda_amunicja_k2",l:"Nagroda K2 (opcjonalnie)"}].map(f=>(
             <input key={f.p} value={nowaTalia[f.p]||""} onChange={e=>setNowaTalia(n=>({...n,[f.p]:e.target.value}))} placeholder={f.l}
-              style={{display:"block",width:"100%",marginBottom:8,padding:"8px 10px",background:"#12122a",border:`1px solid ${f.p==="nagroda_amunicja_k2"?"#da70d655":"#333"}`,borderRadius:6,color:f.p==="nagroda_amunicja_k2"?"#da70d6":"#fff",fontSize:13,boxSizing:"border-box"}}/>
+              style={{display:"block",width:"100%",marginBottom:8,padding:"8px 10px",background:"var(--card-solid)",border:`1px solid ${f.p==="nagroda_amunicja_k2"?"#da70d655":"#333"}`,borderRadius:6,color:f.p==="nagroda_amunicja_k2"?"#da70d6":"#fff",fontSize:13,boxSizing:"border-box"}}/>
           ))}
           <div style={{display:"flex",gap:8}}>
             <button onClick={dodajTalie} style={{padding:"8px 16px",background:"#0c6",border:"none",borderRadius:6,color:"#fff",cursor:"pointer",fontWeight:"bold"}}>Dodaj</button>
@@ -3534,28 +3539,28 @@ function EdycjaTalii({talie,zapisz}) {
         {sorted.map((t,i)=>(
           <button key={t.id} onClick={()=>setWybranaIdx(i)} style={{
             padding:"4px 9px",borderRadius:6,cursor:"pointer",fontSize:11,
-            background:wybranaIdx===i?"rgba(255,215,0,0.12)":"rgba(255,255,255,0.05)",
-            border:wybranaIdx===i?"1px solid #ffd700":"1px solid #2a2a3a",
-            color:wybranaIdx===i?"#ffd700":"#888",
+            background:wybranaIdx===i?"rgba(255,215,0,0.12)":"var(--card)",
+            border:wybranaIdx===i?"1px solid #ffd700":"1px solid var(--border)",
+            color:wybranaIdx===i?"var(--accent)":"var(--muted)",
           }}>#{t.numer} {t.nazwa}</button>
         ))}
       </div>
 
       {talia&&(
-        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:8}}>
-            <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700"}}>
-              {talia.nazwa} <span style={{fontSize:12,color:"#888"}}>({talia.karty.length} kart)</span>
-              <span style={{fontSize:11,color:"#ffd700",marginLeft:8}}>K1: {(talia.nagroda_amunicja||0).toLocaleString()} 💰</span>
+            <div style={{fontSize:15,fontWeight:"bold",color:"var(--accent)"}}>
+              {talia.nazwa} <span style={{fontSize:12,color:"var(--muted)"}}>({talia.karty.length} kart)</span>
+              <span style={{fontSize:11,color:"var(--accent)",marginLeft:8}}>K1: {(talia.nagroda_amunicja||0).toLocaleString()} 💰</span>
               {talia.nagroda_amunicja_k2&&<span style={{fontSize:11,color:"#da70d6",marginLeft:6}}>K2: {talia.nagroda_amunicja_k2.toLocaleString()} 💜</span>}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-              <label style={{fontSize:11,color:"#aaa"}}>Nr: <input key={`nr-${talia.id}`} type="number" defaultValue={talia.numer} onBlur={e=>zapiszPole("numer",e.target.value)} style={{width:45,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
+              <label style={{fontSize:11,color:"#aaa"}}>Nr: <input key={`nr-${talia.id}`} type="number" defaultValue={talia.numer} onBlur={e=>zapiszPole("numer",e.target.value)} style={{width:45,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
               <label style={{fontSize:11,color:"#aaa"}}>
-                K1 💰: <input key={`k1-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja} onBlur={e=>zapiszPole("nagroda_amunicja",e.target.value)} style={{width:65,padding:"3px 5px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#ffd700",fontSize:11}}/>
+                K1 💰: <input key={`k1-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja} onBlur={e=>zapiszPole("nagroda_amunicja",e.target.value)} style={{width:65,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"var(--accent)",fontSize:11}}/>
               </label>
               <label style={{fontSize:11,color:"#aaa"}}>
-                K2 💜: <input key={`k2-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja_k2??""} placeholder="K2" onBlur={e=>zapiszPole("nagroda_amunicja_k2",e.target.value)} style={{width:65,padding:"3px 5px",background:"#12122a",border:"1px solid #da70d655",borderRadius:4,color:"#da70d6",fontSize:11}}/>
+                K2 💜: <input key={`k2-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja_k2??""} placeholder="K2" onBlur={e=>zapiszPole("nagroda_amunicja_k2",e.target.value)} style={{width:65,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #da70d655",borderRadius:4,color:"#da70d6",fontSize:11}}/>
               </label>
               <button onClick={()=>usunTalie(talia.id)} style={{padding:"4px 10px",background:"rgba(255,50,50,0.12)",border:"1px solid #f5544455",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>🗑 Usuń</button>
             </div>
@@ -3585,7 +3590,7 @@ function EdycjaTalii({talie,zapisz}) {
                   {k.nazwa} <span style={{fontSize:9,color:"#444",marginLeft:2}}>✏️</span>
                 </span>
               )}
-              <select value={k.typ} onChange={e=>zmienTyp(k.nazwa,e.target.value)} style={{padding:"3px 6px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:k.typ==="złota"?"#ffd700":"#87CEEB",fontSize:11,cursor:"pointer"}}>
+              <select value={k.typ} onChange={e=>zmienTyp(k.nazwa,e.target.value)} style={{padding:"3px 6px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:k.typ==="złota"?"var(--accent)":"#87CEEB",fontSize:11,cursor:"pointer"}}>
                 <option value="złota">⭐ Złota</option>
                 <option value="diamentowa">💎 Diamentowa</option>
               </select>
@@ -3595,8 +3600,8 @@ function EdycjaTalii({talie,zapisz}) {
           <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
             <input value={nowaKarta.nazwa} onChange={e=>setNowaKarta(k=>({...k,nazwa:e.target.value}))} placeholder="Nazwa karty"
               onKeyDown={e=>e.key==="Enter"&&dodajKarte()}
-              style={{flex:1,minWidth:120,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
-            <select value={nowaKarta.typ} onChange={e=>setNowaKarta(k=>({...k,typ:e.target.value}))} style={{padding:"7px 8px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:nowaKarta.typ==="złota"?"#ffd700":"#87CEEB",fontSize:12,cursor:"pointer"}}>
+              style={{flex:1,minWidth:120,padding:"7px 10px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+            <select value={nowaKarta.typ} onChange={e=>setNowaKarta(k=>({...k,typ:e.target.value}))} style={{padding:"7px 8px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:nowaKarta.typ==="złota"?"var(--accent)":"#87CEEB",fontSize:12,cursor:"pointer"}}>
               <option value="złota">⭐ Złota</option>
               <option value="diamentowa">💎 Diamentowa</option>
             </select>
@@ -3647,16 +3652,16 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
 
   return (
     <div>
-      <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>👥 Członkowie ({czlonkowie.length})</div>
-      <div style={{fontSize:11,color:"#666",marginBottom:12}}>Użyj ▲▼ żeby ustawić kolejność według poziomu w grze. Kolejność wpływa na rangi.</div>
+      <div style={{fontSize:14,fontWeight:"bold",color:"var(--accent)",marginBottom:4}}>👥 Członkowie ({czlonkowie.length})</div>
+      <div style={{fontSize:11,color:"var(--muted)",marginBottom:12}}>Użyj ▲▼ żeby ustawić kolejność według poziomu w grze. Kolejność wpływa na rangi.</div>
       {czlonkowie.map((c,i)=>{
         const ranga=rangaDla(i);
         return (
           <div key={c.id} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 0",borderBottom:"1px solid #12122a"}}>
             {/* Przyciski góra/dół */}
             <div style={{display:"flex",flexDirection:"column",gap:1}}>
-              <button onClick={()=>przesun(i,-1)} disabled={i===0} style={{padding:"0 5px",background:"none",border:"none",color:i===0?"#222":"#666",cursor:i===0?"default":"pointer",fontSize:10,lineHeight:1.2}}>▲</button>
-              <button onClick={()=>przesun(i,1)} disabled={i===czlonkowie.length-1} style={{padding:"0 5px",background:"none",border:"none",color:i===czlonkowie.length-1?"#222":"#666",cursor:i===czlonkowie.length-1?"default":"pointer",fontSize:10,lineHeight:1.2}}>▼</button>
+              <button onClick={()=>przesun(i,-1)} disabled={i===0} style={{padding:"0 5px",background:"none",border:"none",color:i===0?"#222":"var(--muted)",cursor:i===0?"default":"pointer",fontSize:10,lineHeight:1.2}}>▲</button>
+              <button onClick={()=>przesun(i,1)} disabled={i===czlonkowie.length-1} style={{padding:"0 5px",background:"none",border:"none",color:i===czlonkowie.length-1?"#222":"var(--muted)",cursor:i===czlonkowie.length-1?"default":"pointer",fontSize:10,lineHeight:1.2}}>▼</button>
             </div>
             {/* Ranga */}
             <span title={ranga.nazwa} style={{fontSize:14,width:20,textAlign:"center"}}>{ranga.ikona}</span>
@@ -3664,12 +3669,12 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
             {edytujId===c.id?(
               <>
                 <input value={tempNazwa} onChange={e=>setTempNazwa(e.target.value)} onKeyDown={e=>e.key==="Enter"&&zapiszN(c.id)}
-                  style={{flex:1,padding:"5px 8px",background:"#12122a",border:"1px solid #ffd700",borderRadius:5,color:"#fff",fontSize:13}}/>
-                <button onClick={()=>zapiszN(c.id)} style={{padding:"5px 10px",background:"#ffd700",border:"none",borderRadius:5,cursor:"pointer",fontSize:12,color:"#000",fontWeight:"bold"}}>OK</button>
+                  style={{flex:1,padding:"5px 8px",background:"var(--card-solid)",border:"1px solid #ffd700",borderRadius:5,color:"#fff",fontSize:13}}/>
+                <button onClick={()=>zapiszN(c.id)} style={{padding:"5px 10px",background:"var(--accent)",border:"none",borderRadius:5,cursor:"pointer",fontSize:12,color:"#000",fontWeight:"bold"}}>OK</button>
               </>
             ):(
               <>
-                <span style={{flex:1,fontSize:13,color:"#ddd"}}>{c.nazwa}</span>
+                <span style={{flex:1,fontSize:13,color:"var(--text)"}}>{c.nazwa}</span>
                 {(c.krag||1) > 1 && (
                   <span style={{fontSize:10,padding:"1px 6px",background:"rgba(138,43,226,0.2)",border:"1px solid #8a2be255",borderRadius:10,color:"#da70d6",fontWeight:"bold"}}>
                     K{c.krag||1}
@@ -3678,7 +3683,7 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
                 <span style={{fontSize:10,color:"#555"}}>{ranga.nazwa}</span>
                 {/* Selector kręgu */}
                 <select value={c.krag||1} onChange={e=>zapiszKrag(c.id,e.target.value)}
-                  style={{padding:"2px 4px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#aaa",fontSize:10,cursor:"pointer"}}>
+                  style={{padding:"2px 4px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#aaa",fontSize:10,cursor:"pointer"}}>
                   <option value={1}>K1</option>
                   <option value={2}>K2</option>
                   <option value={3}>K3</option>
@@ -3693,14 +3698,14 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
       <div style={{display:"flex",gap:8,marginTop:14}}>
         <input value={nowyNick} onChange={e=>setNowyNick(e.target.value)} placeholder="Nick nowego członka"
           onKeyDown={e=>e.key==="Enter"&&dodaj()}
-          style={{flex:1,padding:"8px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
+          style={{flex:1,padding:"8px 10px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:13}}/>
         <button onClick={dodaj} style={{padding:"8px 16px",background:"rgba(0,200,100,0.12)",border:"1px solid #0c655",borderRadius:6,color:"#0c6",cursor:"pointer",fontWeight:"bold",fontSize:13}}>+ Dodaj</button>
       </div>
       <div style={{marginTop:14,padding:10,background:"rgba(0,0,0,0.2)",borderRadius:8}}>
-        <div style={{fontSize:11,color:"#666",marginBottom:6}}>Rangi według pozycji:</div>
+        <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>Rangi według pozycji:</div>
         {RANGI.map((r,i)=>(
           <div key={i} style={{fontSize:11,color:"#555",padding:"1px 0"}}>
-            {r.ikona} <span style={{color:"#888"}}>{r.nazwa}</span> — pozycja {r.min}{r.max<99?`-${r.max}`:`+`}
+            {r.ikona} <span style={{color:"var(--muted)"}}>{r.nazwa}</span> — pozycja {r.min}{r.max<99?`-${r.max}`:`+`}
           </div>
         ))}
       </div>
@@ -3756,17 +3761,17 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
   return (
     <div>
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:8,padding:"10px 14px",marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:2}}>🔄 Wszystkie duplikaty w gangu</div>
+        <div style={{fontSize:14,fontWeight:"bold",color:"var(--accent)",marginBottom:2}}>🔄 Wszystkie duplikaty w gangu</div>
         <div style={{fontSize:11,color:"#aaa"}}>Karty które ktoś posiada w nadmiarze i może wysłać innym</div>
       </div>
 
       {/* Filtry */}
-      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
+      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
         <textarea
           value={szukaj} onChange={e=>setSzukaj(e.target.value)}
           placeholder={"🔍 Wpisz nazwy kart — każda w osobnej linii:\n\nWystępy mimów\nAkrobatyczne popisy\nSztuka kredowa"}
           rows={4}
-          style={{width:"100%",padding:"8px 12px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,marginBottom:10,boxSizing:"border-box",resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}
+          style={{width:"100%",padding:"8px 12px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,marginBottom:10,boxSizing:"border-box",resize:"vertical",fontFamily:"inherit",lineHeight:1.5}}
         />
         <div style={{fontSize:10,color:"#555",marginBottom:10}}>
           💡 Jedna nazwa per linijka — znajdzie karty pasujące do którejkolwiek z wpisanych fraz
@@ -3779,14 +3784,14 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
           ].map(f=>(
             <button key={f.id} onClick={()=>setFiltrTyp(f.id)} style={{
               padding:"4px 12px",borderRadius:20,fontSize:11,cursor:"pointer",
-              background:filtrTyp===f.id?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
-              border:filtrTyp===f.id?"1px solid #ffd700":"1px solid #2a2a3a",
-              color:filtrTyp===f.id?"#ffd700":"#888",
+              background:filtrTyp===f.id?"rgba(255,215,0,0.15)":"var(--card)",
+              border:filtrTyp===f.id?"1px solid #ffd700":"1px solid var(--border)",
+              color:filtrTyp===f.id?"var(--accent)":"var(--muted)",
             }}>{f.label}</button>
           ))}
           <select value={filtrTalia} onChange={e=>setFiltrTalia(e.target.value)} style={{
             padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
-            background:"rgba(255,255,255,0.05)",border:"1px solid #2a2a3a",color:"#888",
+            background:"var(--card)",border:"1px solid var(--border)",color:"var(--muted)",
             outline:"none",
           }}>
             <option value="wszystkie">Wszystkie talie</option>
@@ -3798,12 +3803,12 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
       {/* Statystyki */}
       <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
         <div style={{background:"rgba(255,215,0,0.08)",border:"1px solid #b8860b44",borderRadius:8,padding:"8px 14px",flex:1,minWidth:100}}>
-          <div style={{fontSize:18,fontWeight:"bold",color:"#ffd700"}}>{filtered.length}</div>
-          <div style={{fontSize:10,color:"#888"}}>różnych kart</div>
+          <div style={{fontSize:18,fontWeight:"bold",color:"var(--accent)"}}>{filtered.length}</div>
+          <div style={{fontSize:10,color:"var(--muted)"}}>różnych kart</div>
         </div>
         <div style={{background:"rgba(0,200,100,0.08)",border:"1px solid #0c644",borderRadius:8,padding:"8px 14px",flex:1,minWidth:100}}>
           <div style={{fontSize:18,fontWeight:"bold",color:"#0c6"}}>{lacznie}</div>
-          <div style={{fontSize:10,color:"#888"}}>duplikatów łącznie</div>
+          <div style={{fontSize:10,color:"var(--muted)"}}>duplikatów łącznie</div>
         </div>
       </div>
 
@@ -3815,13 +3820,13 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
         </div>
       ):(
         filtered.map((d,i)=>(
-          <div key={i} style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:8,padding:"10px 12px",marginBottom:6}}>
+          <div key={i} style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 12px",marginBottom:6}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
-              <span style={{fontSize:10,color:d.kartaTyp==="złota"?"#ffd700":"#87CEEB"}}>
+              <span style={{fontSize:10,color:d.kartaTyp==="złota"?"var(--accent)":"#87CEEB"}}>
                 {d.kartaTyp==="złota"?"⭐":"💎"}
               </span>
-              <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"#ddd"}}>{d.kartaNazwa}</span>
-              <span style={{fontSize:11,color:"#888"}}>#{d.taliaNum} {d.taliaNazwa}</span>
+              <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"var(--text)"}}>{d.kartaNazwa}</span>
+              <span style={{fontSize:11,color:"var(--muted)"}}>#{d.taliaNum} {d.taliaNazwa}</span>
               <span style={{
                 fontSize:12,fontWeight:"bold",padding:"2px 10px",borderRadius:12,
                 background:"rgba(0,200,100,0.15)",border:"1px solid #0c644",color:"#0c6",
@@ -3831,10 +3836,10 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
               {d.posiadacze.map((p,j)=>(
                 <span key={j} style={{
                   fontSize:11,padding:"3px 10px",borderRadius:14,
-                  background:"rgba(255,255,255,0.05)",border:"1px solid #2a2a3a",color:"#bbb",
+                  background:"var(--card)",border:"1px solid var(--border)",color:"#bbb",
                 }}>
                   {p.nick}
-                  {p.ile>1&&<span style={{marginLeft:4,color:"#ffd700",fontWeight:"bold"}}>×{p.ile}</span>}
+                  {p.ile>1&&<span style={{marginLeft:4,color:"var(--accent)",fontWeight:"bold"}}>×{p.ile}</span>}
                 </span>
               ))}
             </div>
@@ -3870,7 +3875,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
   if(!aktywnaWymiana) return (
     <div style={{textAlign:"center",padding:50,color:"#555"}}>
       <div style={{fontSize:40,marginBottom:10}}>📭</div>
-      <div style={{fontSize:14,color:"#666"}}>Brak aktywnej wymiany</div>
+      <div style={{fontSize:14,color:"var(--muted)"}}>Brak aktywnej wymiany</div>
       <div style={{fontSize:11,color:"#555",marginTop:6}}>Admin generuje wymianę w zakładce ⚡ Generuj i publikuje ją tutaj</div>
     </div>
   );
@@ -4040,7 +4045,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
           <div>
             <div style={{fontSize:15,fontWeight:"bold",color:"#0c6"}}>📤 Aktywna wymiana</div>
-            <div style={{fontSize:11,color:"#888",marginTop:2}}>
+            <div style={{fontSize:11,color:"var(--muted)",marginTop:2}}>
               {typAkt==="złote"?"⭐ Złote":"💎 Diamentowe"} • {new Date(data).toLocaleString("pl-PL")} • {wymiany.length} wymian
             </div>
           </div>
@@ -4086,9 +4091,9 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 
       {/* Moja wymiana */}
       {mojePozycje?(
-        <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"#ffd700"}`,borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{background:czyPotwierdzilem?"rgba(0,200,100,0.1)":"rgba(255,215,0,0.1)",border:`2px solid ${czyPotwierdzilem?"#0c6":"var(--accent)"}`,borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-            <div style={{fontSize:13,fontWeight:"bold",color:czyPotwierdzilem?"#0c6":"#ffd700",flex:1}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:czyPotwierdzilem?"#0c6":"var(--accent)",flex:1}}>
               {czyPotwierdzilem?"✅ Twoja wymiana — POTWIERDZONA":"👋 Twoja wymiana — wyślij kartę!"}
             </div>
             {streak>0&&(
@@ -4096,7 +4101,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                 fontSize:11,padding:"3px 10px",borderRadius:12,
                 background:streak>=5?"linear-gradient(135deg,#b8860b,#ffd700)":streak>=3?"rgba(255,165,0,0.2)":"rgba(255,255,255,0.08)",
                 border:streak>=5?"none":streak>=3?"1px solid #fa055":"1px solid #333",
-                color:streak>=5?"#000":streak>=3?"#fa0":"#888",
+                color:streak>=5?"#000":streak>=3?"#fa0":"var(--muted)",
                 fontWeight:"bold",animation:streak>=5?"pulseGold 2s infinite":"none",
               }}>
                 {streak>=10?"🔥":streak>=5?"⚡":streak>=3?"✨":""}
@@ -4105,9 +4110,9 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
             )}
           </div>
           {mojePozycje.map((w,i)=>(
-            <div key={i} style={{fontSize:13,color:"#ddd",padding:"5px 0",borderBottom:"1px solid #12122a"}}>
-              Wyślij <strong style={{color:"#ffd700"}}>{w.karta}</strong> do <strong style={{color:"#0c6"}}>{w.do}</strong>
-              <span style={{fontSize:11,color:"#666",marginLeft:6}}>[{w.talia}]</span>
+            <div key={i} style={{fontSize:13,color:"var(--text)",padding:"5px 0",borderBottom:"1px solid #12122a"}}>
+              Wyślij <strong style={{color:"var(--accent)"}}>{w.karta}</strong> do <strong style={{color:"#0c6"}}>{w.do}</strong>
+              <span style={{fontSize:11,color:"var(--muted)",marginLeft:6}}>[{w.talia}]</span>
             </div>
           ))}
           <div style={{marginTop:12}}>
@@ -4123,23 +4128,23 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                 ✅ Potwierdzam — wysłałem kartę!
               </button>
             ):(
-              <button onClick={cofnijPotwierdzenie} style={{width:"100%",padding:8,background:"rgba(255,255,255,0.05)",border:"1px solid #333",borderRadius:8,color:"#666",fontSize:12,cursor:"pointer"}}>
+              <button onClick={cofnijPotwierdzenie} style={{width:"100%",padding:8,background:"var(--card)",border:"1px solid #333",borderRadius:8,color:"var(--muted)",fontSize:12,cursor:"pointer"}}>
                 ↩️ Cofnij potwierdzenie
               </button>
             )}
           </div>
         </div>
       ):(
-        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid #2a2a3a",borderRadius:8,padding:12,marginBottom:14,textAlign:"center",fontSize:12,color:"#666"}}>
+        <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,padding:12,marginBottom:14,textAlign:"center",fontSize:12,color:"var(--muted)"}}>
           Nie masz żadnej wymiany do wykonania w tej rundzie
         </div>
       )}
 
       {/* Status wszystkich — z podmianą dla admina */}
-      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+      <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:14}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>
           📋 Status wszystkich wysyłek
-          {isAdmin&&<span style={{fontSize:10,color:"#888",fontWeight:"normal",marginLeft:8}}>— ✅/⏳ kliknij żeby zaznaczyć • 🔄 podmień jeśli karta wpadła z paczki</span>}
+          {isAdmin&&<span style={{fontSize:10,color:"var(--muted)",fontWeight:"normal",marginLeft:8}}>— ✅/⏳ kliknij żeby zaznaczyć • 🔄 podmień jeśli karta wpadła z paczki</span>}
         </div>
 
         {Object.entries(poNadawcach).sort(([a],[b])=>(potwierdzone[b]?1:0)-(potwierdzone[a]?1:0)).map(([nadawca,ws])=>{
@@ -4169,10 +4174,10 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                 return (
                   <div key={w._idx}>
                     <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px 5px 38px",borderTop:"1px solid #12122a",flexWrap:"wrap"}}>
-                      <span style={{fontSize:11,color:"#888"}}>→</span>
-                      <span style={{fontSize:12,color:"#ddd",flex:1}}>
-                        <strong style={{color:"#ffd700"}}>{w.karta}</strong>
-                        <span style={{color:"#888",fontSize:11}}> do </span>
+                      <span style={{fontSize:11,color:"var(--muted)"}}>→</span>
+                      <span style={{fontSize:12,color:"var(--text)",flex:1}}>
+                        <strong style={{color:"var(--accent)"}}>{w.karta}</strong>
+                        <span style={{color:"var(--muted)",fontSize:11}}> do </span>
                         <strong>{w.do}</strong>
                         <span style={{fontSize:10,color:"#555",marginLeft:6}}>[{w.talia}]</span>
                       </span>
@@ -4181,8 +4186,8 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                           <button onClick={()=>setPodmienIdx(pokazPodmien?null:w._idx)} style={{
                             padding:"2px 8px",fontSize:10,borderRadius:4,cursor:"pointer",
                             background:pokazPodmien?"rgba(255,215,0,0.2)":"rgba(255,165,0,0.08)",
-                            border:`1px solid ${pokazPodmien?"#ffd700":"#fa055"}`,
-                            color:pokazPodmien?"#ffd700":"#fa0",
+                            border:`1px solid ${pokazPodmien?"var(--accent)":"#fa055"}`,
+                            color:pokazPodmien?"var(--accent)":"#fa0",
                           }}>🔄 Podmień</button>
                           <button onClick={()=>usunWymiane(w._idx)} style={{padding:"2px 6px",fontSize:10,borderRadius:4,cursor:"pointer",background:"rgba(255,50,50,0.08)",border:"none",color:"#f5544488"}}>✕</button>
                         </div>
@@ -4213,12 +4218,12 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
                                 🎯 PRÓG {alt.nastepnyProg?.prog} kart — brakuje {alt.brakujeDoProg} do progu (+{alt.progBonus.toLocaleString()} ammo)
                               </span>
                             )}
-                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"rgba(255,255,255,0.05)",color:opisFazy(alt.faza,typWymiany)?.k||"#aaa"}}>
+                            <span style={{fontSize:10,padding:"1px 6px",borderRadius:8,background:"var(--card)",color:opisFazy(alt.faza,typWymiany)?.k||"#aaa"}}>
                               F{Math.floor(alt.faza/10)}.{alt.faza%10||"0"}
                             </span>
-                            <span style={{fontSize:11,flex:1,color:"#ddd"}}>
-                              <strong style={{color:"#ffd700"}}>{alt.karta}</strong>
-                              <span style={{color:"#888"}}> → {alt.do}</span>
+                            <span style={{fontSize:11,flex:1,color:"var(--text)"}}>
+                              <strong style={{color:"var(--accent)"}}>{alt.karta}</strong>
+                              <span style={{color:"var(--muted)"}}> → {alt.do}</span>
                               <span style={{fontSize:10,color:"#555",marginLeft:4}}>[{alt.talia}]</span>
                             </span>
                             {!alt.zamknieTalie&&!alt.progBonus&&<span style={{fontSize:10,color:"#fa0"}}>🎯{alt.nagroda?.toLocaleString()}</span>}
@@ -4271,16 +4276,16 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
     <div>
       <div style={{background:"rgba(255,165,0,0.08)",border:"1px solid #fa055",borderRadius:10,padding:12,marginBottom:14}}>
         <div style={{fontSize:13,fontWeight:"bold",color:"#fa0",marginBottom:4}}>🧪 Strefa testów</div>
-        <div style={{fontSize:11,color:"#888"}}>Eksperymenty i nowe funkcje. Działają równolegle z normalną apką.</div>
+        <div style={{fontSize:11,color:"var(--muted)"}}>Eksperymenty i nowe funkcje. Działają równolegle z normalną apką.</div>
       </div>
 
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
         {przyciski.map(p=>(
           <button key={p.id} onClick={()=>setTryb(p.id)} style={{
             padding:"7px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
-            background:tryb===p.id?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
-            border:tryb===p.id?"1px solid #ffd700":"1px solid #2a2a3a",
-            color:tryb===p.id?"#ffd700":"#666",
+            background:tryb===p.id?"rgba(255,215,0,0.15)":"var(--card)",
+            border:tryb===p.id?"1px solid #ffd700":"1px solid var(--border)",
+            color:tryb===p.id?"var(--accent)":"var(--muted)",
           }}>{p.label}</button>
         ))}
       </div>
@@ -4395,8 +4400,8 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
   return (
     <div>
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontSize:12,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>⚡ Szybkie wprowadzanie — zaznacz wszystkie karty osoby dla jednej talii</div>
-        <div style={{fontSize:11,color:"#888"}}>Wybierz osobę i talię → kliknij karty które ma lub użyj przycisków "Zaznacz wszystkie"</div>
+        <div style={{fontSize:12,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>⚡ Szybkie wprowadzanie — zaznacz wszystkie karty osoby dla jednej talii</div>
+        <div style={{fontSize:11,color:"var(--muted)"}}>Wybierz osobę i talię → kliknij karty które ma lub użyj przycisków "Zaznacz wszystkie"</div>
       </div>
 
       {/* MASOWE WPROWADZANIE — dla wszystkich naraz */}
@@ -4445,8 +4450,8 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
             <button key={c.id} onClick={()=>setWybranaOsoba(i)} style={{
               padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
               background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.06)",
-              border:wybranaOsoba===i?"none":"1px solid #2a2a3a",
-              color:wybranaOsoba===i?"#000":"#888",fontWeight:wybranaOsoba===i?"bold":"normal",
+              border:wybranaOsoba===i?"none":"1px solid var(--border)",
+              color:wybranaOsoba===i?"#000":"var(--muted)",fontWeight:wybranaOsoba===i?"bold":"normal",
             }}>{c.nazwa}</button>
           ))}
         </div>
@@ -4462,9 +4467,9 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
             return (
               <button key={t.id} onClick={()=>setWybranaTalia(i)} style={{
                 padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
-                background:wybranaTalia===i?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.04)",
-                border:wybranaTalia===i?"1px solid #ffd700":"1px solid #2a2a3a",
-                color:wybranaTalia===i?"#ffd700":"#666",
+                background:wybranaTalia===i?"rgba(255,215,0,0.15)":"var(--card)",
+                border:wybranaTalia===i?"1px solid #ffd700":"1px solid var(--border)",
+                color:wybranaTalia===i?"var(--accent)":"var(--muted)",
               }}>{t.nazwa} <span style={{color:pct===100?"#0c6":"#555",fontSize:10}}>{pct}%</span></button>
             );
           })}
@@ -4472,9 +4477,9 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
       </div>
 
       {osoba&&talia&&(
-        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
-            <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>{osoba.nazwa} — {talia.nazwa}</div>
+            <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)"}}>{osoba.nazwa} — {talia.nazwa}</div>
           </div>
 
           {/* Złote karty */}
@@ -4482,7 +4487,7 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
             <div style={{marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                 <span style={{fontSize:11,color:"#b8860b",fontWeight:"bold"}}>⭐ Złote ({kartyZlote.filter(k=>posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]).length}/{kartyZlote.length})</span>
-                <button onClick={()=>zaznaczWszystkie("złota")} style={{padding:"2px 8px",fontSize:10,borderRadius:4,background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",color:"#ffd700",cursor:"pointer"}}>✓ Wszystkie</button>
+                <button onClick={()=>zaznaczWszystkie("złota")} style={{padding:"2px 8px",fontSize:10,borderRadius:4,background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",color:"var(--accent)",cursor:"pointer"}}>✓ Wszystkie</button>
                 <button onClick={()=>odznaczWszystkie("złota")} style={{padding:"2px 8px",fontSize:10,borderRadius:4,background:"rgba(255,50,50,0.1)",border:"1px solid #f5544455",color:"#f55",cursor:"pointer"}}>✗ Wyczyść</button>
               </div>
               <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
@@ -4491,7 +4496,7 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
                   return (
                     <button key={k.nazwa} onClick={()=>toggle(k.nazwa)} style={{
                       padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
-                      background:ma?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.04)",
+                      background:ma?"linear-gradient(135deg,#b8860b,#ffd700)":"var(--card)",
                       border:ma?"none":"2px dashed #333",
                       color:ma?"#000":"#444",fontWeight:ma?"bold":"normal",
                       transition:"all 0.15s",
@@ -4516,7 +4521,7 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
                   return (
                     <button key={k.nazwa} onClick={()=>toggle(k.nazwa)} style={{
                       padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
-                      background:ma?"linear-gradient(135deg,#1a3a8f,#87CEEB)":"rgba(255,255,255,0.04)",
+                      background:ma?"linear-gradient(135deg,#1a3a8f,#87CEEB)":"var(--card)",
                       border:ma?"none":"2px dashed #333",
                       color:ma?"#fff":"#444",fontWeight:ma?"bold":"normal",
                       transition:"all 0.15s",
@@ -4735,8 +4740,8 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
             <button key={c.id} onClick={()=>setWybranaOsoba(i)} style={{
               padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
               background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.06)",
-              border:wybranaOsoba===i?"none":"1px solid #2a2a3a",
-              color:wybranaOsoba===i?"#000":"#888",
+              border:wybranaOsoba===i?"none":"1px solid var(--border)",
+              color:wybranaOsoba===i?"#000":"var(--muted)",
             }}>{c.nazwa}</button>
           ))}
         </div>
@@ -4759,7 +4764,7 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
                 ⏹ Stop auto
               </button>
             )}
-            <button onClick={dodajDoKolejki} style={{padding:"10px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:8,color:"#ffd700",cursor:"pointer",fontSize:13}}>
+            <button onClick={dodajDoKolejki} style={{padding:"10px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:8,color:"var(--accent)",cursor:"pointer",fontSize:13}}>
               📸 Dodaj ręcznie
             </button>
             <button onClick={stopKamery} style={{padding:"10px 12px",background:"rgba(255,50,50,0.15)",border:"1px solid #f5544455",borderRadius:8,color:"#f55",cursor:"pointer",fontSize:12}}>
@@ -4788,7 +4793,7 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
             <span>🤖 Analizuję {postep.current}/{postep.total}...</span>
             <span>{Math.round((postep.current/postep.total)*100)}%</span>
           </div>
-          <div style={{height:8,background:"#12122a",borderRadius:4,overflow:"hidden"}}>
+          <div style={{height:8,background:"var(--card-solid)",borderRadius:4,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${(postep.current/postep.total)*100}%`,background:"linear-gradient(90deg,#0c6,#0fa)",transition:"width 0.3s",borderRadius:4}}/>
           </div>
         </div>
@@ -4806,7 +4811,7 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
               {odliczanie}
             </div>
           )}
-          {kolejka.length>0&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.8)",padding:"4px 10px",borderRadius:4,fontSize:12,color:"#ffd700",fontWeight:"bold"}}>📋 {kolejka.length}</div>}
+          {kolejka.length>0&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,0.8)",padding:"4px 10px",borderRadius:4,fontSize:12,color:"var(--accent)",fontWeight:"bold"}}>📋 {kolejka.length}</div>}
         </div>
       )}
       <canvas ref={canvasRef} style={{display:"none"}}/>
@@ -4818,8 +4823,8 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {kolejka.map((z,i)=>(
               <div key={i} style={{position:"relative"}}>
-                <img src={z.thumb} alt={`talia ${i+1}`} style={{width:80,height:54,borderRadius:4,border:"1px solid #2a2a3a",objectFit:"cover"}}/>
-                <div style={{position:"absolute",top:2,left:2,background:"rgba(0,0,0,0.7)",borderRadius:3,padding:"0 4px",fontSize:9,color:"#ffd700"}}>{i+1}</div>
+                <img src={z.thumb} alt={`talia ${i+1}`} style={{width:80,height:54,borderRadius:4,border:"1px solid var(--border)",objectFit:"cover"}}/>
+                <div style={{position:"absolute",top:2,left:2,background:"rgba(0,0,0,0.7)",borderRadius:3,padding:"0 4px",fontSize:9,color:"var(--accent)"}}>{i+1}</div>
                 <button onClick={()=>usunZKolejki(i)} style={{position:"absolute",top:2,right:2,background:"rgba(255,50,50,0.8)",border:"none",borderRadius:3,color:"#fff",fontSize:9,cursor:"pointer",padding:"0 3px"}}>✕</button>
               </div>
             ))}
@@ -4829,15 +4834,15 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
 
       {/* Wyniki */}
       {wynikiFinal.length>0&&(
-        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:12}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>
             🔍 Wyniki dla <span style={{color:"#0c6"}}>{osoba?.nazwa}</span>
           </div>
           {wynikiFinal.map((w,i)=>(
             <div key={i} style={{marginBottom:8,padding:"8px 10px",background:w.ok?"rgba(0,200,100,0.05)":"rgba(255,50,50,0.05)",border:`1px solid ${w.ok?"#0c633":"#f5544433"}`,borderRadius:8}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:w.ok?6:0}}>
                 {w.thumb&&<img src={w.thumb} alt="" style={{width:50,height:34,borderRadius:3,objectFit:"cover"}}/>}
-                <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"#ffd700":"#f55"}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"var(--accent)":"#f55"}}>
                   {w.ok?`✓ ${w.taliaMatch?.nazwa||w.talia}`:`❌ Nie rozpoznano — ${w.blad||""}`}
                 </div>
               </div>
@@ -4846,8 +4851,8 @@ Zwróć JSON: {"talia":"nazwa","karty":[{"nazwa":"...","posiadana":true|false,"d
                   {w.karty.map((k,j)=>(
                     <span key={j} style={{
                       padding:"2px 7px",borderRadius:4,fontSize:10,
-                      background:k.posiadana?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.03)",
-                      border:k.posiadana?"1px solid #0c633":"1px solid #2a2a3a",
+                      background:k.posiadana?"rgba(0,200,100,0.15)":"var(--card)",
+                      border:k.posiadana?"1px solid #0c633":"1px solid var(--border)",
                       color:k.posiadana?"#0c6":"#444",
                     }}>{k.posiadana?"✓ ":""}{k.nazwa}{k.duplikat?" +dup":""}</span>
                   ))}
@@ -4898,35 +4903,35 @@ function PostepSezonu({talie,czlonkowie,posiadane}) {
   return (
     <div>
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #b8860b33",borderRadius:10,padding:14,marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📊 Postęp sezonu gangu</div>
+        <div style={{fontSize:14,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>📊 Postęp sezonu gangu</div>
         <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
-            <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700"}}>{talie.length}</div>
-            <div style={{fontSize:11,color:"#888"}}>talii w sezonie</div>
+            <div style={{fontSize:22,fontWeight:"bold",color:"var(--accent)"}}>{talie.length}</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>talii w sezonie</div>
           </div>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
             <div style={{fontSize:22,fontWeight:"bold",color:"#0c6"}}>{lacznaMozliwa.toLocaleString()}</div>
-            <div style={{fontSize:11,color:"#888"}}>max amunicja</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>max amunicja</div>
           </div>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:120}}>
             <div style={{fontSize:22,fontWeight:"bold",color:"#87CEEB"}}>{czlonkowie.length}</div>
-            <div style={{fontSize:11,color:"#888"}}>członków</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>członków</div>
           </div>
         </div>
       </div>
 
       {/* Ranking członków */}
       <div style={{marginBottom:14}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>🏆 Ranking postępu</div>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>🏆 Ranking postępu</div>
         {stats.map((s,i)=>{
-          const kragKolor = s.krag===3?"#ffd700":s.krag===2?"#da70d6":"transparent";
-          const kragBorder = s.krag>1?`1px solid ${kragKolor}55`:"1px solid #2a2a3a";
+          const kragKolor = s.krag===3?"var(--accent)":s.krag===2?"#da70d6":"transparent";
+          const kragBorder = s.krag>1?`1px solid ${kragKolor}55`:"1px solid var(--border)";
           return (
           <div key={s.nazwa} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:4,background:s.krag>1?"rgba(138,43,226,0.06)":"rgba(0,0,0,0.2)",border:kragBorder,borderRadius:8}}>
-            <span style={{fontSize:12,color:"#666",width:20}}>{i+1}.</span>
+            <span style={{fontSize:12,color:"var(--muted)",width:20}}>{i+1}.</span>
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:5}}>
-                <span style={{fontSize:12,color:"#ddd"}}>{s.nazwa}</span>
+                <span style={{fontSize:12,color:"var(--text)"}}>{s.nazwa}</span>
                 {s.krag>1&&(
                   <span style={{fontSize:10,padding:"1px 5px",background:"rgba(138,43,226,0.25)",border:`1px solid ${kragKolor}55`,borderRadius:10,color:kragKolor,fontWeight:"bold"}}>
                     Krąg {s.krag}
@@ -4937,9 +4942,9 @@ function PostepSezonu({talie,czlonkowie,posiadane}) {
                 {s.krag>1?`${(s.krag-1)*135}+${s.kartyPosiadane} kart łącznie`:`${s.kartyPosiadane}/${s.kartyTotal135} kart`}
               </div>
             </div>
-            <span style={{fontSize:11,color:"#ffd700"}}>{s.zamkniete}/{talie.length} talii</span>
+            <span style={{fontSize:11,color:"var(--accent)"}}>{s.zamkniete}/{talie.length} talii</span>
             <span style={{fontSize:11,color:"#0c6",marginLeft:4}}>{s.ammo.toLocaleString()} 💰</span>
-            <div style={{width:50,height:6,background:"#12122a",borderRadius:3,overflow:"hidden",marginLeft:4}}>
+            <div style={{width:50,height:6,background:"var(--card-solid)",borderRadius:3,overflow:"hidden",marginLeft:4}}>
               <div style={{height:"100%",width:`${s.pct}%`,background:s.krag>1?"linear-gradient(90deg,#8a2be2,#da70d6)":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
             </div>
             <span style={{fontSize:10,color:"#555",width:30}}>{s.pct}%</span>
@@ -4950,12 +4955,12 @@ function PostepSezonu({talie,czlonkowie,posiadane}) {
 
       {/* Postęp talii */}
       <div>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>📋 Postęp talii (% gangu ma zamkniętą)</div>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>📋 Postęp talii (% gangu ma zamkniętą)</div>
         {talieStats.map(t=>(
           <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",marginBottom:3,background:"rgba(0,0,0,0.15)",borderRadius:6}}>
-            <span style={{fontSize:11,flex:1,color:t.pct===100?"#0c6":t.pct>=50?"#ffd700":"#888"}}>{t.nazwa}</span>
-            <span style={{fontSize:11,color:"#666"}}>{t.zamkniete}/{czlonkowie.length}</span>
-            <div style={{width:80,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+            <span style={{fontSize:11,flex:1,color:t.pct===100?"#0c6":t.pct>=50?"var(--accent)":"var(--muted)"}}>{t.nazwa}</span>
+            <span style={{fontSize:11,color:"var(--muted)"}}>{t.zamkniete}/{czlonkowie.length}</span>
+            <div style={{width:80,height:5,background:"var(--card-solid)",borderRadius:3,overflow:"hidden"}}>
               <div style={{height:"100%",width:`${t.pct}%`,background:t.pct===100?"#0c6":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
             </div>
             <span style={{fontSize:10,color:t.pct===100?"#0c6":"#555",width:35}}>{t.pct}%</span>
@@ -5003,29 +5008,29 @@ function KalkulatorSezonu({talie,czlonkowie,posiadane,duplikaty,typWymiany}) {
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:130}}>
             <div style={{fontSize:20,fontWeight:"bold",color:"#0c6"}}>{juzZamkniete}/{talie.length}</div>
-            <div style={{fontSize:11,color:"#888"}}>talii zamkniętych przez cały gang</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>talii zamkniętych przez cały gang</div>
           </div>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 14px",flex:1,minWidth:130}}>
-            <div style={{fontSize:20,fontWeight:"bold",color:"#ffd700"}}>{dostepneAmmo.toLocaleString()}</div>
-            <div style={{fontSize:11,color:"#888"}}>ammo wciąż do zdobycia</div>
+            <div style={{fontSize:20,fontWeight:"bold",color:"var(--accent)"}}>{dostepneAmmo.toLocaleString()}</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>ammo wciąż do zdobycia</div>
           </div>
         </div>
       </div>
 
-      <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>💰 Talie według potencjału ammo</div>
+      <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>💰 Talie według potencjału ammo</div>
       {potencjal.map(t=>{
         const wszyscyMaja=t.osobyBezTalii===0;
         return (
-          <div key={t.id} style={{marginBottom:6,padding:"10px 12px",background:wszyscyMaja?"rgba(0,200,100,0.06)":"rgba(0,0,0,0.2)",border:`1px solid ${wszyscyMaja?"#0c633":"#2a2a3a"}`,borderRadius:8}}>
+          <div key={t.id} style={{marginBottom:6,padding:"10px 12px",background:wszyscyMaja?"rgba(0,200,100,0.06)":"rgba(0,0,0,0.2)",border:`1px solid ${wszyscyMaja?"#0c633":"var(--border)"}`,borderRadius:8}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
               <div>
-                <span style={{fontSize:12,fontWeight:"bold",color:wszyscyMaja?"#0c6":"#ddd"}}>{t.nazwa}</span>
+                <span style={{fontSize:12,fontWeight:"bold",color:wszyscyMaja?"#0c6":"var(--text)"}}>{t.nazwa}</span>
                 {wszyscyMaja&&<span style={{fontSize:10,color:"#0c6",marginLeft:6}}>✓ Wszyscy mają</span>}
               </div>
-              <span style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>+{(t.nagroda_amunicja||0).toLocaleString()} 💰</span>
+              <span style={{fontSize:13,fontWeight:"bold",color:"var(--accent)"}}>+{(t.nagroda_amunicja||0).toLocaleString()} 💰</span>
             </div>
             {!wszyscyMaja&&(
-              <div style={{marginTop:6,fontSize:11,color:"#888"}}>
+              <div style={{marginTop:6,fontSize:11,color:"var(--muted)"}}>
                 <span style={{color:"#fa0"}}>{t.osobyBezTalii} osób</span> nie ma zamkniętej •
                 {t.bliskoZamkniecia.length>0&&<span style={{color:"#0c6",marginLeft:4}}>🎯 {t.bliskoZamkniecia.length} blisko ({t.bliskoZamkniecia.map(o=>o.nazwa).join(", ")})</span>}
               </div>
@@ -5093,7 +5098,7 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
     <div>
       <div style={{background:"rgba(135,206,235,0.06)",border:"1px solid #87CEEB33",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#87CEEB",marginBottom:6}}>📜 Historia wymian</div>
-        <div style={{fontSize:11,color:"#888",marginBottom:10}}>Archiwum poprzednich wymian. Synchronizowane przez Firebase — widoczne na wszystkich urządzeniach.</div>
+        <div style={{fontSize:11,color:"var(--muted)",marginBottom:10}}>Archiwum poprzednich wymian. Synchronizowane przez Firebase — widoczne na wszystkich urządzeniach.</div>
         {aktywnaWymiana?(
           <button onClick={archiwizuj} style={{padding:"8px 16px",background:"linear-gradient(135deg,#87CEEB,#4169E1)",border:"none",borderRadius:6,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:"bold"}}>
             📥 Archiwizuj aktywną wymianę
@@ -5115,12 +5120,12 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
         })).sort((a,b)=>b.dług-a.dług);
         const maxDług = Math.max(...ranking.map(r=>Math.abs(r.dług)),0.1);
         return (
-          <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:4}}>
+          <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:4}}>
               ⚖️ Sprawiedliwość wymian
             </div>
-            <div style={{fontSize:11,color:"#888",marginBottom:10}}>
-              Średnia: <strong style={{color:"#ddd"}}>{srednia.toFixed(1)}</strong> kart/osoba z {historia.length} wymian.
+            <div style={{fontSize:11,color:"var(--muted)",marginBottom:10}}>
+              Średnia: <strong style={{color:"var(--text)"}}>{srednia.toFixed(1)}</strong> kart/osoba z {historia.length} wymian.
               Dług = ile poniżej średniej — im wyższy tym bardziej pominięty.
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -5131,10 +5136,10 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
                 return (
                   <div key={r.nazwa} style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontSize:11,width:16,textAlign:"center"}}>{ikonka}</span>
-                    <span style={{fontSize:12,color:"#ddd",width:90,flexShrink:0}}>{r.nazwa}</span>
-                    <span style={{fontSize:11,color:"#888",width:50,flexShrink:0,textAlign:"right"}}>{r.dostala} kart</span>
+                    <span style={{fontSize:12,color:"var(--text)",width:90,flexShrink:0}}>{r.nazwa}</span>
+                    <span style={{fontSize:11,color:"var(--muted)",width:50,flexShrink:0,textAlign:"right"}}>{r.dostala} kart</span>
                     {/* Pasek długu */}
-                    <div style={{flex:1,height:6,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{flex:1,height:6,background:"var(--card-solid)",borderRadius:3,overflow:"hidden"}}>
                       <div style={{
                         height:"100%",
                         width:`${szerokoscPaska}%`,
@@ -5164,11 +5169,11 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
       {historia.length===0?(
         <div style={{textAlign:"center",padding:30,color:"#555",fontSize:12}}>Brak zapisanych wymian</div>
       ):historia.map(w=>(
-        <div key={w.id} style={{marginBottom:8,padding:"10px 12px",background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8}}>
+        <div key={w.id} style={{marginBottom:8,padding:"10px 12px",background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
             <div>
-              <span style={{fontSize:12,fontWeight:"bold",color:"#ddd"}}>{new Date(w.data).toLocaleString("pl-PL")}</span>
-              <span style={{fontSize:11,color:"#888",marginLeft:8}}>{w.typWymiany==="złote"?"⭐ Złote":"💎 Diamentowe"}</span>
+              <span style={{fontSize:12,fontWeight:"bold",color:"var(--text)"}}>{new Date(w.data).toLocaleString("pl-PL")}</span>
+              <span style={{fontSize:11,color:"var(--muted)",marginLeft:8}}>{w.typWymiany==="złote"?"⭐ Złote":"💎 Diamentowe"}</span>
             </div>
             <button onClick={()=>usunWpis(w.id)} style={{background:"none",border:"none",color:"#f5544466",cursor:"pointer",fontSize:12}}>✕</button>
           </div>
@@ -5179,8 +5184,8 @@ function HistoriaWymian({zapiszStrukture,aktywnaWymiana,czlonkowie=[]}) {
             {(w.wymiany||[]).map((x,i)=>(
               <span key={i} style={{
                 fontSize:10,padding:"1px 6px",borderRadius:4,
-                background:w.potwierdzone?.[x.od]?"rgba(0,200,100,0.1)":"rgba(255,255,255,0.04)",
-                border:w.potwierdzone?.[x.od]?"1px solid #0c633":"1px solid #2a2a3a",
+                background:w.potwierdzone?.[x.od]?"rgba(0,200,100,0.1)":"var(--card)",
+                border:w.potwierdzone?.[x.od]?"1px solid #0c633":"1px solid var(--border)",
                 color:w.potwierdzone?.[x.od]?"#0c6":"#555",
               }}>{x.od}→{x.do}</span>
             ))}
@@ -5240,10 +5245,10 @@ function AutoBackupPanel() {
             <div key={b.id} style={{
               display:"flex",justifyContent:"space-between",alignItems:"center",
               padding:"6px 8px",marginBottom:4,borderRadius:6,
-              background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",
+              background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",
             }}>
               <div>
-                <div style={{fontSize:11,color:"#ddd"}}>{b.data}</div>
+                <div style={{fontSize:11,color:"var(--text)"}}>{b.data}</div>
                 <div style={{fontSize:9,color:"#555"}}>{b.powod}</div>
               </div>
               <button onClick={()=>przywroc(b)} style={{
@@ -5353,7 +5358,7 @@ To NADPISZE wszystkie obecne dane gangu!`
       {/* Stan danych */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
         {[
-          {label:"Członków",val:dane.czlonkowie?.length||0,color:"#ffd700"},
+          {label:"Członków",val:dane.czlonkowie?.length||0,color:"var(--accent)"},
           {label:"Kart posiadanych",val:kartyCount,color:"#0c6"},
           {label:"Duplikatów",val:dupCount,color:"#87CEEB"},
         ].map(s=>(
@@ -5393,9 +5398,9 @@ To NADPISZE wszystkie obecne dane gangu!`
         <div style={{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:"bold"}}>🔄 Przywróć z pliku</div>
         <label style={{
           display:"block",width:"100%",padding:12,
-          background:przywracanie?"rgba(255,165,0,0.1)":"rgba(255,255,255,0.05)",
+          background:przywracanie?"rgba(255,165,0,0.1)":"var(--card)",
           border:"2px dashed #333",borderRadius:10,
-          color:przywracanie?"#fa0":"#666",fontSize:13,
+          color:przywracanie?"#fa0":"var(--muted)",fontSize:13,
           cursor:"pointer",textAlign:"center",boxSizing:"border-box",
         }}>
           {przywracanie ? "⏳ Przywracam dane..." : "📂 Kliknij i wybierz plik backup (.json)"}
@@ -5404,7 +5409,7 @@ To NADPISZE wszystkie obecne dane gangu!`
         </label>
       </div>
 
-      <div style={{padding:12,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,fontSize:11,color:"#555",lineHeight:1.7}}>
+      <div style={{padding:12,background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8,fontSize:11,color:"#555",lineHeight:1.7}}>
         <strong style={{color:"#aaa"}}>Co zawiera backup:</strong><br/>
         • Talie z nagrodami K1/K2 ✓<br/>
         • Członkowie i kręgi ✓<br/>
@@ -5464,8 +5469,8 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture,walki=[]}) {
     <div style={{textAlign:"center",padding:30}}>
       <div style={{fontSize:40,marginBottom:10}}>🎉</div>
       <div style={{fontSize:16,fontWeight:"bold",color:"#0c6",marginBottom:8}}>Reset sezonu zakończony!</div>
-      <div style={{fontSize:12,color:"#888",marginBottom:16}}>Reset zakończony. Nagrody za talie zachowane. Wgraj nowe karty przez OCR w zakładce ⚙️ Talie.</div>
-      <button onClick={()=>setKrok(0)} style={{padding:"8px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:6,color:"#ffd700",cursor:"pointer",fontSize:12}}>
+      <div style={{fontSize:12,color:"var(--muted)",marginBottom:16}}>Reset zakończony. Nagrody za talie zachowane. Wgraj nowe karty przez OCR w zakładce ⚙️ Talie.</div>
+      <button onClick={()=>setKrok(0)} style={{padding:"8px 16px",background:"rgba(255,215,0,0.15)",border:"1px solid #b8860b",borderRadius:6,color:"var(--accent)",cursor:"pointer",fontSize:12}}>
         ← Wróć
       </button>
     </div>
@@ -5489,7 +5494,7 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture,walki=[]}) {
         <button onClick={wykonajReset} disabled={resetujace} style={{flex:1,padding:12,background:"linear-gradient(135deg,#f55,#f00)",border:"none",borderRadius:8,color:"#fff",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
           {resetujace?"⏳ Resetuję...":"🗑️ TAK, resetuj sezon"}
         </button>
-        <button onClick={()=>setKrok(0)} style={{padding:"12px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid #333",borderRadius:8,color:"#888",cursor:"pointer",fontSize:13}}>
+        <button onClick={()=>setKrok(0)} style={{padding:"12px 20px",background:"var(--card)",border:"1px solid #333",borderRadius:8,color:"var(--muted)",cursor:"pointer",fontSize:13}}>
           Anuluj
         </button>
       </div>
@@ -5500,7 +5505,7 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture,walki=[]}) {
     <div>
       <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:8}}>🔄 Reset sezonu</div>
-        <div style={{fontSize:11,color:"#888",lineHeight:1.7}}>
+        <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.7}}>
           Używasz gdy zaczyna się nowy sezon i chcesz wyczyścić dane kart.<br/>
           <strong style={{color:"#aaa"}}>Co zostanie wyczyszczone:</strong><br/>
           • Wszystkie posiadane karty i duplikaty<br/>
@@ -5558,7 +5563,7 @@ function PowiadomieniaPush() {
     <div>
       <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:6}}>🔔 Powiadomienia push</div>
-        <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
+        <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.6}}>
           Otrzymuj powiadomienia gdy admin opublikuje nową ROZPISKĘ.<br/>
           Każdy członek gangu musi włączyć powiadomienia na swoim telefonie.
         </div>
@@ -5584,7 +5589,7 @@ function PowiadomieniaPush() {
         <div style={{textAlign:"center",padding:20}}>
           <div style={{fontSize:40,marginBottom:10}}>✅</div>
           <div style={{fontSize:14,fontWeight:"bold",color:"#0c6",marginBottom:6}}>Powiadomienia włączone!</div>
-          <div style={{fontSize:11,color:"#888",marginBottom:16}}>Dostaniesz powiadomienie gdy pojawi się nowa ROZPISKA</div>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:16}}>Dostaniesz powiadomienie gdy pojawi się nowa ROZPISKA</div>
           <button onClick={testPowiadomienie} style={{padding:"8px 18px",background:"rgba(0,200,100,0.15)",border:"1px solid #0c655",borderRadius:6,color:"#0c6",cursor:"pointer",fontSize:12}}>
             🧪 Wyślij testowe powiadomienie
           </button>
@@ -5599,7 +5604,7 @@ function PowiadomieniaPush() {
         <div style={{textAlign:"center",padding:20}}>
           <div style={{fontSize:40,marginBottom:10}}>❌</div>
           <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:6}}>Powiadomienia zablokowane</div>
-          <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
+          <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.6}}>
             Przeglądarka zablokowała powiadomienia.<br/>
             Żeby odblokować: Ustawienia przeglądarki → Prywatność → Powiadomienia → gang-manager-beta.vercel.app → Zezwól
           </div>
@@ -5641,7 +5646,7 @@ function OsiagnieciaWidget({talie,czlonkowie,posiadane,duplikaty,zalogowany}) {
       <div style={{fontSize:11,color:"#b8860b",marginBottom:6}}>🏆 Twoje osiągnięcia</div>
       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
         {odblokowane.map(a=>(
-          <span key={a.id} title={a.opis} style={{fontSize:11,padding:"3px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b55",borderRadius:12,color:"#ffd700",cursor:"default"}}>
+          <span key={a.id} title={a.opis} style={{fontSize:11,padding:"3px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b55",borderRadius:12,color:"var(--accent)",cursor:"default"}}>
             {a.ikona} {a.nazwa}
           </span>
         ))}
@@ -5696,7 +5701,7 @@ function KalendarzEventow() {
     zapiszEventy(nowe);
   };
 
-  const kolorTypu = { złote: "#ffd700", diamentowe: "#87CEEB", "event6h_tak": "#0c6", "event6h_nie": "#f55", "karty2x": "#ff6dff", inne: "#fa0" };
+  const kolorTypu = { złote: "var(--accent)", diamentowe: "#87CEEB", "event6h_tak": "#0c6", "event6h_nie": "#f55", "karty2x": "#ff6dff", inne: "#fa0" };
   const ikonTypu = { złote: "⭐", diamentowe: "💎", "event6h_tak": "✅", "event6h_nie": "❌", "karty2x": "🃏", inne: "📌" };
   const labelTypu = { złote: "Złote", diamentowe: "Diamentowe", "event6h_tak": "Event 6H ✅", "event6h_nie": "Event 6H ❌", "karty2x": "Karty 2x", inne: "Inne" };
 
@@ -5708,14 +5713,14 @@ function KalendarzEventow() {
     <div>
       <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#6496ff",marginBottom:4}}>📅 Kalendarz eventów gangu</div>
-        <div style={{fontSize:11,color:"#888"}}>Zapisuj złote/diamentowe dni wymiany i inne eventy. Widoczne dla wszystkich adminów w czasie rzeczywistym.</div>
+        <div style={{fontSize:11,color:"var(--muted)"}}>Zapisuj złote/diamentowe dni wymiany i inne eventy. Widoczne dla wszystkich adminów w czasie rzeczywistym.</div>
       </div>
 
       {/* Nawigacja miesiąca */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-        <button onClick={()=>{ if(miesiac===0){setMiesiac(11);setRok(r=>r-1);}else setMiesiac(m=>m-1); }} style={{padding:"6px 12px",background:"rgba(255,255,255,0.07)",border:"1px solid #2a2a3a",borderRadius:6,color:"#aaa",cursor:"pointer",fontSize:13}}>◀</button>
-        <div style={{fontSize:15,fontWeight:"bold",color:"#ffd700"}}>{nazwyMiesiecy[miesiac]} {rok}</div>
-        <button onClick={()=>{ if(miesiac===11){setMiesiac(0);setRok(r=>r+1);}else setMiesiac(m=>m+1); }} style={{padding:"6px 12px",background:"rgba(255,255,255,0.07)",border:"1px solid #2a2a3a",borderRadius:6,color:"#aaa",cursor:"pointer",fontSize:13}}>▶</button>
+        <button onClick={()=>{ if(miesiac===0){setMiesiac(11);setRok(r=>r-1);}else setMiesiac(m=>m-1); }} style={{padding:"6px 12px",background:"rgba(255,255,255,0.07)",border:"1px solid var(--border)",borderRadius:6,color:"#aaa",cursor:"pointer",fontSize:13}}>◀</button>
+        <div style={{fontSize:15,fontWeight:"bold",color:"var(--accent)"}}>{nazwyMiesiecy[miesiac]} {rok}</div>
+        <button onClick={()=>{ if(miesiac===11){setMiesiac(0);setRok(r=>r+1);}else setMiesiac(m=>m+1); }} style={{padding:"6px 12px",background:"rgba(255,255,255,0.07)",border:"1px solid var(--border)",borderRadius:6,color:"#aaa",cursor:"pointer",fontSize:13}}>▶</button>
       </div>
 
       {/* Siatka kalendarza */}
@@ -5742,11 +5747,11 @@ function KalendarzEventow() {
             return (
               <div key={d} onClick={()=>setWybranyDzien(wybrany?null:d)} style={{
                 borderRadius:6,padding:"4px 2px",minHeight:44,cursor:"pointer",textAlign:"center",
-                background:wybrany?"rgba(255,215,0,0.2)":jestDzis?"rgba(0,200,100,0.1)":"rgba(255,255,255,0.03)",
+                background:wybrany?"rgba(255,215,0,0.2)":jestDzis?"rgba(0,200,100,0.1)":"var(--card)",
                 border:wybrany?"1px solid #ffd700":jestDzis?"1px solid #0c655":"1px solid #1a1a2e",
                 transition:"all 0.1s",
               }}>
-                <div style={{fontSize:12,fontWeight:jestDzis?"bold":"normal",color:jestDzis?"#0c6":wybrany?"#ffd700":"#aaa",marginBottom:2}}>{d}</div>
+                <div style={{fontSize:12,fontWeight:jestDzis?"bold":"normal",color:jestDzis?"#0c6":wybrany?"var(--accent)":"#aaa",marginBottom:2}}>{d}</div>
                 <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:1}}>
                   {dniEventy.slice(0,3).map(e=>(
                     <span key={e.id} style={{fontSize:8,color:kolorTypu[e.typ]||"#aaa"}}>{ikonTypu[e.typ]||"•"}</span>
@@ -5761,8 +5766,8 @@ function KalendarzEventow() {
 
       {/* Panel wybranego dnia */}
       {wybranyDzien&&(
-        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:14}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:14}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>
             📅 {wybranyDzien} {nazwyMiesiecy[miesiac]} {rok}
             {wybranyKlucz===dzisiajKlucz&&<span style={{marginLeft:8,fontSize:11,color:"#0c6"}}>• Dzisiaj</span>}
           </div>
@@ -5771,9 +5776,9 @@ function KalendarzEventow() {
           {eventyWybranego.length===0?(
             <div style={{fontSize:12,color:"#555",marginBottom:10,textAlign:"center"}}>Brak eventów tego dnia</div>
           ):eventyWybranego.map(e=>(
-            <div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",marginBottom:4,background:"rgba(255,255,255,0.04)",border:`1px solid ${kolorTypu[e.typ]||"#333"}33`,borderRadius:6}}>
+            <div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",marginBottom:4,background:"var(--card)",border:`1px solid ${kolorTypu[e.typ]||"#333"}33`,borderRadius:6}}>
               <span style={{fontSize:14}}>{ikonTypu[e.typ]||"📌"}</span>
-              <span style={{flex:1,fontSize:12,color:"#ddd"}}>{e.tekst}</span>
+              <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{e.tekst}</span>
               <span style={{fontSize:10,padding:"1px 6px",borderRadius:4,background:`${kolorTypu[e.typ]||"#aaa"}22`,color:kolorTypu[e.typ]||"#aaa"}}>{labelTypu[e.typ]||e.typ}</span>
               <button onClick={()=>usunEvent(wybranyKlucz,e.id)} style={{background:"none",border:"none",color:"#f5544466",cursor:"pointer",fontSize:13}}>✕</button>
             </div>
@@ -5786,9 +5791,9 @@ function KalendarzEventow() {
               {Object.entries(labelTypu).map(([typ,label])=>(
                 <button key={typ} onClick={()=>setTypEvent(typ)} style={{
                   padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
-                  background:typEvent===typ?`${kolorTypu[typ]}22`:"rgba(255,255,255,0.05)",
-                  border:typEvent===typ?`1px solid ${kolorTypu[typ]}`:"1px solid #2a2a3a",
-                  color:typEvent===typ?kolorTypu[typ]:"#666",
+                  background:typEvent===typ?`${kolorTypu[typ]}22`:"var(--card)",
+                  border:typEvent===typ?`1px solid ${kolorTypu[typ]}`:"1px solid var(--border)",
+                  color:typEvent===typ?kolorTypu[typ]:"var(--muted)",
                 }}>{ikonTypu[typ]} {label}</button>
               ))}
             </div>
@@ -5796,7 +5801,7 @@ function KalendarzEventow() {
               <input value={nowyEvent} onChange={e=>setNowyEvent(e.target.value)}
                 onKeyDown={e=>e.key==="Enter"&&dodajEvent()}
                 placeholder="Opis eventu..." style={{
-                  flex:1,padding:"8px 10px",background:"#12122a",border:"1px solid #333",
+                  flex:1,padding:"8px 10px",background:"var(--card-solid)",border:"1px solid #333",
                   borderRadius:6,color:"#fff",fontSize:12,
                 }}/>
               <button onClick={dodajEvent} style={{padding:"8px 14px",background:"linear-gradient(135deg,#b8860b,#ffd700)",border:"none",borderRadius:6,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:12}}>
@@ -5820,10 +5825,10 @@ function KalendarzEventow() {
         }
         if(!nadchodzace.length) return null;
         return (
-          <div style={{marginTop:14,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
+          <div style={{marginTop:14,background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12}}>
             <div style={{fontSize:12,fontWeight:"bold",color:"#6496ff",marginBottom:8}}>📋 Nadchodzące eventy (30 dni)</div>
             {nadchodzace.map(({data,klucz,eventy:ev,dzisiaj})=>(
-              <div key={klucz} style={{marginBottom:6,padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:6,borderLeft:`3px solid ${dzisiaj?"#0c6":"#6496ff"}`}}>
+              <div key={klucz} style={{marginBottom:6,padding:"6px 8px",background:"var(--card)",borderRadius:6,borderLeft:`3px solid ${dzisiaj?"#0c6":"#6496ff"}`}}>
                 <div style={{fontSize:11,color:dzisiaj?"#0c6":"#6496ff",fontWeight:"bold",marginBottom:3}}>
                   {dzisiaj?"🟢 Dzisiaj":"📅"} {data.getDate()} {nazwyMiesiecy[data.getMonth()]}
                 </div>
@@ -6104,11 +6109,11 @@ Zwróć WYŁĄCZNIE JSON:
     <div>
       <div style={{background:"rgba(100,150,255,0.06)",border:"1px solid #6496ff33",borderRadius:10,padding:12,marginBottom:12}}>
         <div style={{fontSize:13,fontWeight:"bold",color:"#6496ff",marginBottom:4}}>🖥️ Screen Capture — auto-wykrywanie talii</div>
-        <div style={{fontSize:11,color:"#888",lineHeight:1.6}}>
+        <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.6}}>
           1. Wybierz osobę → kliknij <strong style={{color:"#6496ff"}}>Udostępnij ekran</strong><br/>
           2. Wybierz okno/ekran z grą → kliknij <strong style={{color:"#0c6"}}>Start monitorowania</strong><br/>
           3. Przełącz na grę — otwieraj talie jedna po drugiej<br/>
-          4. Usłyszysz <strong style={{color:"#ffd700"}}>ding 🎵</strong> gdy talia zostanie wykryta → przełącz na następną<br/>
+          4. Usłyszysz <strong style={{color:"var(--accent)"}}>ding 🎵</strong> gdy talia zostanie wykryta → przełącz na następną<br/>
           5. Po wszystkich taliach → <strong style={{color:"#0c6"}}>Analizuj → Zatwierdź</strong>
         </div>
       </div>
@@ -6121,8 +6126,8 @@ Zwróć WYŁĄCZNIE JSON:
             <button key={c.id} onClick={()=>setWybranaOsoba(i)} style={{
               padding:"4px 10px",borderRadius:6,fontSize:11,cursor:"pointer",
               background:wybranaOsoba===i?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.06)",
-              border:wybranaOsoba===i?"none":"1px solid #2a2a3a",
-              color:wybranaOsoba===i?"#000":"#888",
+              border:wybranaOsoba===i?"none":"1px solid var(--border)",
+              color:wybranaOsoba===i?"#000":"var(--muted)",
             }}>{c.nazwa}</button>
           ))}
         </div>
@@ -6166,14 +6171,14 @@ Zwróć WYŁĄCZNIE JSON:
       {status&&(
         <div style={{fontSize:12,padding:"8px 12px",borderRadius:6,marginBottom:10,
           background:status.includes("❌")?"rgba(255,50,50,0.1)":status.includes("🎉")||status.includes("✅")?"rgba(0,200,100,0.1)":"rgba(0,0,0,0.2)",
-          color:status.includes("❌")?"#f55":status.includes("🎉")||status.includes("✅")?"#0c6":status.includes("🎵")?"#ffd700":"#87CEEB",
+          color:status.includes("❌")?"#f55":status.includes("🎉")||status.includes("✅")?"#0c6":status.includes("🎵")?"var(--accent)":"#87CEEB",
           border:status.includes("🎵")?"1px solid #ffd70044":"none",
         }}>{status}</div>
       )}
 
       {/* Aktualna wykryta talia */}
       {wykrytaTalia&&intervalRef.current&&(
-        <div style={{textAlign:"center",padding:"8px",background:"rgba(255,215,0,0.08)",border:"1px solid #ffd70033",borderRadius:8,marginBottom:10,fontSize:12,color:"#ffd700"}}>
+        <div style={{textAlign:"center",padding:"8px",background:"rgba(255,215,0,0.08)",border:"1px solid #ffd70033",borderRadius:8,marginBottom:10,fontSize:12,color:"var(--accent)"}}>
           🃏 Aktualnie: <strong>{wykrytaTalia}</strong>
           <span style={{color:"#555",marginLeft:8,fontSize:10}}>screeny: {licznikScreenow}</span>
         </div>
@@ -6186,7 +6191,7 @@ Zwróć WYŁĄCZNIE JSON:
             <span>🤖 Analizuję: {postep.talia}</span>
             <span>{postep.current}/{postep.total}</span>
           </div>
-          <div style={{height:8,background:"#12122a",borderRadius:4,overflow:"hidden"}}>
+          <div style={{height:8,background:"var(--card-solid)",borderRadius:4,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${(postep.current/postep.total)*100}%`,background:"linear-gradient(90deg,#b8860b,#ffd700)",transition:"width 0.3s",borderRadius:4}}/>
           </div>
         </div>
@@ -6199,7 +6204,7 @@ Zwróć WYŁĄCZNIE JSON:
           <div style={{position:"absolute",top:4,left:4,background:"rgba(0,0,0,0.8)",padding:"2px 6px",borderRadius:4,fontSize:9,color:intervalRef.current?"#0c6":"#6496ff"}}>
             {intervalRef.current?"🔍 LIVE":"● EKRAN"}
           </div>
-          {kolejka.length>0&&<div style={{position:"absolute",top:4,right:4,background:"rgba(0,0,0,0.8)",padding:"2px 8px",borderRadius:4,fontSize:10,color:"#ffd700",fontWeight:"bold"}}>
+          {kolejka.length>0&&<div style={{position:"absolute",top:4,right:4,background:"rgba(0,0,0,0.8)",padding:"2px 8px",borderRadius:4,fontSize:10,color:"var(--accent)",fontWeight:"bold"}}>
             📋 {kolejka.length}
           </div>}
         </div>
@@ -6213,8 +6218,8 @@ Zwróć WYŁĄCZNIE JSON:
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {kolejka.map((z,i)=>(
               <div key={i} style={{position:"relative",textAlign:"center"}}>
-                <img src={z.thumb} alt={z.talia} style={{width:100,height:56,borderRadius:4,border:"1px solid #2a2a3a",objectFit:"cover",display:"block"}}/>
-                <div style={{fontSize:9,color:"#ffd700",marginTop:2,maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{z.talia}</div>
+                <img src={z.thumb} alt={z.talia} style={{width:100,height:56,borderRadius:4,border:"1px solid var(--border)",objectFit:"cover",display:"block"}}/>
+                <div style={{fontSize:9,color:"var(--accent)",marginTop:2,maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{z.talia}</div>
                 <button onClick={()=>{
                   const n=kolejka.filter((_,j)=>j!==i);
                   setKolejka(n); kolejkaRef.current=n;
@@ -6227,15 +6232,15 @@ Zwróć WYŁĄCZNIE JSON:
 
       {/* Wyniki */}
       {wynikiFinal.length>0&&(
-        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+        <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:12}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>
             🔍 Wyniki dla <span style={{color:"#0c6"}}>{osoba?.nazwa}</span>
           </div>
           {wynikiFinal.map((w,i)=>(
             <div key={i} style={{marginBottom:6,padding:"8px 10px",background:w.ok?"rgba(0,200,100,0.05)":"rgba(255,50,50,0.05)",border:`1px solid ${w.ok?"#0c633":"#f5544433"}`,borderRadius:8}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:w.ok?4:0}}>
                 {w.thumb&&<img src={w.thumb} alt="" style={{width:60,height:34,borderRadius:3,objectFit:"cover"}}/>}
-                <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"#ffd700":"#f55"}}>
+                <div style={{fontSize:12,fontWeight:"bold",color:w.ok?"var(--accent)":"#f55"}}>
                   {w.ok?`✓ ${w.taliaMatch?.nazwa||w.talia}`:`❌ ${w.talia}`}
                   {w.blad&&<span style={{fontSize:10,color:"#f55",marginLeft:4}}>{w.blad}</span>}
                 </div>
@@ -6245,8 +6250,8 @@ Zwróć WYŁĄCZNIE JSON:
                   {w.karty.map((k,j)=>(
                     <span key={j} style={{
                       padding:"2px 7px",borderRadius:4,fontSize:10,
-                      background:k.posiadana?"rgba(0,200,100,0.15)":"rgba(255,255,255,0.03)",
-                      border:k.posiadana?"1px solid #0c633":"1px solid #2a2a3a",
+                      background:k.posiadana?"rgba(0,200,100,0.15)":"var(--card)",
+                      border:k.posiadana?"1px solid #0c633":"1px solid var(--border)",
                       color:k.posiadana?"#0c6":"#444",
                     }}>{k.posiadana?"✓ ":""}{k.nazwa}{k.duplikat?" +dup":""}</span>
                   ))}
@@ -6576,7 +6581,7 @@ body {
     <div>
       <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa055",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:4}}>📢 Generator ogłoszenia</div>
-        <div style={{fontSize:11,color:"#888"}}>Generuje piękne ogłoszenie w stylu The Gang. Zrób zrzut ekranu i wklej na Messenger!</div>
+        <div style={{fontSize:11,color:"var(--muted)"}}>Generuje piękne ogłoszenie w stylu The Gang. Zrób zrzut ekranu i wklej na Messenger!</div>
       </div>
 
       {/* Ile miejsc */}
@@ -6587,21 +6592,21 @@ body {
             <button key={n} onClick={()=>setIleMiejsc(n)} style={{
               padding:"8px 18px",borderRadius:8,fontSize:15,fontWeight:"bold",cursor:"pointer",
               background:ileMiejsc===n?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.07)",
-              border:ileMiejsc===n?"none":"1px solid #2a2a3a",
-              color:ileMiejsc===n?"#000":"#888",
+              border:ileMiejsc===n?"none":"1px solid var(--border)",
+              color:ileMiejsc===n?"#000":"var(--muted)",
             }}>{n}</button>
           ))}
         </div>
       </div>
 
       {/* Screen z poziomami */}
-      <div style={{marginBottom:14,background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:12}}>
+      <div style={{marginBottom:14,background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8,padding:12}}>
         <div style={{fontSize:12,color:"#87CEEB",fontWeight:"bold",marginBottom:4}}>💎 Wgraj screeny z poziomami (opcjonalnie)</div>
         <div style={{fontSize:11,color:"#555",marginBottom:8}}>
           Możesz wgrać kilka screenów naraz — lista jest za długa na jeden? Wgraj 2-3 screeny, AI scali je automatycznie.
         </div>
         <input type="file" accept="image/*" multiple onChange={analizujScreen} disabled={analizuje}
-          style={{width:"100%",padding:8,background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,boxSizing:"border-box"}}/>
+          style={{width:"100%",padding:8,background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12,boxSizing:"border-box"}}/>
         {analizuje&&<div style={{fontSize:12,color:"#87CEEB",marginTop:6}}>🤖 Analizuję i scalanie screenów...</div>}
         {Object.keys(poziomy).length>0&&(
           <div style={{marginTop:6,fontSize:11,color:"#0c6",display:"flex",gap:12,flexWrap:"wrap"}}>
@@ -6622,7 +6627,7 @@ body {
       {/* Podgląd HTML */}
       {pokazPodglad&&(
         <div>
-          <div style={{fontSize:11,color:"#888",marginBottom:8,textAlign:"center"}}>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:8,textAlign:"center"}}>
             👆 Zrób zrzut ekranu tego ogłoszenia i wklej na Messenger
           </div>
           <div ref={podgladRef} style={{border:"2px solid #b8860b",borderRadius:8,overflow:"hidden"}}>
@@ -6672,16 +6677,16 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
         <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:8}}>🔒 Logi logowań</div>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"8px 14px",flex:1}}>
-            <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700"}}>{logi.length}</div>
-            <div style={{fontSize:11,color:"#888"}}>logowań łącznie</div>
+            <div style={{fontSize:22,fontWeight:"bold",color:"var(--accent)"}}>{logi.length}</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>logowań łącznie</div>
           </div>
           <div style={{background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",borderRadius:8,padding:"8px 14px",flex:1}}>
             <div style={{fontSize:22,fontWeight:"bold",color:"#f55"}}>{noweUrzadzenia.length}</div>
-            <div style={{fontSize:11,color:"#888"}}>nowych urządzeń</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>nowych urządzeń</div>
           </div>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"8px 14px",flex:1}}>
             <div style={{fontSize:22,fontWeight:"bold",color:"#0c6"}}>{unikalne.length}</div>
-            <div style={{fontSize:11,color:"#888"}}>unikalnych nicków</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>unikalnych nicków</div>
           </div>
         </div>
       </div>
@@ -6701,12 +6706,12 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
         <input value={filtrNick} onChange={e=>setFiltrNick(e.target.value)}
           placeholder="Szukaj nicku..."
-          style={{flex:1,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+          style={{flex:1,padding:"7px 10px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
         <button onClick={()=>setPokazTylkoNowe(p=>!p)} style={{
           padding:"7px 12px",borderRadius:6,fontSize:12,cursor:"pointer",
-          background:pokazTylkoNowe?"rgba(255,50,50,0.2)":"rgba(255,255,255,0.05)",
+          background:pokazTylkoNowe?"rgba(255,50,50,0.2)":"var(--card)",
           border:pokazTylkoNowe?"1px solid #f55":"1px solid #333",
-          color:pokazTylkoNowe?"#f55":"#666",
+          color:pokazTylkoNowe?"#f55":"var(--muted)",
         }}>⚠️ Tylko nowe urządzenia</button>
       </div>
 
@@ -6717,7 +6722,7 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
         ):filtered.map((l,i)=>(
           <div key={i} style={{
             display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:3,
-            background:l.noweUrzadzenie?"rgba(255,50,50,0.08)":"rgba(255,255,255,0.03)",
+            background:l.noweUrzadzenie?"rgba(255,50,50,0.08)":"var(--card)",
             border:`1px solid ${l.noweUrzadzenie?"#f5544433":"#1a1a2e"}`,
             borderRadius:6,
           }}>
@@ -6725,11 +6730,11 @@ function LogiLogowan({isAdmin=false, zablokowane=[], onZablokuj, onOdblokuj}) {
               {l.noweUrzadzenie?"🔴":l.typ==="wejscie"?"🟢":l.rola==="admin"?"👑":l.rola==="zastepca"?"⚔️":"👤"}
             </span>
             <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:"bold",color:l.noweUrzadzenie?"#f55":"#ddd"}}>
+              <div style={{fontSize:12,fontWeight:"bold",color:l.noweUrzadzenie?"#f55":"var(--text)"}}>
                 {l.nick}
                 {l.noweUrzadzenie&&<span style={{fontSize:10,color:"#f55",marginLeft:6,background:"rgba(255,50,50,0.15)",padding:"1px 5px",borderRadius:4}}>NOWE URZĄDZENIE!</span>}
                 {l.typ==="wejscie"&&<span style={{fontSize:10,color:"#0c6",marginLeft:6,background:"rgba(0,200,100,0.1)",padding:"1px 5px",borderRadius:4}}>wejście</span>}
-                {l.typ==="login"&&<span style={{fontSize:10,color:"#888",marginLeft:6,background:"rgba(255,255,255,0.05)",padding:"1px 5px",borderRadius:4}}>logowanie</span>}
+                {l.typ==="login"&&<span style={{fontSize:10,color:"var(--muted)",marginLeft:6,background:"var(--card)",padding:"1px 5px",borderRadius:4}}>logowanie</span>}
                 {l.typ==="login_nowe_urzadzenie"&&<span style={{fontSize:10,color:"#f55",marginLeft:6,background:"rgba(255,50,50,0.1)",padding:"1px 5px",borderRadius:4}}>nowe urządzenie</span>}
                 <span style={{fontSize:10,color:"#555",marginLeft:6}}>{l.rola}</span>
                 {l.noweUrzadzenie&&isAdmin&&(
@@ -6805,8 +6810,8 @@ function ZarzadzajiePinami({czlonkowie}) {
   return (
     <div style={{marginBottom:16}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>🔐 PINy członków</div>
-        <button onClick={odswież} style={{fontSize:10,padding:"3px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #ffd70033",borderRadius:4,color:"#ffd700",cursor:"pointer"}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)"}}>🔐 PINy członków</div>
+        <button onClick={odswież} style={{fontSize:10,padding:"3px 8px",background:"rgba(255,215,0,0.1)",border:"1px solid #ffd70033",borderRadius:4,color:"var(--accent)",cursor:"pointer"}}>
           {ladowanie?"⏳":"🔄"} Odśwież
         </button>
       </div>
@@ -6927,7 +6932,7 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
 
   return (
     <div style={{animation:"fadeIn 0.3s ease"}}>
-      <div style={{fontSize:16,fontWeight:"bold",color:"#ffd700",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+      <div style={{fontSize:16,fontWeight:"bold",color:"var(--accent)",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
         📊 Dashboard admina
         <span style={{fontSize:11,color:"#555",fontWeight:"normal"}}>— dane na żywo</span>
       </div>
@@ -6948,18 +6953,18 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
 
         {/* Aktywna wymiana */}
         <div style={{
-          background: aktywnaWymiana ? "rgba(255,215,0,0.08)" : "rgba(255,255,255,0.03)",
+          background: aktywnaWymiana ? "rgba(255,215,0,0.08)" : "var(--card)",
           border: aktywnaWymiana ? "1px solid #ffd70044" : "1px solid #1a1a2e",
           borderRadius:10,padding:12,
         }}>
-          <div style={{fontSize:11,color:"#ffd700",marginBottom:4}}>📋 Aktywna wymiana</div>
+          <div style={{fontSize:11,color:"var(--accent)",marginBottom:4}}>📋 Aktywna wymiana</div>
           {aktywnaWymiana ? (
             <>
-              <div style={{fontSize:22,fontWeight:"bold",color:"#ffd700"}}>
+              <div style={{fontSize:22,fontWeight:"bold",color:"var(--accent)"}}>
                 {Object.values(aktywnaWymiana.potwierdzone||{}).filter(Boolean).length}
-                <span style={{fontSize:13,color:"#888",fontWeight:"normal"}}>/{Object.keys(aktywnaWymiana.wymiany?.reduce((a,w)=>{a[w.od]=1;return a;},{}) || {}).length}</span>
+                <span style={{fontSize:13,color:"var(--muted)",fontWeight:"normal"}}>/{Object.keys(aktywnaWymiana.wymiany?.reduce((a,w)=>{a[w.od]=1;return a;},{}) || {}).length}</span>
               </div>
-              <div style={{fontSize:10,color:"#888"}}>potwierdzeń</div>
+              <div style={{fontSize:10,color:"var(--muted)"}}>potwierdzeń</div>
               {niepotwierdzonychCount > 0 && (
                 <div style={{marginTop:4,fontSize:10,color:"#f55",background:"rgba(255,50,50,0.1)",padding:"2px 6px",borderRadius:4,display:"inline-block"}}>
                   ⚠️ {niepotwierdzonychCount} nie potwierdziło
@@ -6976,7 +6981,7 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
           <div style={{fontSize:11,color:"#fa0",marginBottom:4}}>💰 Ammo gangu (sezon)</div>
           <div style={{fontSize:22,fontWeight:"bold",color:"#fa0"}}>{ammoGangu.toLocaleString()}</div>
           <div style={{fontSize:10,color:"#555"}}>łącznie zdobyte</div>
-          <div style={{marginTop:4,fontSize:10,color:"#666"}}>{historiaWymian.length} wymian w historii</div>
+          <div style={{marginTop:4,fontSize:10,color:"var(--muted)"}}>{historiaWymian.length} wymian w historii</div>
         </div>
 
         {/* Postęp kart */}
@@ -6984,7 +6989,7 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
           <div style={{fontSize:11,color:"#87CEEB",marginBottom:4}}>🃏 Karty gangu</div>
           <div style={{fontSize:22,fontWeight:"bold",color:"#87CEEB"}}>{Math.round(kartyGangu/Math.max(1,totalKartyMax/czlonkowie.length*czlonkowie.length)*100)}%</div>
           <div style={{fontSize:10,color:"#555"}}>{kartyGangu.toLocaleString()} / {totalKartyMax.toLocaleString()} łącznie</div>
-          <div style={{height:4,background:"#12122a",borderRadius:2,marginTop:6,overflow:"hidden"}}>
+          <div style={{height:4,background:"var(--card-solid)",borderRadius:2,marginTop:6,overflow:"hidden"}}>
             <div style={{height:"100%",width:`${kartyGangu/Math.max(1,totalKartyMax)*100}%`,background:"linear-gradient(90deg,#4169E1,#87CEEB)",borderRadius:2}}/>
           </div>
         </div>
@@ -7005,8 +7010,8 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
       )}
 
       {/* === RANKING KART === */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>🏆 Ranking — postęp kolekcji</div>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>🏆 Ranking — postęp kolekcji</div>
         {statKarty.map((s,i) => {
           const isOnline = onlineNicki.some(n => normalizuj(n) === normalizuj(s.c.nazwa));
           return (
@@ -7017,13 +7022,13 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
             }}>
               <span style={{fontSize:11,color:"#555",width:18,textAlign:"right"}}>{i+1}.</span>
               <div style={{width:6,height:6,borderRadius:"50%",background:isOnline?"#0c6":"#333",flexShrink:0,boxShadow:isOnline?"0 0 4px #0c6":"none"}}/>
-              <span style={{flex:1,fontSize:12,color:i===0?"#ffd700":"#ddd"}}>{s.c.nazwa}</span>
+              <span style={{flex:1,fontSize:12,color:i===0?"var(--accent)":"var(--text)"}}>{s.c.nazwa}</span>
               {s.c.krag > 1 && <span style={{fontSize:9,color:"#da70d6"}}>K{s.c.krag}</span>}
               <span style={{fontSize:10,color:"#555"}}>{s.zamkniete}/{talie.length} talii</span>
-              <div style={{width:60,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+              <div style={{width:60,height:5,background:"var(--card-solid)",borderRadius:3,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${s.pct}%`,background:s.pct===100?"#0c6":"linear-gradient(90deg,#b8860b,#ffd700)",borderRadius:3}}/>
               </div>
-              <span style={{fontSize:11,color:"#888",width:32,textAlign:"right"}}>{s.pct}%</span>
+              <span style={{fontSize:11,color:"var(--muted)",width:32,textAlign:"right"}}>{s.pct}%</span>
               {s.dup > 0 && <span style={{fontSize:9,color:"#87CEEB88"}}>+{s.dup}dup</span>}
             </div>
           );
@@ -7031,8 +7036,8 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
       </div>
 
       {/* === AKTYWNOŚĆ WYMIAN === */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>
           📈 Aktywność — potwierdzenia wymian
           <span style={{fontSize:10,color:"#555",fontWeight:"normal",marginLeft:6}}>({historiaWymian.length} wymian w historii)</span>
         </div>
@@ -7043,9 +7048,9 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
           return (
             <div key={r.c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",marginBottom:2,borderRadius:5}}>
               <div style={{width:6,height:6,borderRadius:"50%",background:isOnline?"#0c6":"#333",flexShrink:0}}/>
-              <span style={{flex:1,fontSize:12,color:"#ddd"}}>{r.c.nazwa}</span>
+              <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{r.c.nazwa}</span>
               <span style={{fontSize:10,color:"#555",width:60,textAlign:"right"}}>{r.ostatnia ? dataTemu(r.ostatnia) : "brak"}</span>
-              <div style={{width:80,height:5,background:"#12122a",borderRadius:3,overflow:"hidden"}}>
+              <div style={{width:80,height:5,background:"var(--card-solid)",borderRadius:3,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${pct}%`,background:kolor,borderRadius:3}}/>
               </div>
               <span style={{fontSize:11,fontWeight:"bold",color:kolor,width:28,textAlign:"right"}}>{r.potwierdzone}</span>
@@ -7078,8 +7083,8 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
 
       {/* === EFEKTYWNOŚĆ WYMIAN === */}
       {historiaWymian.length > 0 && (
-        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:12}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>📊 Efektywność wymian</div>
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>📊 Efektywność wymian</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
             {[
               {
@@ -7092,7 +7097,7 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
               {
                 label:"Śr. wymian/sesja",
                 val: Math.round(historiaWymian.reduce((s,w) => s + (w.lacznieWymian||0), 0) / historiaWymian.length),
-                color:"#ffd700",
+                color:"var(--accent)",
               },
               {
                 label:"Sesji łącznie",
@@ -7183,9 +7188,9 @@ function TaktykaSezonu({zapiszStrukture}) {
       </div>
 
       {/* NOTATKI TAKTYCZNE */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:12}}>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:12}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>📝 Notatki taktyczne sezonu</div>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)"}}>📝 Notatki taktyczne sezonu</div>
           <button onClick={() => { setEdytujNotatki(!edytujNotatki); setTempNotatki(dane.notatki||""); }}
             style={{fontSize:11,padding:"3px 10px",background:"rgba(255,215,0,0.1)",border:"1px solid #b8860b55",borderRadius:6,color:"#b8860b",cursor:"pointer"}}>
             {edytujNotatki ? "✕ Anuluj" : "✏️ Edytuj"}
@@ -7195,7 +7200,7 @@ function TaktykaSezonu({zapiszStrukture}) {
           <div>
             <textarea value={tempNotatki} onChange={e=>setTempNotatki(e.target.value)}
               rows={6} placeholder="Wpisz strategię sezonu, co skupiamy, ważne info..."
-              style={{width:"100%",padding:"10px 12px",background:"#12122a",border:"1px solid #ffd70033",
+              style={{width:"100%",padding:"10px 12px",background:"var(--card-solid)",border:"1px solid #ffd70033",
                 borderRadius:8,color:"#fff",fontSize:12,lineHeight:1.6,resize:"vertical",
                 fontFamily:"inherit",boxSizing:"border-box"}}/>
             <button onClick={() => {
@@ -7213,15 +7218,15 @@ function TaktykaSezonu({zapiszStrukture}) {
       </div>
 
       {/* PLAN DZIAŁAŃ */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:10,padding:14,marginBottom:12}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>✅ Plan działań / TODO</div>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>✅ Plan działań / TODO</div>
         {(dane.plany||[]).length === 0 && (
           <div style={{fontSize:11,color:"#444",marginBottom:10}}>Brak zadań — dodaj poniżej</div>
         )}
         {(dane.plany||[]).map(p => (
           <div key={p.id} style={{
             display:"flex",alignItems:"center",gap:8,padding:"7px 10px",marginBottom:4,
-            background:p.gotowe?"rgba(0,200,100,0.05)":"rgba(255,255,255,0.03)",
+            background:p.gotowe?"rgba(0,200,100,0.05)":"var(--card)",
             border:`1px solid ${p.gotowe?"#0c633":"#1a1a2e"}`,borderRadius:6,
             opacity:p.gotowe?0.6:1,
           }}>
@@ -7231,7 +7236,7 @@ function TaktykaSezonu({zapiszStrukture}) {
               cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
               fontSize:10,color:"#000",
             }}>{p.gotowe?"✓":""}</button>
-            <span style={{flex:1,fontSize:12,color:p.gotowe?"#555":"#ddd",textDecoration:p.gotowe?"line-through":"none"}}>{p.tekst}</span>
+            <span style={{flex:1,fontSize:12,color:p.gotowe?"#555":"var(--text)",textDecoration:p.gotowe?"line-through":"none"}}>{p.tekst}</span>
             <span style={{fontSize:9,color:kolorPrio[p.priorytet]}}>{labelPrio[p.priorytet]}</span>
             <button onClick={()=>usunPlan(p.id)} style={{background:"none",border:"none",color:"#f5544455",cursor:"pointer",fontSize:12}}>✕</button>
           </div>
@@ -7240,14 +7245,14 @@ function TaktykaSezonu({zapiszStrukture}) {
           <input value={nowyPlan.tekst} onChange={e=>setNowyPlan(p=>({...p,tekst:e.target.value}))}
             onKeyDown={e=>e.key==="Enter"&&dodajPlan()}
             placeholder="Nowe zadanie..."
-            style={{flex:1,minWidth:120,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+            style={{flex:1,minWidth:120,padding:"7px 10px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
           <select value={nowyPlan.priorytet} onChange={e=>setNowyPlan(p=>({...p,priorytet:e.target.value}))}
-            style={{padding:"7px 8px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:kolorPrio[nowyPlan.priorytet],fontSize:11,cursor:"pointer"}}>
+            style={{padding:"7px 8px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:kolorPrio[nowyPlan.priorytet],fontSize:11,cursor:"pointer"}}>
             <option value="high">🔴 Wysoki</option>
             <option value="medium">🟡 Średni</option>
             <option value="low">🟢 Niski</option>
           </select>
-          <button onClick={dodajPlan} style={{padding:"7px 14px",background:"rgba(255,215,0,0.12)",border:"1px solid #b8860b55",borderRadius:6,color:"#ffd700",cursor:"pointer",fontWeight:"bold",fontSize:12}}>+ Dodaj</button>
+          <button onClick={dodajPlan} style={{padding:"7px 14px",background:"rgba(255,215,0,0.12)",border:"1px solid #b8860b55",borderRadius:6,color:"var(--accent)",cursor:"pointer",fontWeight:"bold",fontSize:12}}>+ Dodaj</button>
         </div>
       </div>
 
@@ -7286,21 +7291,21 @@ function TaktykaSezonu({zapiszStrukture}) {
 
       {/* Dodaj gang */}
       <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #1a1a2e",borderRadius:8,padding:12}}>
-        <div style={{fontSize:11,color:"#888",marginBottom:8}}>+ Dodaj gang:</div>
+        <div style={{fontSize:11,color:"var(--muted)",marginBottom:8}}>+ Dodaj gang:</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           <select value={nowyS.typ} onChange={e=>setNowyS(s=>({...s,typ:e.target.value}))}
-            style={{padding:"7px 8px",background:"#12122a",border:"1px solid #333",borderRadius:6,
+            style={{padding:"7px 8px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,
               color:nowyS.typ==="sojusznik"?"#0c6":"#f55",fontSize:12,cursor:"pointer"}}>
             <option value="sojusznik">🤝 Sojusznik</option>
             <option value="wrog">⚔️ Wróg/Unikamy</option>
           </select>
           <input value={nowyS.nazwa} onChange={e=>setNowyS(s=>({...s,nazwa:e.target.value}))}
             placeholder="Nazwa gangu" onKeyDown={e=>e.key==="Enter"&&dodajGang()}
-            style={{flex:1,minWidth:100,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+            style={{flex:1,minWidth:100,padding:"7px 10px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
           <input value={nowyS.notatka} onChange={e=>setNowyS(s=>({...s,notatka:e.target.value}))}
             placeholder="Notatka (opcjonalnie)"
-            style={{flex:1,minWidth:100,padding:"7px 10px",background:"#12122a",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
-          <button onClick={dodajGang} style={{padding:"7px 14px",background:"rgba(255,215,0,0.12)",border:"1px solid #b8860b55",borderRadius:6,color:"#ffd700",cursor:"pointer",fontWeight:"bold",fontSize:12}}>+ Dodaj</button>
+            style={{flex:1,minWidth:100,padding:"7px 10px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:6,color:"#fff",fontSize:12}}/>
+          <button onClick={dodajGang} style={{padding:"7px 14px",background:"rgba(255,215,0,0.12)",border:"1px solid #b8860b55",borderRadius:6,color:"var(--accent)",cursor:"pointer",fontWeight:"bold",fontSize:12}}>+ Dodaj</button>
         </div>
       </div>
       {zapisywanie && <div style={{textAlign:"center",fontSize:10,color:"#555",marginTop:8}}>⏳ Zapisywanie...</div>}
@@ -7364,8 +7369,8 @@ function RzadkieKarty({ talie, czlonkowie, posiadane, duplikaty }) {
   const pokazywane = sorted.slice(0, limit);
 
   // Kolory
-  const kolorProcent = (p) => p <= 20 ? "#f55" : p <= 50 ? "#fa0" : p <= 80 ? "#ffd700" : "#0c6";
-  const kolorTyp = (typ) => typ === "złota" ? "#ffd700" : "#87CEEB";
+  const kolorProcent = (p) => p <= 20 ? "#f55" : p <= 50 ? "#fa0" : p <= 80 ? "var(--accent)" : "#0c6";
+  const kolorTyp = (typ) => typ === "złota" ? "var(--accent)" : "#87CEEB";
 
   return (
     <div>
@@ -7385,9 +7390,9 @@ function RzadkieKarty({ talie, czlonkowie, posiadane, duplikaty }) {
         ].map(t=>(
           <button key={t.id} onClick={()=>setFiltr(t.id)} style={{
             padding:"6px 12px",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:"bold",
-            background:filtr===t.id?"linear-gradient(135deg,#1a3a8f,#6496ff)":"rgba(255,255,255,0.05)",
-            border:filtr===t.id?"none":"1px solid #2a2a3a",
-            color:filtr===t.id?"#fff":"#666",
+            background:filtr===t.id?"linear-gradient(135deg,#1a3a8f,#6496ff)":"var(--card)",
+            border:filtr===t.id?"none":"1px solid var(--border)",
+            color:filtr===t.id?"#fff":"var(--muted)",
           }}>
             {t.label}
             <div style={{fontSize:9,fontWeight:"normal",color:filtr===t.id?"#aaa":"#444"}}>{t.opis}</div>
@@ -7398,14 +7403,14 @@ function RzadkieKarty({ talie, czlonkowie, posiadane, duplikaty }) {
       {/* Filtry */}
       <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
         <select value={filtrTalia} onChange={e=>setFiltrTalia(e.target.value)}
-          style={{padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#aaa",fontSize:11}}>
+          style={{padding:"5px 8px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:5,color:"#aaa",fontSize:11}}>
           <option value="wszystkie">Wszystkie talie</option>
           {[...talie].sort((a,b)=>(a.numer||99)-(b.numer||99)).map(t=>(
             <option key={t.id} value={t.numer||99}>#{t.numer||"?"} {t.nazwa}</option>
           ))}
         </select>
         <select value={filtrTyp} onChange={e=>setFiltrTyp(e.target.value)}
-          style={{padding:"5px 8px",background:"#12122a",border:"1px solid #333",borderRadius:5,color:"#aaa",fontSize:11}}>
+          style={{padding:"5px 8px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:5,color:"#aaa",fontSize:11}}>
           <option value="wszystkie">Złote + Diamentowe</option>
           <option value="złota">⭐ Tylko złote</option>
           <option value="diamentowa">💎 Tylko diamentowe</option>
@@ -7429,14 +7434,14 @@ function RzadkieKarty({ talie, czlonkowie, posiadane, duplikaty }) {
               display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",
               gap:4,padding:"7px 8px",marginBottom:3,borderRadius:7,
               background:"rgba(0,0,0,0.2)",
-              border:`1px solid ${s.procent<=20?"#f5544422":s.procent<=50?"#fa055":"#2a2a3a"}`,
+              border:`1px solid ${s.procent<=20?"#f5544422":s.procent<=50?"#fa055":"var(--border)"}`,
               position:"relative",overflow:"hidden",alignItems:"center",
             }}>
               {/* Pasek tła */}
               <div style={{position:"absolute",left:0,top:0,bottom:0,width:pasek,background:`${kolor}08`,zIndex:0}}/>
               {/* Nazwa karty */}
               <div style={{zIndex:1}}>
-                <div style={{fontSize:11,color:"#ddd",fontWeight:s.procent<=20?"bold":"normal"}}>
+                <div style={{fontSize:11,color:"var(--text)",fontWeight:s.procent<=20?"bold":"normal"}}>
                   <span style={{fontSize:9,color:kolorTyp(s.typ),marginRight:4}}>
                     {s.typ==="złota"?"⭐":"💎"}
                   </span>
@@ -7469,15 +7474,15 @@ function RzadkieKarty({ talie, czlonkowie, posiadane, duplikaty }) {
       {/* Pokaż więcej */}
       {sorted.length > limit && (
         <button onClick={()=>setLimit(l=>l+20)} style={{
-          width:"100%",padding:8,background:"rgba(255,255,255,0.05)",border:"1px solid #2a2a3a",
-          borderRadius:6,color:"#666",cursor:"pointer",fontSize:11,
+          width:"100%",padding:8,background:"var(--card)",border:"1px solid var(--border)",
+          borderRadius:6,color:"var(--muted)",cursor:"pointer",fontSize:11,
         }}>
           Pokaż więcej ({sorted.length - limit} pozostałych)
         </button>
       )}
 
       {/* Podsumowanie */}
-      <div style={{marginTop:10,padding:"8px 12px",background:"rgba(0,0,0,0.2)",borderRadius:8,border:"1px solid #2a2a3a",fontSize:11,color:"#555",lineHeight:1.8}}>
+      <div style={{marginTop:10,padding:"8px 12px",background:"rgba(0,0,0,0.2)",borderRadius:8,border:"1px solid var(--border)",fontSize:11,color:"#555",lineHeight:1.8}}>
         🔴 Czerwone (0-20%) — super rzadkie, priorytet w wymianach<br/>
         🟡 Żółte (21-50%) — rzadkie, warto celować<br/>
         🟡 Złote (51-80%) — powszechne<br/>
@@ -7579,7 +7584,7 @@ function TrackerKrecen() {
   return (
     <div>
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70033",borderRadius:10,padding:12,marginBottom:12}}>
-        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:2}}>🎯 Tracker kręceń — szukamy wzorca</div>
+        <div style={{fontSize:14,fontWeight:"bold",color:"var(--accent)",marginBottom:2}}>🎯 Tracker kręceń — szukamy wzorca</div>
         <div style={{fontSize:11,color:"#555",lineHeight:1.6}}>
           Klikaj mnożnik przed każdym kręceniem, potem "Kręcenie" lub "KRYTYK" jeśli wypadły 3× celowniki. Po kilku sesjach analiza pokaże czy jest wzorzec.
         </div>
@@ -7589,7 +7594,7 @@ function TrackerKrecen() {
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,padding:"8px 12px",background:"rgba(255,165,0,0.08)",borderRadius:8,border:"1px solid #fa033"}}>
         <span style={{fontSize:11,color:"#fa0",flexShrink:0}}>🔫 Ammo:</span>
         <input type="number" value={ammo} onChange={e=>{setAmmo(e.target.value);localStorage.setItem("tracker_ammo",e.target.value);}}
-          style={{flex:1,padding:"4px 8px",background:"#12122a",border:"1px solid #fa033",borderRadius:5,color:"#fa0",fontSize:16,fontWeight:"bold"}}/>
+          style={{flex:1,padding:"4px 8px",background:"var(--card-solid)",border:"1px solid #fa033",borderRadius:5,color:"#fa0",fontSize:16,fontWeight:"bold"}}/>
         <span style={{fontSize:10,color:"#555"}}>sesja: {sesja.length} kręceń</span>
       </div>
 
@@ -7600,9 +7605,9 @@ function TrackerKrecen() {
           {MNOZNIKI.map(m=>(
             <button key={m} onClick={()=>setAktMnoznik(m)} style={{
               padding:"8px 12px",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:"bold",
-              background:aktMnoznik===m?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
-              border:aktMnoznik===m?"none":"1px solid #2a2a3a",
-              color:aktMnoznik===m?"#000":"#666",
+              background:aktMnoznik===m?"linear-gradient(135deg,#b8860b,#ffd700)":"var(--card)",
+              border:aktMnoznik===m?"none":"1px solid var(--border)",
+              color:aktMnoznik===m?"#000":"var(--muted)",
             }}>×{m}</button>
           ))}
         </div>
@@ -7612,7 +7617,7 @@ function TrackerKrecen() {
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
         <button onClick={()=>dodajKrecenie(false)} style={{
           padding:16,background:"rgba(255,255,255,0.06)",border:"1px solid #333",
-          borderRadius:10,color:"#888",fontSize:14,cursor:"pointer",fontWeight:"bold",
+          borderRadius:10,color:"var(--muted)",fontSize:14,cursor:"pointer",fontWeight:"bold",
         }}>
           🎰 Kręcenie ×{aktMnoznik}
           <div style={{fontSize:10,color:"#555",marginTop:2}}>−{aktMnoznik} ammo</div>
@@ -7628,15 +7633,15 @@ function TrackerKrecen() {
 
       {/* Ostatnie 10 kręceń */}
       {ostatnie10.length > 0 && (
-        <div style={{marginBottom:12,padding:"8px 10px",background:"rgba(0,0,0,0.2)",borderRadius:8,border:"1px solid #2a2a3a"}}>
+        <div style={{marginBottom:12,padding:"8px 10px",background:"rgba(0,0,0,0.2)",borderRadius:8,border:"1px solid var(--border)"}}>
           <div style={{fontSize:10,color:"#555",marginBottom:5}}>Ostatnie {ostatnie10.length} kręceń:</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
             {ostatnie10.map((k,i)=>(
               <div key={i} style={{
                 fontSize:11,padding:"2px 7px",borderRadius:12,fontWeight:"bold",
-                background:k.krytyk?"rgba(255,50,50,0.2)":"rgba(255,255,255,0.05)",
+                background:k.krytyk?"rgba(255,50,50,0.2)":"var(--card)",
                 border:k.krytyk?"1px solid #f55":"1px solid #333",
-                color:k.krytyk?"#f55":"#666",
+                color:k.krytyk?"#f55":"var(--muted)",
               }}>
                 {k.krytyk?"🎯":"🎰"} ×{k.mnoznik}
               </div>
@@ -7649,7 +7654,7 @@ function TrackerKrecen() {
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         <button onClick={zapiszSesje} disabled={sesja.length===0} style={{
           flex:1,padding:10,
-          background:sesja.length>0?"linear-gradient(135deg,#0c6,#0fa)":"rgba(255,255,255,0.05)",
+          background:sesja.length>0?"linear-gradient(135deg,#0c6,#0fa)":"var(--card)",
           border:"none",borderRadius:8,color:sesja.length>0?"#000":"#444",
           fontWeight:"bold",fontSize:12,cursor:sesja.length>0?"pointer":"not-allowed",
         }}>💾 Zapisz sesję ({sesja.length} kręceń)</button>
@@ -7691,7 +7696,7 @@ function TrackerKrecen() {
                   <div style={{fontSize:11,color:"#aaa",marginBottom:6}}>🔍 Najczęstsze sekwencje przed krytykiem:</div>
                   {analiza.topSek.map(([sek, ile])=>(
                     <div key={sek} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",marginBottom:3,background:"rgba(255,50,50,0.08)",borderRadius:5,border:"1px solid #f5544422"}}>
-                      <span style={{fontSize:11,color:"#ddd",fontFamily:"monospace"}}>{sek}</span>
+                      <span style={{fontSize:11,color:"var(--text)",fontFamily:"monospace"}}>{sek}</span>
                       <span style={{fontSize:11,color:"#f55",fontWeight:"bold"}}>{ile}×</span>
                     </div>
                   ))}
@@ -7702,7 +7707,7 @@ function TrackerKrecen() {
               )}
 
               {analiza.odleglosci.length >= 5 && (
-                <div style={{marginTop:8,padding:"6px 8px",background:"rgba(0,0,0,0.2)",borderRadius:5,fontSize:10,color:"#666"}}>
+                <div style={{marginTop:8,padding:"6px 8px",background:"rgba(0,0,0,0.2)",borderRadius:5,fontSize:10,color:"var(--muted)"}}>
                   Odległości między krytykami: {analiza.odleglosci.slice(-10).join(", ")} (ostatnie 10)
                 </div>
               )}
@@ -7731,9 +7736,9 @@ function KalkulatorEventu() {
   // Progi łączone — kręcisz cały czas w górę, po drodze zbierasz nagrody
   const TYPY_NAGRODY = [
     {id:"paczki", label:"📦 Paczki", kolor:"#87CEEB", waga:10},
-    {id:"klucze",  label:"🗝️ Klucze",  kolor:"#ffd700", waga:6},
+    {id:"klucze",  label:"🗝️ Klucze",  kolor:"var(--accent)", waga:6},
     {id:"ammo",   label:"🔫 Ammo",    kolor:"#fa0",    waga:3},
-    {id:"hajs",   label:"💵 Hajs",    kolor:"#888",    waga:1},
+    {id:"hajs",   label:"💵 Hajs",    kolor:"var(--muted)",    waga:1},
     {id:"inne",   label:"🎁 Inne",    kolor:"#555",    waga:0},
   ];
 
@@ -7897,27 +7902,27 @@ function KalkulatorEventu() {
         <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:8,padding:10}}>
           <div style={{fontSize:11,color:"#fa0",marginBottom:4,fontWeight:"bold"}}>🔫 Posiadane ammo</div>
           <input type="number" value={ammoMam} onChange={e=>{setAmmoMam(e.target.value);localStorage.setItem("slot_ammo",e.target.value);}}
-            style={{width:"100%",padding:"10px 8px",background:"#12122a",border:"1px solid #fa033",
+            style={{width:"100%",padding:"10px 8px",background:"var(--card-solid)",border:"1px solid #fa033",
               borderRadius:6,color:"#fa0",fontSize:18,fontWeight:"bold",boxSizing:"border-box"}}/>
         </div>
         <div style={{background:"rgba(135,206,235,0.06)",border:"1px solid #87CEEB33",borderRadius:8,padding:10}}>
           <div style={{fontSize:11,color:"#87CEEB",marginBottom:4,fontWeight:"bold"}}>📦 Paczki już zebrane</div>
           <input type="number" value={paczkiMam} onChange={e=>{setPaczkiMam(e.target.value);localStorage.setItem("slot_paczki",e.target.value);}}
-            min="0" style={{width:"100%",padding:"10px 8px",background:"#12122a",border:"1px solid #87CEEB33",
+            min="0" style={{width:"100%",padding:"10px 8px",background:"var(--card-solid)",border:"1px solid #87CEEB33",
               borderRadius:6,color:"#87CEEB",fontSize:18,fontWeight:"bold",boxSizing:"border-box"}}/>
         </div>
       </div>
 
       {/* MNOŻNIK */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:10,marginBottom:10}}>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:10}}>
         <div style={{fontSize:11,color:"#aaa",marginBottom:6,fontWeight:"bold"}}>⚡ Mnożnik kręcenia</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
           {MNOZNIKI.map(n=>(
             <button key={n} onClick={()=>setMnoznik(String(n))} style={{
               padding:"5px 11px",borderRadius:5,cursor:"pointer",fontSize:12,fontWeight:"bold",
-              background:parseFloat(mnoznik)===n?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
-              border:parseFloat(mnoznik)===n?"none":"1px solid #2a2a3a",
-              color:parseFloat(mnoznik)===n?"#000":"#666",
+              background:parseFloat(mnoznik)===n?"linear-gradient(135deg,#b8860b,#ffd700)":"var(--card)",
+              border:parseFloat(mnoznik)===n?"none":"1px solid var(--border)",
+              color:parseFloat(mnoznik)===n?"#000":"var(--muted)",
             }}>×{n}</button>
           ))}
         </div>
@@ -7927,7 +7932,7 @@ function KalkulatorEventu() {
       </div>
 
       {/* LICZNIK OBSERWACJI */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:10,marginBottom:10}}>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:10}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:pokazLicznik?8:0}}>
           <div style={{fontSize:11,fontWeight:"bold",color:"#aaa"}}>
             📋 Licznik kręceń
@@ -7935,9 +7940,9 @@ function KalkulatorEventu() {
           </div>
           <button onClick={()=>setPokazLicznik(p=>!p)} style={{
             fontSize:10,padding:"2px 8px",borderRadius:4,cursor:"pointer",
-            background:pokazLicznik?"rgba(255,215,0,0.1)":"rgba(255,255,255,0.05)",
+            background:pokazLicznik?"rgba(255,215,0,0.1)":"var(--card)",
             border:pokazLicznik?"1px solid #ffd70055":"1px solid #333",
-            color:pokazLicznik?"#ffd700":"#555",
+            color:pokazLicznik?"var(--accent)":"#555",
           }}>{pokazLicznik?"▼ Schowaj":"▶ Licz kręcenia"}</button>
         </div>
         {pokazLicznik&&(
@@ -7947,7 +7952,7 @@ function KalkulatorEventu() {
               {[
                 {label:"💨 Nic",count:licz0,set:setLicz0,c:"#555"},
                 {label:"🍋 Jeden",count:licz1,set:setLicz1,c:"#fa0"},
-                {label:"🍋🍋 Dwa",count:licz2,set:setLicz2,c:"#ffd700"},
+                {label:"🍋🍋 Dwa",count:licz2,set:setLicz2,c:"var(--accent)"},
                 {label:"🍋🍋🍋 JACKPOT",count:licz3,set:setLicz3,c:"#0c6"},
               ].map(b=>(
                 <div key={b.label} style={{textAlign:"center"}}>
@@ -7971,7 +7976,7 @@ function KalkulatorEventu() {
                   border:"1px solid #f5544433",borderRadius:4,color:"#f55",cursor:"pointer"}}>Reset</button>
               <button onClick={aktualizujSzanse} disabled={!lacznieObs} style={{
                 fontSize:10,padding:"4px 12px",
-                background:lacznieObs?"linear-gradient(135deg,#0c6,#0fa)":"rgba(255,255,255,0.05)",
+                background:lacznieObs?"linear-gradient(135deg,#0c6,#0fa)":"var(--card)",
                 border:"none",borderRadius:4,color:lacznieObs?"#000":"#444",
                 cursor:lacznieObs?"pointer":"default",fontWeight:"bold"}}>✓ Zastosuj</button>
             </div>
@@ -7980,19 +7985,19 @@ function KalkulatorEventu() {
       </div>
 
       {/* SZANSE */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:10,marginBottom:10}}>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:10}}>
         <div style={{fontSize:11,fontWeight:"bold",color:"#aaa",marginBottom:8}}>🎲 Szanse losowania (%)</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
           {[
             {label:`🍋 1 symbol = ×${m} pkt`,val:szansa1,set:(v)=>{setSzansa1(v);localStorage.setItem("slot_s1",v);},c:"#fa0"},
-            {label:`🍋🍋 2 symbole = ×${m*2} pkt`,val:szansa2,set:(v)=>{setSzansa2(v);localStorage.setItem("slot_s2",v);},c:"#ffd700"},
+            {label:`🍋🍋 2 symbole = ×${m*2} pkt`,val:szansa2,set:(v)=>{setSzansa2(v);localStorage.setItem("slot_s2",v);},c:"var(--accent)"},
             {label:`🍋🍋🍋 JACKPOT = ×${m*10} pkt`,val:szansa3,set:(v)=>{setSzansa3(v);localStorage.setItem("slot_s3",v);},c:"#0c6"},
           ].map(f=>(
             <div key={f.label}>
               <div style={{fontSize:9,color:f.c,marginBottom:3}}>{f.label}</div>
               <div style={{display:"flex",alignItems:"center",gap:3}}>
                 <input type="number" value={f.val} onChange={e=>f.set(e.target.value)} min="0" max="100"
-                  style={{width:"100%",padding:"5px 6px",background:"#12122a",border:`1px solid ${f.c}44`,
+                  style={{width:"100%",padding:"5px 6px",background:"var(--card-solid)",border:`1px solid ${f.c}44`,
                     borderRadius:4,color:f.c,fontSize:14,fontWeight:"bold",textAlign:"center"}}/>
                 <span style={{fontSize:10,color:"#555"}}>%</span>
               </div>
@@ -8000,8 +8005,8 @@ function KalkulatorEventu() {
           ))}
         </div>
         {ePktNaAmmo > 0 && (
-          <div style={{marginTop:8,fontSize:11,color:"#888",textAlign:"center"}}>
-            Oczekiwane: <strong style={{color:"#ffd700"}}>{ePktNaAmmo.toFixed(3)}</strong> pkt/ammo ·
+          <div style={{marginTop:8,fontSize:11,color:"var(--muted)",textAlign:"center"}}>
+            Oczekiwane: <strong style={{color:"var(--accent)"}}>{ePktNaAmmo.toFixed(3)}</strong> pkt/ammo ·
             za {ammo.toLocaleString()} ammo ≈ <strong style={{color:"#0c6"}}>{Math.round(ammo*ePktNaAmmo).toLocaleString()}</strong> pkt łącznie
           </div>
         )}
@@ -8014,7 +8019,7 @@ function KalkulatorEventu() {
           {[
             {prog:60, nagroda:"1 💎 nowa diamentowa", kolor:"#87CEEB"},
             {prog:90, nagroda:"2 💎 nowe diamentowe", kolor:"#64c8ff"},
-            {prog:120, nagroda:"3 💎 nowe diamentowe", kolor:"#ffd700"},
+            {prog:120, nagroda:"3 💎 nowe diamentowe", kolor:"var(--accent)"},
           ].map(p => {
             const brakuje = Math.max(0, p.prog - paczkiJuzMam);
             const osiagniety = paczkiJuzMam >= p.prog;
@@ -8038,7 +8043,7 @@ function KalkulatorEventu() {
       </div>
 
       {/* WYBÓR SZABLONU EVENTU */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:10,marginBottom:10}}>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:10}}>
         <div style={{fontSize:11,fontWeight:"bold",color:"#aaa",marginBottom:8}}>📋 Wybierz event poboczny</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {Object.keys(SZABLONY_EVENTOW).map(nazwa => (
@@ -8047,9 +8052,9 @@ function KalkulatorEventu() {
               setAktywnyEvent(nazwa);
             }} style={{
               padding:"6px 12px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:"bold",
-              background:aktywnyEvent===nazwa?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
-              border:aktywnyEvent===nazwa?"none":"1px solid #2a2a3a",
-              color:aktywnyEvent===nazwa?"#000":"#888",
+              background:aktywnyEvent===nazwa?"linear-gradient(135deg,#b8860b,#ffd700)":"var(--card)",
+              border:aktywnyEvent===nazwa?"none":"1px solid var(--border)",
+              color:aktywnyEvent===nazwa?"#000":"var(--muted)",
             }}>{nazwa}</button>
           ))}
           <button onClick={() => { setAktywnyEvent(null); }} style={{
@@ -8059,7 +8064,7 @@ function KalkulatorEventu() {
         </div>
         {aktywnyEvent && (
           <div style={{fontSize:10,color:"#555",marginTop:6}}>
-            Wczytano: <strong style={{color:"#ffd700"}}>{aktywnyEvent}</strong> · {progi.length} progów ·
+            Wczytano: <strong style={{color:"var(--accent)"}}>{aktywnyEvent}</strong> · {progi.length} progów ·
             Paczki łącznie: <strong style={{color:"#87CEEB"}}>
               {progi.filter(p=>p.typ==="paczki").reduce((s,p)=>s+(parseFloat(p.nagroda)||0),0)} 📦
             </strong>
@@ -8071,7 +8076,7 @@ function KalkulatorEventu() {
       </div>
 
       {/* PROGI EVENTU */}
-      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid #2a2a3a",borderRadius:8,padding:10,marginBottom:12}}>
+      <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:12}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{fontSize:11,fontWeight:"bold",color:"#aaa"}}>
             📊 Progi eventu
@@ -8079,22 +8084,22 @@ function KalkulatorEventu() {
           </div>
           <button onClick={()=>setPokazDodaj(p=>!p)} style={{
             fontSize:10,padding:"3px 8px",background:"rgba(255,215,0,0.1)",
-            border:"1px solid #b8860b55",borderRadius:4,color:"#ffd700",cursor:"pointer"}}>+ Dodaj próg</button>
+            border:"1px solid #b8860b55",borderRadius:4,color:"var(--accent)",cursor:"pointer"}}>+ Dodaj próg</button>
         </div>
 
         {pokazDodaj&&(
           <div style={{display:"flex",gap:5,marginBottom:8,flexWrap:"wrap",padding:8,
             background:"rgba(255,215,0,0.03)",border:"1px solid #ffd70022",borderRadius:6}}>
             <input type="number" value={nowyProg.punkty} onChange={e=>setNowyProg(p=>({...p,punkty:e.target.value}))}
-              placeholder="Pkt progu" style={{width:80,padding:"5px 6px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
+              placeholder="Pkt progu" style={{width:80,padding:"5px 6px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
             <input type="number" value={nowyProg.nagroda} onChange={e=>setNowyProg(p=>({...p,nagroda:e.target.value}))}
-              placeholder="Ile" style={{width:55,padding:"5px 6px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
+              placeholder="Ile" style={{width:55,padding:"5px 6px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:12}}/>
             <select value={nowyProg.typ} onChange={e=>setNowyProg(p=>({...p,typ:e.target.value}))}
-              style={{padding:"5px 6px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#87CEEB",fontSize:12}}>
+              style={{padding:"5px 6px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#87CEEB",fontSize:12}}>
               {TYPY_NAGRODY.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
             <input value={nowyProg.opis} onChange={e=>setNowyProg(p=>({...p,opis:e.target.value}))}
-              placeholder="Opis (opcja)" style={{flex:1,minWidth:60,padding:"5px 6px",background:"#12122a",border:"1px solid #333",borderRadius:4,color:"#aaa",fontSize:11}}/>
+              placeholder="Opis (opcja)" style={{flex:1,minWidth:60,padding:"5px 6px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#aaa",fontSize:11}}/>
             <button onClick={dodajProg} style={{padding:"5px 10px",background:"rgba(0,200,100,0.15)",
               border:"1px solid #0c633",borderRadius:4,color:"#0c6",cursor:"pointer",fontWeight:"bold"}}>✓</button>
           </div>
@@ -8118,16 +8123,16 @@ function KalkulatorEventu() {
               border:isOpt?"1px solid #ffd70055":a.mozna?"1px solid #0c6118":"1px solid transparent",
             }}>
               <div style={{textAlign:"center"}}>
-                <div style={{fontSize:11,fontWeight:"bold",color:a.mozna?"#ddd":"#444"}}>{a.punkty.toLocaleString()}</div>
+                <div style={{fontSize:11,fontWeight:"bold",color:a.mozna?"var(--text)":"#444"}}>{a.punkty.toLocaleString()}</div>
                 {a.opis&&<div style={{fontSize:8,color:
                   a.opis.includes("DIAMENTOWA")||a.opis.includes("💎")?"#64c8ff":
-                  a.opis.includes("ZŁOTA")||a.opis.includes("🌟")?"#ffd700":"#666"
+                  a.opis.includes("ZŁOTA")||a.opis.includes("🌟")?"var(--accent)":"var(--muted)"
                 }}>{a.opis}</div>}
               </div>
               <div style={{textAlign:"center"}}>
                 <span style={{fontSize:11,fontWeight:"bold",color:
                   a.opis.includes("DIAMENTOWA")||a.opis.includes("💎")?"#64c8ff":
-                  a.opis.includes("ZŁOTA")||a.opis.includes("🌟")?"#ffd700":typInfo.kolor
+                  a.opis.includes("ZŁOTA")||a.opis.includes("🌟")?"var(--accent)":typInfo.kolor
                 }}>{a.nagroda} {typInfo.label.split(" ")[0]}</span>
               </div>
               <div style={{textAlign:"center"}}>
@@ -8137,14 +8142,14 @@ function KalkulatorEventu() {
               <div style={{textAlign:"center"}}>
                 <span style={{fontSize:12,fontWeight:"bold",color:"#87CEEB"}}>{a.paczkiDoProg}</span>
                 {paczkiJuzMam>0&&<span style={{fontSize:9,color:"#0c6",marginLeft:2}}>={a.paczkiLacznie}📦</span>}
-                {a.kluczeDoProg>0&&<span style={{fontSize:9,color:"#ffd700",marginLeft:3}}>+{a.kluczeDoProg}🗝️</span>}
+                {a.kluczeDoProg>0&&<span style={{fontSize:9,color:"var(--accent)",marginLeft:3}}>+{a.kluczeDoProg}🗝️</span>}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{fontSize:11,fontWeight:"bold",
                   color:parseFloat(a.paczkiNa1000)>=1?"#0c6":parseFloat(a.paczkiNa1000)>=0.5?"#fa0":"#f55"}}>
                   {a.paczkiNa1000}
                 </div>
-                {isOpt&&<div style={{fontSize:7,color:"#ffd700"}}>★ NAJLEPSZY</div>}
+                {isOpt&&<div style={{fontSize:7,color:"var(--accent)"}}>★ NAJLEPSZY</div>}
               </div>
               <button onClick={()=>setProgi(p=>p.filter(x=>x.id!==a.id))}
                 style={{background:"none",border:"none",color:"#f5544433",cursor:"pointer",fontSize:10}}>✕</button>
@@ -8156,9 +8161,9 @@ function KalkulatorEventu() {
       {/* REKOMENDACJA */}
       {optymalny&&ePktNaAmmo>0&&(
         <div style={{background:"rgba(255,215,0,0.08)",border:"2px solid #ffd70044",borderRadius:12,padding:14}}>
-          <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700",marginBottom:10}}>🎯 Rekomendacja</div>
-          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:12,marginBottom:8,fontSize:12,color:"#ddd",lineHeight:1.8}}>
-            <div>Graj do progu: <strong style={{color:"#ffd700"}}>{optymalny.punkty.toLocaleString()} pkt</strong>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>🎯 Rekomendacja</div>
+          <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:12,marginBottom:8,fontSize:12,color:"var(--text)",lineHeight:1.8}}>
+            <div>Graj do progu: <strong style={{color:"var(--accent)"}}>{optymalny.punkty.toLocaleString()} pkt</strong>
               {optymalny.opis&&<span style={{color:"#fa0",marginLeft:6}}>({optymalny.opis})</span>}
             </div>
             <div>Wydasz: <strong style={{color:optymalny.mozna?"#fa0":"#f55"}}>{optymalny.ammoDoProg.toLocaleString()} ammo</strong>
@@ -8167,7 +8172,7 @@ function KalkulatorEventu() {
             </div>
             <div>Zbierzesz z eventu: <strong style={{color:"#87CEEB"}}>{optymalny.paczkiDoProg} 📦 paczek</strong>
               {paczkiJuzMam>0&&<span style={{color:"#0c6"}}> → łącznie {optymalny.paczkiLacznie} 📦</span>}
-              {optymalny.kluczeDoProg>0&&<span style={{color:"#ffd700"}}> + {optymalny.kluczeDoProg} 🗝️ kluczy</span>}
+              {optymalny.kluczeDoProg>0&&<span style={{color:"var(--accent)"}}> + {optymalny.kluczeDoProg} 🗝️ kluczy</span>}
             </div>
             <div>Efektywność: <strong style={{color:"#0c6"}}>{optymalny.paczkiNa1000} paczek / 1000 ammo</strong></div>
             <div style={{marginTop:4,fontSize:11,color:"#555"}}>
@@ -8177,7 +8182,7 @@ function KalkulatorEventu() {
           </div>
 
           {/* Wszystkie nagrody po drodze */}
-          <div style={{fontSize:11,color:"#888",marginBottom:6}}>Nagrody po drodze:</div>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>Nagrody po drodze:</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
             {progsSorted.slice(0, progsSorted.indexOf(optymalny)+1).map(p=>{
               const t = TYPY_NAGRODY.find(x=>x.id===p.typ)||TYPY_NAGRODY[0];
@@ -8187,14 +8192,14 @@ function KalkulatorEventu() {
                   background:`${t.kolor}18`,border:`1px solid ${t.kolor}33`,color:t.kolor,
                 }}>
                   {p.nagroda} {t.label} @ {p.punkty.toLocaleString()}pkt
-                  {p.opis&&<span style={{color:"#ffd700",marginLeft:3}}>★</span>}
+                  {p.opis&&<span style={{color:"var(--accent)",marginLeft:3}}>★</span>}
                 </div>
               );
             })}
           </div>
 
           {/* Następny event info */}
-          <div style={{marginTop:10,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6,
+          <div style={{marginTop:10,padding:"6px 10px",background:"var(--card)",borderRadius:6,
             border:"1px solid #1a1a2e",fontSize:10,color:"#555",lineHeight:1.5}}>
             💡 Progi mogą się różnić w każdym evencie. Gdy przyjdzie nowy — zaktualizuj listę progów.
             Szanse losowania pozostają podobne dla slotów tego samego typu.
@@ -8252,7 +8257,7 @@ function GangChat({zalogowany, czlonkowie}) {
 
   // Kolory nicków
   const nickColor = (n) => {
-    const colors = ["#ffd700","#0c6","#87CEEB","#da70d6","#fa0","#f55","#0ff","#ff69b4"];
+    const colors = ["var(--accent)","#0c6","#87CEEB","#da70d6","#fa0","#f55","#0ff","#ff69b4"];
     let hash = 0;
     for (let i = 0; i < n.length; i++) hash = n.charCodeAt(i) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];
@@ -8270,7 +8275,7 @@ function GangChat({zalogowany, czlonkowie}) {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"70vh",maxHeight:600}}>
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70033",borderRadius:10,padding:"10px 14px",marginBottom:10}}>
-        <div style={{fontSize:13,fontWeight:"bold",color:"#ffd700"}}>💬 Chat gangu — na żywo</div>
+        <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)"}}>💬 Chat gangu — na żywo</div>
         <div style={{fontSize:10,color:"#555"}}>Wiadomości widoczne dla wszystkich adminów • ostatnie 100</div>
       </div>
 
@@ -8315,8 +8320,8 @@ function GangChat({zalogowany, czlonkowie}) {
                   background: moja
                     ? "linear-gradient(135deg,#b8860b,#ffd700)"
                     : "rgba(255,255,255,0.07)",
-                  border: moja ? "none" : "1px solid #2a2a3a",
-                  color: moja ? "#000" : "#ddd",
+                  border: moja ? "none" : "1px solid var(--border)",
+                  color: moja ? "#000" : "var(--text)",
                   fontSize:13,lineHeight:1.4,wordBreak:"break-word",
                 }}>
                   {w.tekst}
@@ -8341,13 +8346,13 @@ function GangChat({zalogowany, czlonkowie}) {
           maxLength={500}
           style={{
             flex:1,padding:"10px 14px",background:"rgba(0,0,0,0.4)",
-            border:"1px solid #2a2a3a",borderRadius:24,color:"#fff",fontSize:13,
+            border:"1px solid var(--border)",borderRadius:24,color:"#fff",fontSize:13,
             outline:"none",
           }}
         />
         <button onClick={wyslij} disabled={wysylanie||!tekst.trim()} style={{
           padding:"10px 18px",borderRadius:24,border:"none",cursor:"pointer",
-          background:tekst.trim()?"linear-gradient(135deg,#b8860b,#ffd700)":"rgba(255,255,255,0.05)",
+          background:tekst.trim()?"linear-gradient(135deg,#b8860b,#ffd700)":"var(--card)",
           color:tekst.trim()?"#000":"#444",fontWeight:"bold",fontSize:13,
           transition:"all 0.15s",
         }}>
@@ -8412,19 +8417,19 @@ function DupleView({czlonkowie, talie, duplikaty}) {
   return (
     <div>
       <div style={{background:"rgba(255,215,0,0.06)",border:"1px solid #ffd70033",borderRadius:10,padding:14,marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:"bold",color:"#ffd700",marginBottom:8}}>🃏 Ranking duplikatów</div>
+        <div style={{fontSize:14,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>🃏 Ranking duplikatów</div>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
           <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"8px 14px",flex:1,textAlign:"center"}}>
-            <div style={{fontSize:24,fontWeight:"bold",color:"#ffd700"}}>{lacznie}</div>
-            <div style={{fontSize:11,color:"#888"}}>duplikatów łącznie</div>
+            <div style={{fontSize:24,fontWeight:"bold",color:"var(--accent)"}}>{lacznie}</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>duplikatów łącznie</div>
           </div>
           <div style={{background:"rgba(255,215,0,0.08)",borderRadius:8,padding:"8px 14px",flex:1,textAlign:"center"}}>
-            <div style={{fontSize:24,fontWeight:"bold",color:"#ffd700"}}>{lacznieZlote} ⭐</div>
-            <div style={{fontSize:11,color:"#888"}}>złotych</div>
+            <div style={{fontSize:24,fontWeight:"bold",color:"var(--accent)"}}>{lacznieZlote} ⭐</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>złotych</div>
           </div>
           <div style={{background:"rgba(135,206,235,0.08)",borderRadius:8,padding:"8px 14px",flex:1,textAlign:"center"}}>
             <div style={{fontSize:24,fontWeight:"bold",color:"#87CEEB"}}>{lacznie_dia} 💎</div>
-            <div style={{fontSize:11,color:"#888"}}>diamentowych</div>
+            <div style={{fontSize:11,color:"var(--muted)"}}>diamentowych</div>
           </div>
         </div>
       </div>
@@ -8434,14 +8439,14 @@ function DupleView({czlonkowie, talie, duplikaty}) {
         {["wszystkie","złote","diamentowe"].map(t=>(
           <button key={t} onClick={()=>setFiltrTyp(t)} style={{
             padding:"6px 12px",borderRadius:6,fontSize:12,cursor:"pointer",
-            background:filtrTyp===t?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.05)",
-            border:filtrTyp===t?"1px solid #ffd700":"1px solid #2a2a3a",
-            color:filtrTyp===t?"#ffd700":"#666",
+            background:filtrTyp===t?"rgba(255,215,0,0.15)":"var(--card)",
+            border:filtrTyp===t?"1px solid #ffd700":"1px solid var(--border)",
+            color:filtrTyp===t?"var(--accent)":"var(--muted)",
           }}>{t==="złote"?"⭐ Złote":t==="diamentowe"?"💎 Diamentowe":"🃏 Wszystkie"}</button>
         ))}
         <select value={filtrTalia} onChange={e=>setFiltrTalia(e.target.value)} style={{
-          padding:"6px 10px",background:"#12122a",border:"1px solid #2a2a3a",
-          borderRadius:6,color:"#888",fontSize:12,cursor:"pointer",
+          padding:"6px 10px",background:"var(--card-solid)",border:"1px solid var(--border)",
+          borderRadius:6,color:"var(--muted)",fontSize:12,cursor:"pointer",
         }}>
           <option value="wszystkie">Wszystkie talie</option>
           {talie.map(t=><option key={t.id} value={t.id}>{t.nazwa}</option>)}
@@ -8451,16 +8456,16 @@ function DupleView({czlonkowie, talie, duplikaty}) {
       {/* Ranking */}
       {filtered.map((s,i) => (
         <div key={s.czlonek.id} style={{
-          background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",
+          background:"var(--card)",border:"1px solid #1a1a2e",
           borderRadius:8,padding:"10px 12px",marginBottom:6,
         }}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:s.perTalia.length>0?6:0}}>
             <span style={{fontSize:12,color:"#555",width:22,textAlign:"right"}}>{i+1}.</span>
-            <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"#ddd"}}>{s.czlonek.nazwa}</span>
-            <span style={{fontSize:12,color:"#ffd700",background:"rgba(255,215,0,0.1)",padding:"2px 8px",borderRadius:6}}>
+            <span style={{flex:1,fontSize:13,fontWeight:"bold",color:"var(--text)"}}>{s.czlonek.nazwa}</span>
+            <span style={{fontSize:12,color:"var(--accent)",background:"rgba(255,215,0,0.1)",padding:"2px 8px",borderRadius:6}}>
               {s.lacznie} duple
             </span>
-            {s.zlote>0&&<span style={{fontSize:11,color:"#ffd700"}}>⭐{s.zlote}</span>}
+            {s.zlote>0&&<span style={{fontSize:11,color:"var(--accent)"}}>⭐{s.zlote}</span>}
             {s.diamentowe>0&&<span style={{fontSize:11,color:"#87CEEB"}}>💎{s.diamentowe}</span>}
           </div>
           {/* Szczegóły per talia */}
@@ -8468,7 +8473,7 @@ function DupleView({czlonkowie, talie, duplikaty}) {
             <div key={p.talia.id} style={{
               marginLeft:30,marginTop:3,display:"flex",flexWrap:"wrap",gap:4,alignItems:"center",
             }}>
-              <span style={{fontSize:10,color:"#666",minWidth:100}}>{p.talia.nazwa}:</span>
+              <span style={{fontSize:10,color:"var(--muted)",minWidth:100}}>{p.talia.nazwa}:</span>
               {p.duple.map(k=>(
                 <span key={k.nazwa} style={{
                   fontSize:10,padding:"1px 6px",borderRadius:4,
