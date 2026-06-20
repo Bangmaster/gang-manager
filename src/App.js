@@ -948,7 +948,7 @@ function App() {
         ))}
       </div>)}
 
-      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto",paddingBottom:wyglad.uklad==="bottom"?90:14}}>
+      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={czlonkowieMemo}
@@ -1019,23 +1019,20 @@ function App() {
         />}
       </div>
       </div>
-      {/* DOLNY PASEK - zawsze widoczny gdy układ bottom */}
+      {/* DOLNY PASEK - sticky, scrolluje razem z contentem */}
       {wyglad.uklad==="bottom"&&(
         <>
-          <div style={{height:72}}/>
           <nav style={{
-            position:"fixed",
-            bottom:0,left:0,right:0,
-            zIndex:9999,
+            position:"sticky",
+            bottom:0,
+            zIndex:200,
             display:"flex",
             overflowX:"auto",
             WebkitOverflowScrolling:"touch",
             background:"var(--bg)",
             borderTop:"2px solid var(--border)",
-            boxShadow:"0 -4px 20px rgba(0,0,0,0.7)",
-            padding:"6px 4px env(safe-area-inset-bottom,10px)",
-            WebkitBackdropFilter:"blur(10px)",
-            backdropFilter:"blur(10px)",
+            boxShadow:"0 -2px 16px rgba(0,0,0,0.6)",
+            padding:"6px 4px 12px",
           }}>
             {tabs.map(t=>(
               <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
@@ -1470,12 +1467,28 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
               </div>
             );
 
+            // Kolor ramki: zamknięta=zielona, blisko=pomarańczowa, reszta=kolor motywu
+            const taliaAkcentKolor = brak===0?"#0c6":brak<=2?"#fa0":"var(--accent)";
+            const taliaBgGrad = brak===0
+              ? "linear-gradient(135deg,rgba(0,200,100,0.08) 0%,transparent 60%)"
+              : brak<=2
+              ? "linear-gradient(135deg,rgba(255,165,0,0.07) 0%,transparent 60%)"
+              : "linear-gradient(135deg,var(--card) 0%,transparent 70%)";
+
             return (
               <div key={talia.id} className="gang-talia-card" style={{
-                marginBottom:10,borderRadius:8,padding:"10px 12px",
-                background:brak===0?"rgba(0,200,100,0.1)":brak<=2?"rgba(255,165,0,0.09)":"rgba(255,255,255,0.02)",
-                border:brak===0?"1px solid #0c655":brak<=2?"1px solid #fa050":"1px solid #202035",
+                marginBottom:10,borderRadius:10,padding:"10px 12px",
+                background:taliaBgGrad,
+                border:`1px solid ${brak===0?"#0c655":brak<=2?"#fa040":"var(--border)"}`,
+                borderTop:`2px solid ${taliaAkcentKolor}`,
+                boxShadow:`0 2px 12px rgba(0,0,0,0.3), inset 0 0 30px ${brak===0?"rgba(0,200,100,0.03)":brak<=2?"rgba(255,165,0,0.03)":"var(--card)"}`,
+                position:"relative",overflow:"hidden",
               }}>
+              <div style={{
+                position:"absolute",top:0,left:0,right:0,height:1,
+                background:`linear-gradient(90deg,transparent,${taliaAkcentKolor}88,transparent)`,
+                pointerEvents:"none",
+              }}/>
                 {/* Nagłówek talii */}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
