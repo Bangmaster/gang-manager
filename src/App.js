@@ -527,7 +527,8 @@ function MotywStyle({ motyw, rozmiar }) {
     "--font:"+fnt+";",
     "--card-solid:color-mix(in srgb,"+motyw.bg+" 80%,white 20%);",
     "}",
-    "html{font-size:"+r+"px!important}",
+    "html{font-size:"+r+"px!important;-webkit-text-size-adjust:"+r+"px!important}",
+    ".gang-main-content *{font-size:inherit}",
     "body,#root{background:"+motyw.bg+"!important;color:"+motyw.text+"!important;font-family:"+fnt+"!important;font-size:"+r+"px!important}",
     "div,span,p,label,li{font-family:"+fnt+"!important}",
     "button{font-family:"+fnt+"!important;font-size:"+r+"px}",
@@ -920,7 +921,7 @@ function App() {
         ))}
       </div>)}
 
-      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
+      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto",paddingBottom:wyglad.uklad==="bottom"?80:14}}>
         {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={czlonkowieMemo}
@@ -991,22 +992,21 @@ function App() {
         />}
       </div>
       </div>
-      {/* DOLNY PASEK - fixed, zawsze na dole ekranu */}
+      {/* DOLNY PASEK - fixed na dole viewportu */}
       {wyglad.uklad==="bottom"&&(
-        <>
-          <div style={{height:72}}/>
-          <nav style={{
-            position:"fixed",
-            bottom:0,left:0,right:0,
-            zIndex:9999,
-            display:"flex",
-            overflowX:"auto",
-            WebkitOverflowScrolling:"touch",
-            background:"var(--bg)",
-            borderTop:"2px solid var(--border)",
-            boxShadow:"0 -4px 20px rgba(0,0,0,0.7)",
-            padding:"6px 4px 12px",
-          }}>
+        <nav style={{
+          position:"fixed",
+          bottom:0,left:0,right:0,
+          zIndex:9999,
+          display:"flex",
+          overflowX:"auto",
+          WebkitOverflowScrolling:"touch",
+          background:"var(--bg)",
+          borderTop:"2px solid var(--border)",
+          boxShadow:"0 -4px 20px rgba(0,0,0,0.8)",
+          padding:"6px 4px 14px",
+          minHeight:64,
+        }}>
             {tabs.map(t=>(
               <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
                 flexShrink:0,
@@ -1041,7 +1041,6 @@ function App() {
               </button>
             ))}
           </nav>
-        </>
       )}
     </div>
 
