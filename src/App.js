@@ -524,8 +524,46 @@ function MotywStyle({ motyw, rozmiar }) {
       --btn-text: ${motyw.btnText};
       --fnt: ${r}px;
     }
-    body { background: ${motyw.bg} !important; font-size: ${r}px !important; color: ${motyw.text} !important; }
-    button { font-size: inherit; }
+    /* Globalny reset kolorów apki */
+    body, #root {
+      background: ${motyw.bg} !important;
+      color: ${motyw.text} !important;
+      font-size: ${r}px !important;
+    }
+    /* Karty i kontenery */
+    [style*="background:#0a0a12"],
+    [style*="background: #0a0a12"],
+    [style*="background:#12122a"],
+    [style*="background: #12122a"],
+    [style*="background:#050510"],
+    [style*="background:#0d0000"] {
+      background: ${motyw.bg} !important;
+    }
+    /* Złote akcenty -> kolor motywu */
+    [style*="color:#ffd700"],
+    [style*="color: #ffd700"] {
+      color: ${motyw.accent} !important;
+    }
+    /* Ramki */
+    [style*="border:1px solid #2a2a3a"],
+    [style*="border: 1px solid #2a2a3a"],
+    [style*="borderColor:#2a2a3a"] {
+      border-color: ${motyw.border} !important;
+    }
+    /* Input / textarea */
+    input, textarea, select {
+      background: ${motyw.bg} !important;
+      color: ${motyw.text} !important;
+      border-color: ${motyw.border} !important;
+      font-size: ${r}px !important;
+    }
+    input::placeholder, textarea::placeholder {
+      color: ${motyw.muted} !important;
+    }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: ${motyw.bg}; }
+    ::-webkit-scrollbar-thumb { background: ${motyw.border}; border-radius: 2px; }
   `;
   return <style>{css}</style>;
 }
@@ -888,7 +926,7 @@ function App() {
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
       </div>
 
-      <div style={{display:"flex",background:"rgba(0,0,0,0.4)",borderBottom:"1px solid var(--border)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+      {wyglad.uklad!=="bottom"&&<div style={{display:"flex",background:"rgba(0,0,0,0.4)",borderBottom:"1px solid var(--border)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
             padding:"10px 16px",background:"transparent",border:"none",
@@ -980,18 +1018,51 @@ function App() {
         />}
       </div>
       </div>
-      {/* DOLNY PASEK */}
+      {/* DOLNY PASEK - zawsze widoczny gdy układ bottom */}
       {wyglad.uklad==="bottom"&&(
         <>
-          <div style={{height:60}}/>
-          <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:999,display:"flex",background:"var(--bg)",borderTop:"1px solid var(--border)",padding:"4px 0 8px"}}>
+          <div style={{height:72}}/>
+          <nav style={{
+            position:"fixed",bottom:0,left:0,right:0,zIndex:999,
+            display:"flex",
+            overflowX:"auto",
+            WebkitOverflowScrolling:"touch",
+            background:"var(--bg)",
+            borderTop:"2px solid var(--border)",
+            boxShadow:"0 -4px 20px rgba(0,0,0,0.5)",
+            padding:"6px 4px 10px",
+          }}>
             {tabs.map(t=>(
-              <button key={t.id} onClick={()=>setZakładka(t.id)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 2px",minWidth:0}}>
-                <span style={{fontSize:18,lineHeight:1}}>{t.label.split(" ")[0]}</span>
-                <span style={{fontSize:9,color:zakładka===t.id?"var(--accent)":"var(--muted)",fontWeight:zakładka===t.id?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%",display:"block",textAlign:"center"}}>
+              <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
+                flexShrink:0,
+                minWidth:64,
+                flex:1,
+                border:"none",
+                background:zakładka===t.id?"var(--card)":"transparent",
+                cursor:"pointer",
+                display:"flex",
+                flexDirection:"column",
+                alignItems:"center",
+                gap:3,
+                padding:"6px 6px 4px",
+                borderRadius:10,
+                margin:"0 2px",
+                transition:"background 0.15s",
+              }}>
+                <span style={{fontSize:24,lineHeight:1}}>{t.label.split(" ")[0]}</span>
+                <span style={{
+                  fontSize:10,
+                  color:zakładka===t.id?"var(--accent)":"var(--muted)",
+                  fontWeight:zakładka===t.id?"bold":"normal",
+                  whiteSpace:"nowrap",
+                }}>
                   {t.label.split(" ").slice(1).join(" ")}
                 </span>
-                {zakładka===t.id&&<div style={{width:16,height:2,borderRadius:1,background:"var(--accent)",marginTop:1}}/>}
+                {zakładka===t.id&&<div style={{
+                  width:20,height:3,borderRadius:2,
+                  background:"var(--accent)",
+                  boxShadow:"0 0 6px var(--accent)",
+                }}/>}
               </button>
             ))}
           </nav>
