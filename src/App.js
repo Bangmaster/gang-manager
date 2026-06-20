@@ -769,6 +769,7 @@ function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--text)",position:"relative",overflow:"hidden",fontSize:"var(--fnt)"}}>
+      <MotywStyle motyw={motyw} rozmiar={wyglad.rozmiar}/>
 
       {/* Tło */}
       <div style={{
