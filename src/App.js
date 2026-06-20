@@ -926,7 +926,7 @@ function App() {
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
       </div>
 
-      {wyglad.uklad!=="bottom"&&<div style={{display:"flex",background:"rgba(0,0,0,0.4)",borderBottom:"1px solid var(--border)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+      {wyglad.uklad!=="bottom"&&(<div style={{display:"flex",background:"rgba(0,0,0,0.4)",borderBottom:"1px solid var(--border)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
             padding:"10px 16px",background:"transparent",border:"none",
