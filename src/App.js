@@ -768,7 +768,7 @@ function App() {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:motyw.bg,fontFamily:motyw.font,color:motyw.text,position:"relative",overflow:"hidden",fontSize:rozmiarFnt}}>
+    <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--text)",position:"relative",overflow:"hidden",fontSize:"var(--fnt)"}}>
 
       {/* Tło */}
       <div style={{
@@ -980,6 +980,25 @@ function App() {
       </div>
       </div>
     </div>
+
+
+      {/* DOLNY PASEK NAWIGACJI */}
+      {wyglad.uklad==="bottom"&&(
+        <>
+          <div style={{height:60}}/>
+          <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:999,display:"flex",background:"var(--bg)",borderTop:"1px solid var(--border)",padding:"4px 0 8px"}}>
+            {tabs.map(t=>(
+              <button key={t.id} onClick={()=>setZakładka(t.id)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 2px",minWidth:0}}>
+                <span style={{fontSize:18,lineHeight:1}}>{t.label.split(" ")[0]}</span>
+                <span style={{fontSize:9,color:zakładka===t.id?"var(--accent)":"var(--muted)",fontWeight:zakładka===t.id?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%",display:"block",textAlign:"center"}}>
+                  {t.label.split(" ").slice(1).join(" ")}
+                </span>
+                {zakładka===t.id&&<div style={{width:16,height:2,borderRadius:1,background:"var(--accent)",marginTop:1}}/>}
+              </button>
+            ))}
+          </nav>
+        </>
+      )}
   );
 }
 
@@ -8117,44 +8136,6 @@ function KalkulatorEventu() {
         </div>
       )}
 
-      {/* DOLNY PASEK */}
-      {wyglad.uklad==="bottom"&&(
-        <>
-          <div style={{height:60}}/>
-          <nav style={{
-            position:"fixed",bottom:0,left:0,right:0,zIndex:999,
-            display:"flex",background:"var(--bg)",
-            borderTop:"1px solid var(--border)",
-            padding:"4px 0 8px",
-          }}>
-            {tabs.map(t=>(
-              <button key={t.id} onClick={()=>setZakładka(t.id)} style={{
-                flex:1,border:"none",background:"transparent",cursor:"pointer",
-                display:"flex",flexDirection:"column",alignItems:"center",
-                gap:2,padding:"4px 2px",minWidth:0,
-              }}>
-                <span style={{fontSize:t.label.length>8?16:18,lineHeight:1}}>
-                  {t.label.split(" ")[0]}
-                </span>
-                <span style={{
-                  fontSize:9,
-                  color:zakładka===t.id?"var(--accent)":"var(--muted)",
-                  fontWeight:zakładka===t.id?"bold":"normal",
-                  whiteSpace:"nowrap",overflow:"hidden",
-                  textOverflow:"ellipsis",maxWidth:"100%",
-                  display:"block",textAlign:"center",
-                }}>
-                  {t.label.replace(/^[^\s]+\s/,"").slice(0,10)}
-                </span>
-                {zakładka===t.id&&<div style={{
-                  width:16,height:2,borderRadius:1,background:"var(--accent)",
-                  marginTop:1,
-                }}/>}
-              </button>
-            ))}
-          </nav>
-        </>
-      )}
     </div>
   );
 }
