@@ -945,7 +945,7 @@ function App() {
             {t.label}
           </button>
         ))}
-      </div>
+      </div>)}
 
       <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
