@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, startTransition } from "re
 
 import { createPortal } from "react-dom";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, subscribePowiadomienia } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, subscribePowiadomienia } // eslint-disable-line no-unused-vars from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -575,10 +575,6 @@ function App() {
     } catch { return null; }
   });
   const [wyglad, setWyglad, motyw] = useWyglad();
-  const [powiadomieniaWl, setPowiadomieniaWl] = useState(false); // czy user włączył notyfikacje
-  const [wysylaniePush, setWysylaniePush] = useState(false);
-  const [pushTytul, setPushTytul] = useState("");
-  const [pushTresc, setPushTresc] = useState("");
   const [historiaPush, setHistoriaPush] = useState([]);
 
   const [dane, setDane] = useState(null); // null = loading
@@ -5623,7 +5619,6 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture,walki=[]}) {
 // ============================================================
 function PowiadomieniaPush({ zalogowany, isAdmin, historiaPush }) {
   const [status, setStatus] = useState("idle"); // idle / requesting / granted / denied
-  const [fcmToken, setFcmToken] = useState(null);
   const [pushTytul, setPushTytul] = useState("📢 Ważna informacja od admina");
   const [pushTresc, setPushTresc] = useState("");
   const [sending, setSending] = useState(false);
@@ -5642,8 +5637,7 @@ function PowiadomieniaPush({ zalogowany, isAdmin, historiaPush }) {
     try {
       const token = await registerFCMToken(zalogowany?.login || "unknown");
       if (token) {
-        setFcmToken(token);
-        setStatus("granted");
+          setStatus("granted");
       } else {
         setStatus(Notification.permission === "denied" ? "denied" : "error");
       }
@@ -5655,7 +5649,6 @@ function PowiadomieniaPush({ zalogowany, isAdmin, historiaPush }) {
 
   const wylaczPowiadomienia = async () => {
     await unregisterFCMToken(zalogowany?.login || "unknown");
-    setFcmToken(null);
     setStatus("idle");
   };
 
