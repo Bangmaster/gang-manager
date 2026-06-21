@@ -782,6 +782,7 @@ function App() {
   return (
     <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--text)",position:"relative",overflow:"hidden",fontSize:"var(--fnt)"}}>
       <MotywStyle motyw={motyw} rozmiar={wyglad.rozmiar}/>
+      <div style={{flex:1,overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch"}}>
 
       {/* Tło */}
       <div style={{
@@ -921,7 +922,7 @@ function App() {
         ))}
       </div>)}
 
-      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto",paddingBottom:wyglad.uklad==="bottom"?80:14}}>
+      <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
         {zakładka==="dane"&&<DaneView
           talie={talieSorted} czlonkowie={czlonkowieMemo}
@@ -992,11 +993,13 @@ function App() {
         />}
       </div>
       </div>
-      {/* DOLNY PASEK - fixed na dole viewportu */}
+      </div>{/* koniec scroll div */}
+      {/* DOLNY PASEK - przyklejony na dole, scrolluje z treścią */}
       {wyglad.uklad==="bottom"&&(
         <nav style={{
-          position:"fixed",
-          bottom:0,left:0,right:0,
+          flexShrink:0,
+          position:"sticky",
+          bottom:0,
           zIndex:9999,
           display:"flex",
           overflowX:"auto",
