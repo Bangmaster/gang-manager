@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -12,6 +13,73 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+// === FCM — PUSH NOTYFIKACJE ===
+let messagingInstance = null;
+export function getMessagingInstance() {
+  if (!messagingInstance) {
+    try { messagingInstance = getMessaging(app); } catch(e) { return null; }
+  }
+  return messagingInstance;
+}
+
+// VAPID key z Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
+// ZMIEŃ TO na swój klucz VAPID!
+const VAPID_KEY = "BLF-0G9vBBjxVGimdfVxpBbEfnKME4uEQOc-m7seb5iTH2X3rQNcvE91aU89iudXAk_4u2V2zQW-YtYpXHpf_48";
+
+// Rejestruj token FCM dla tego urządzenia i zapisz do Firestore
+export async function registerFCMToken(nick) {
+  try {
+    const messaging = getMessagingInstance();
+    if (!messaging) return null;
+
+    // Sprawdź pozwolenie
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return null;
+
+    // Pobierz token
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    if (!token) return null;
+
+    // Zapisz token w Firestore (nadpisz poprzedni dla tego nicka)
+    const tokenDoc = doc(db, "fcm_tokens", nick.replace(/[^a-zA-Z0-9]/g, "_"));
+    await setDoc(tokenDoc, {
+      token,
+      nick,
+      timestamp: Date.now(),
+      userAgent: navigator.userAgent,
+    });
+
+    return token;
+  } catch(e) {
+    console.error("Błąd rejestracji FCM:", e);
+    return null;
+  }
+}
+
+// Usuń token FCM (wylogowanie)
+export async function unregisterFCMToken(nick) {
+  try {
+    const tokenDoc = doc(db, "fcm_tokens", nick.replace(/[^a-zA-Z0-9]/g, "_"));
+    await deleteDoc(tokenDoc);
+  } catch(e) { console.error(e); }
+}
+
+// Słuchaj powiadomień gdy apka jest otwarta
+export function onForegroundMessage(callback) {
+  const messaging = getMessagingInstance();
+  if (!messaging) return () => {};
+  return onMessage(messaging, callback);
+}
+
+// Historia powiadomień admina
+export function subscribePowiadomienia(callback) {
+  const col = collection(db, "powiadomienia");
+  const q = query(col, orderBy("timestamp", "desc"), firestoreLimit(20));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
 
 const GANG_DOC = doc(db, "gang", "main");
 const ONLINE_DOC = doc(db, "gang", "online");

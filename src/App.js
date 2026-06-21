@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, startTransition } from "re
 
 import { createPortal } from "react-dom";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow } from "./firebase";
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, subscribePowiadomienia } from "./firebase";
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -575,6 +575,11 @@ function App() {
     } catch { return null; }
   });
   const [wyglad, setWyglad, motyw] = useWyglad();
+  const [powiadomieniaWl, setPowiadomieniaWl] = useState(false); // czy user włączył notyfikacje
+  const [wysylaniePush, setWysylaniePush] = useState(false);
+  const [pushTytul, setPushTytul] = useState("");
+  const [pushTresc, setPushTresc] = useState("");
+  const [historiaPush, setHistoriaPush] = useState([]);
 
   const [dane, setDane] = useState(null); // null = loading
   const [zakładka, setZakładka] = useState(() => {
@@ -4382,7 +4387,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana} czlonkowie={czlonkowie}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture} walki={dane.walki||[]}/>}
       {tryb==="backup"&&<BackupDanych dane={dane} zapiszStrukture={zapiszStrukture}/>}
-      {tryb==="push"&&<PowiadomieniaPush/>}
+      {tryb==="push"&&<PowiadomieniaPush zalogowany={zalogowany} isAdmin={isAdmin} historiaPush={historiaPush}/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="logi"&&<>
         <ZarzadzajiePinami czlonkowie={czlonkowie}/>
@@ -5616,90 +5621,186 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture,walki=[]}) {
 // ============================================================
 // POWIADOMIENIA PUSH
 // ============================================================
-function PowiadomieniaPush() {
-  const [status,setStatus]=useState("idle");
+function PowiadomieniaPush({ zalogowany, isAdmin, historiaPush }) {
+  const [status, setStatus] = useState("idle"); // idle / requesting / granted / denied
+  const [fcmToken, setFcmToken] = useState(null);
+  const [pushTytul, setPushTytul] = useState("📢 Ważna informacja od admina");
+  const [pushTresc, setPushTresc] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
 
-  useEffect(()=>{
-    if("Notification" in window){
-      if(Notification.permission==="granted") setStatus("granted");
-      else if(Notification.permission==="denied") setStatus("denied");
+  useEffect(() => {
+    if ("Notification" in window) {
+      if (Notification.permission === "granted") setStatus("granted");
+      else if (Notification.permission === "denied") setStatus("denied");
     }
-  },[]);
+  }, []);
 
-  const popros=async()=>{
-    if(!("Notification" in window)){
-      setStatus("denied");
-      return;
-    }
+  const wlaczPowiadomienia = async () => {
+    if (!("Notification" in window)) { setStatus("denied"); return; }
     setStatus("requesting");
-    const result=await Notification.requestPermission();
-    setStatus(result==="granted"?"granted":"denied");
+    try {
+      const token = await registerFCMToken(zalogowany?.login || "unknown");
+      if (token) {
+        setFcmToken(token);
+        setStatus("granted");
+      } else {
+        setStatus(Notification.permission === "denied" ? "denied" : "error");
+      }
+    } catch(e) {
+      console.error(e);
+      setStatus("denied");
+    }
   };
 
-  const testPowiadomienie=()=>{
-    if(Notification.permission==="granted"){
-      new Notification("🃏 Gang Manager", {
-        body:"Nowa wymiana kart jest gotowa! Sprawdź ROZPISKĘ.",
-        icon:"/favicon.ico",
-        badge:"/favicon.ico",
+  const wylaczPowiadomienia = async () => {
+    await unregisterFCMToken(zalogowany?.login || "unknown");
+    setFcmToken(null);
+    setStatus("idle");
+  };
+
+  const wyslijPush = async () => {
+    if (!pushTresc.trim()) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch("/api/send-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: pushTytul,
+          body: pushTresc,
+          adminKey: "family_admin_2024",
+        }),
       });
+      const data = await res.json();
+      setSendResult(data);
+      if (data.success) setPushTresc("");
+    } catch(e) {
+      setSendResult({ error: e.message });
     }
+    setSending(false);
   };
 
   return (
     <div>
+      {/* INFO */}
       <div style={{background:"rgba(255,165,0,0.06)",border:"1px solid #fa033",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:"bold",color:"#fa0",marginBottom:6}}>🔔 Powiadomienia push</div>
         <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.6}}>
-          Otrzymuj powiadomienia gdy admin opublikuje nową ROZPISKĘ.<br/>
-          Każdy członek gangu musi włączyć powiadomienia na swoim telefonie.
+          Prawdziwe powiadomienia na telefonie — nawet gdy apka jest <strong>zamknięta</strong>.<br/>
+          Każdy musi raz włączyć powiadomienia poniżej.
         </div>
       </div>
 
-      {status==="idle"&&(
-        <div style={{textAlign:"center",padding:20}}>
-          <div style={{fontSize:40,marginBottom:12}}>🔔</div>
-          <div style={{fontSize:13,color:"#aaa",marginBottom:16}}>Włącz powiadomienia żeby wiedzieć gdy jest nowa wymiana</div>
-          <button onClick={popros} style={{padding:"12px 24px",background:"linear-gradient(135deg,#fa0,#f55)",border:"none",borderRadius:10,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14}}>
-            🔔 Włącz powiadomienia
-          </button>
-        </div>
-      )}
-
-      {status==="requesting"&&(
-        <div style={{textAlign:"center",padding:30,color:"#fa0",fontSize:13}}>
-          ⏳ Czekam na zgodę...
-        </div>
-      )}
-
-      {status==="granted"&&(
-        <div style={{textAlign:"center",padding:20}}>
-          <div style={{fontSize:40,marginBottom:10}}>✅</div>
-          <div style={{fontSize:14,fontWeight:"bold",color:"#0c6",marginBottom:6}}>Powiadomienia włączone!</div>
-          <div style={{fontSize:11,color:"var(--muted)",marginBottom:16}}>Dostaniesz powiadomienie gdy pojawi się nowa ROZPISKA</div>
-          <button onClick={testPowiadomienie} style={{padding:"8px 18px",background:"rgba(0,200,100,0.15)",border:"1px solid #0c655",borderRadius:6,color:"#0c6",cursor:"pointer",fontSize:12}}>
-            🧪 Wyślij testowe powiadomienie
-          </button>
-          <div style={{fontSize:10,color:"#555",marginTop:12}}>
-            ℹ️ Powiadomienia działają gdy apka jest otwarta w przeglądarce.<br/>
-            Dla powiadomień w tle potrzebna byłaby aplikacja natywna.
+      {/* WŁĄCZ/WYŁĄCZ dla członka */}
+      <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:"bold",color:"var(--text)",marginBottom:10}}>👤 Twoje powiadomienia</div>
+        {status === "idle" && (
+          <button onClick={wlaczPowiadomienia} style={{
+            width:"100%",padding:"12px",background:"linear-gradient(135deg,#fa0,#f80)",
+            border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:14
+          }}>🔔 Włącz powiadomienia push</button>
+        )}
+        {status === "requesting" && (
+          <div style={{textAlign:"center",color:"#fa0",fontSize:13,padding:10}}>
+            ⏳ Rejestruję urządzenie...
           </div>
-        </div>
-      )}
-
-      {status==="denied"&&(
-        <div style={{textAlign:"center",padding:20}}>
-          <div style={{fontSize:40,marginBottom:10}}>❌</div>
-          <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:6}}>Powiadomienia zablokowane</div>
-          <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.6}}>
-            Przeglądarka zablokowała powiadomienia.<br/>
-            Żeby odblokować: Ustawienia przeglądarki → Prywatność → Powiadomienia → gang-manager-beta.vercel.app → Zezwól
+        )}
+        {status === "granted" && (
+          <div>
+            <div style={{textAlign:"center",marginBottom:10}}>
+              <div style={{fontSize:32}}>✅</div>
+              <div style={{fontSize:13,fontWeight:"bold",color:"#0c6"}}>Powiadomienia włączone!</div>
+              <div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>Dostaniesz powiadomienie nawet gdy apka jest zamknięta</div>
+            </div>
+            <button onClick={wylaczPowiadomienia} style={{
+              width:"100%",padding:"8px",background:"rgba(255,50,50,0.1)",
+              border:"1px solid #f5544433",borderRadius:6,color:"#f5544488",cursor:"pointer",fontSize:11
+            }}>Wyłącz powiadomienia</button>
           </div>
+        )}
+        {status === "denied" && (
+          <div style={{textAlign:"center",padding:10}}>
+            <div style={{fontSize:32}}>❌</div>
+            <div style={{fontSize:12,fontWeight:"bold",color:"#f55",marginBottom:6}}>Powiadomienia zablokowane</div>
+            <div style={{fontSize:10,color:"var(--muted)",lineHeight:1.5}}>
+              Żeby odblokować: Ustawienia przeglądarki → Powiadomienia → gang-manager-beta.vercel.app → Zezwól
+            </div>
+          </div>
+        )}
+        {status === "error" && (
+          <div style={{textAlign:"center",color:"#f55",fontSize:11,padding:10}}>
+            ❌ Błąd rejestracji. Sprawdź czy VAPID key jest ustawiony w firebase.js
+          </div>
+        )}
+      </div>
+
+      {/* PANEL ADMINA — wyślij powiadomienie */}
+      {isAdmin && (
+        <div style={{background:"rgba(255,215,0,0.04)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>
+            👑 Admin — wyślij powiadomienie do gangu
+          </div>
+          <input
+            type="text"
+            value={pushTytul}
+            onChange={e => setPushTytul(e.target.value)}
+            placeholder="Tytuł powiadomienia"
+            style={{width:"100%",padding:"8px 10px",background:"var(--card-solid)",border:"1px solid var(--border)",
+              borderRadius:6,color:"var(--text)",fontSize:12,marginBottom:8,boxSizing:"border-box"}}
+          />
+          <textarea
+            value={pushTresc}
+            onChange={e => setPushTresc(e.target.value)}
+            placeholder="Treść powiadomienia... np. Nowa rozpiska! Sprawdźcie RASPISKĘ w apce."
+            rows={3}
+            style={{width:"100%",padding:"8px 10px",background:"var(--card-solid)",border:"1px solid var(--border)",
+              borderRadius:6,color:"var(--text)",fontSize:12,marginBottom:8,resize:"vertical",boxSizing:"border-box"}}
+          />
+          <button
+            onClick={wyslijPush}
+            disabled={sending || !pushTresc.trim()}
+            style={{
+              width:"100%",padding:"12px",
+              background:sending||!pushTresc.trim()?"rgba(255,255,255,0.05)":"linear-gradient(135deg,var(--accent2),var(--accent))",
+              border:"none",borderRadius:8,
+              color:sending||!pushTresc.trim()?"var(--muted)":"var(--btn-text)",
+              fontWeight:"bold",cursor:sending||!pushTresc.trim()?"not-allowed":"pointer",fontSize:13,
+            }}
+          >
+            {sending ? "⏳ Wysyłam..." : "📤 Wyślij do wszystkich"}
+          </button>
+          {sendResult && (
+            <div style={{marginTop:8,padding:"6px 10px",borderRadius:6,fontSize:11,
+              background:sendResult.success?"rgba(0,200,100,0.1)":"rgba(255,50,50,0.1)",
+              border:sendResult.success?"1px solid #0c633":"1px solid #f5544433",
+              color:sendResult.success?"#0c6":"#f55"
+            }}>
+              {sendResult.success
+                ? `✓ Wysłano do ${sendResult.sent} urządzeń${sendResult.failed>0?` (${sendResult.failed} błędów)`:""}`
+                : `❌ Błąd: ${sendResult.error}`}
+            </div>
+          )}
+
+          {/* Historia powiadomień */}
+          {historiaPush && historiaPush.length > 0 && (
+            <div style={{marginTop:12}}>
+              <div style={{fontSize:10,color:"var(--muted)",marginBottom:6}}>📋 Historia (ostatnie 5):</div>
+              {historiaPush.slice(0,5).map(p => (
+                <div key={p.id} style={{fontSize:10,color:"var(--muted)",padding:"4px 0",borderBottom:"1px solid var(--border)"}}>
+                  <strong style={{color:"var(--text)"}}>{p.title}</strong> — {p.body?.slice(0,40)}...
+                  <span style={{color:"#0c6",marginLeft:6}}>✓{p.sent}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
 
 // ============================================================
 // OSIĄGNIĘCIA
