@@ -575,7 +575,7 @@ function App() {
     } catch { return null; }
   });
   const [wyglad, setWyglad, motyw] = useWyglad();
-  const [historiaPush, setHistoriaPush] = useState([]);
+  const [historiaPush, setHistoriaPush] = useState([]); // eslint-disable-line no-unused-vars
 
   const [dane, setDane] = useState(null); // null = loading
   const [zakładka, setZakładka] = useState(() => {
