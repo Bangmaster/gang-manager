@@ -1,6 +1,5 @@
-/* Firebase Messaging Service Worker - obsługa powiadomień w tle */
-importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js");
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -13,35 +12,13 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Powiadomienia w tle (gdy apka zamknięta)
-messaging.onBackgroundMessage((payload) => {
-  const { title, body, icon, data } = payload.notification || {};
-  self.registration.showNotification(title || "™FAM™ Gang Manager", {
-    body: body || "",
-    icon: icon || "/logo192.png",
-    badge: "/logo192.png",
-    tag: "gang-notification",
-    renotify: true,
-    data: data || {},
-    actions: [
-      { action: "open", title: "Otwórz apkę" },
-    ],
+messaging.onBackgroundMessage(function(payload) {
+  const title = payload.notification?.title || '™FAM™';
+  const body = payload.notification?.body || '';
+  self.registration.showNotification(title, {
+    body: body,
+    icon: '/logo192.png',
+    badge: '/logo192.png',
     vibrate: [200, 100, 200],
   });
-});
-
-// Klik w powiadomienie → otwórz apkę
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      const url = self.location.origin;
-      for (const client of clientList) {
-        if (client.url.startsWith(url) && "focus" in client) {
-          return client.focus();
-        }
-      }
-      if (clients.openWindow) return clients.openWindow(url);
-    })
-  );
 });
