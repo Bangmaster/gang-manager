@@ -1647,19 +1647,40 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
   // Licznik kart przydzielonych per odbiorca (do limitu maxKartNaOsobe)
   const kartDlaosoby = {}; // osobaId -> count
   // Oblicz ile kart diamentowych brakuje danej osobie (do zamknięcia kręgu)
+  // Ile diamentowych kart brakuje osobie do zamknięcia kręgu (łącznie we wszystkich taliach)
   const brakDiamentOsoby = (osobaId) => {
-    if (typWymiany !== "diamentowe" || Object.keys(paczkiDiament).length === 0) return null;
+    if (typWymiany !== "diamentowe") return 0;
     return talie.reduce((sum,t)=>sum+(t.karty.filter(k=>k.typ==="diamentowa"&&!posiadane[osobaId+"_"+t.id+"_"+k.nazwa]).length),0);
+  };
+
+  // Ile jeszcze kart potrzeba po odjęciu paczek
+  const brakPoOdjęciuPaczek = (osobaId) => {
+    if (tryb !== "paczki_diament") return null;
+    const paczki = paczkiDiament[osobaId] || 0;
+    const brakLacznie = brakDiamentOsoby(osobaId);
+    return Math.max(0, brakLacznie - paczki);
+  };
+
+  // Limit kart dla trybu paczki — ile kart max może dostać osoba w tej wymianie
+  const limitPaczkiDiament = (osobaId) => {
+    if (tryb !== "paczki_diament" || !(osobaId in paczkiDiament)) return null;
+    const brakEfektywny = brakPoOdjęciuPaczek(osobaId);
+    // Wyklucz jeśli paczki pokrywają cały brak
+    if (brakEfektywny === 0) return 0;
+    // Obsługuj tylko jeśli brak efektywny <= 4 (nie przepalamy wymian)
+    if (brakEfektywny > 4) return 0;
+    return brakEfektywny; // max tyle kart ile faktycznie potrzeba
   };
 
   const czyMozeDostac = (osobaId) => {
     const ile = kartDlaosoby[osobaId] || 0;
-    // Tryb paczki: jeśli osoba ma wystarczająco paczek żeby zamknąć krąg -> wyklucz jako odbiorcę
-    if (tryb === "paczki_diament" && paczkiDiament[osobaId] !== undefined) {
-      const brak = brakDiamentOsoby(osobaId);
-      if (brak !== null && paczkiDiament[osobaId] >= brak && brak > 0) return false;
+    // Tryb paczki
+    if (tryb === "paczki_diament" && osobaId in paczkiDiament) {
+      const limit = limitPaczkiDiament(osobaId);
+      if (limit === 0) return false; // wykluczona
+      if (limit !== null) return ile < limit;
     }
-    // Indywidualny limit per osoba — priorytet nad globalnym
+    // Indywidualny limit per osoba
     if (limitKartOsoby[osobaId] !== undefined) return ile < limitKartOsoby[osobaId];
     return maxKartNaOsobe <= 0 || ile < maxKartNaOsobe;
   };
@@ -1851,6 +1872,16 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
 
   const wysylajacy = new Set();
   const planoweWymiany = [];
+
+  // Tryb paczki — sortuj osoby z paczkami na koniec (niższy priorytet)
+  if (tryb === "paczki_diament") {
+    staneTalii.sort((a, b) => {
+      const aPaczki = a.osoba.id in paczkiDiament;
+      const bPaczki = b.osoba.id in paczkiDiament;
+      if (aPaczki !== bPaczki) return aPaczki ? 1 : -1; // osoby bez paczek pierwsze
+      return 0;
+    });
+  }
 
   staneTaliiRef.list = staneTalii; // Wypełnij przed trybem celowanym
 
@@ -2820,19 +2851,26 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
             {czlonkowie.map(c=>{
               const brakDiam = talie.reduce((sum,t)=>sum+(t.karty.filter(k=>k.typ==="diamentowa"&&!posiadane[c.id+"_"+t.id+"_"+k.nazwa]).length),0);
               const ilePaczek = paczkiDiament[c.id]||0;
-              const zamknieCrag = brakDiam>0 && ilePaczek>=brakDiam;
+              const maPaczki = c.id in paczkiDiament;
+              const brakEfekt = Math.max(0, brakDiam - ilePaczek);
+              const zamknieSam = maPaczki && brakEfekt===0 && brakDiam>0;
+              const dostaniePriorytet = maPaczki && brakEfekt>0 && brakEfekt<=4;
+              const pomijamy = maPaczki && brakEfekt>4;
               return(
-                <div key={c.id} style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{flex:1,fontSize:11,color:zamknieCrag?"#0c6":"var(--text)"}}>{c.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")}</span>
-                  <span style={{fontSize:10,color:"var(--muted)",minWidth:60}}>brak: {brakDiam}💎</span>
+                <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,
+                  padding:"4px 6px",borderRadius:6,
+                  background:zamknieSam?"rgba(0,200,100,0.06)":dostaniePriorytet?"rgba(255,165,0,0.05)":"transparent"
+                }}>
+                  <span style={{flex:1,fontSize:11,color:zamknieSam?"#0c6":dostaniePriorytet?"#fa0":"var(--muted)"}}>{c.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")}</span>
+                  <span style={{fontSize:10,color:"var(--muted)",minWidth:50}}>brak: {brakDiam}💎</span>
                   <input type="number" min="0" max="99"
                     value={ilePaczek||""}
                     placeholder="0"
                     onChange={e=>setPaczkiDiament(p=>({...p,[c.id]:parseInt(e.target.value)||0}))}
-                    style={{width:50,padding:"3px 6px",borderRadius:5,border:"1px solid #87CEEB44",background:"rgba(135,206,235,0.08)",color:"#87CEEB",fontSize:12,textAlign:"center"}}
+                    style={{width:46,padding:"3px 5px",borderRadius:5,border:"1px solid #87CEEB44",background:"rgba(135,206,235,0.08)",color:"#87CEEB",fontSize:12,textAlign:"center"}}
                   />
-                  <span style={{fontSize:10,minWidth:70,color:zamknieCrag?"#0c6":"#fa0"}}>
-                    {zamknieCrag?"✓ zamknie sam":"📦 paczki"}
+                  <span style={{fontSize:9,minWidth:80,color:zamknieSam?"#0c6":dostaniePriorytet?"#fa0":pomijamy?"var(--muted)":"var(--muted)"}}>
+                    {!maPaczki?"–":zamknieSam?"✓ zamknie sam":dostaniePriorytet?"dostanie "+brakEfekt+"💎":pomijamy?"⏭ pomijamy":""}
                   </span>
                 </div>
               );
