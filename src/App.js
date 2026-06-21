@@ -4343,7 +4343,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 // ============================================================
 // TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={}}) {
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={},historiaPush=[]}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaTalia,setWybranaTalia]=useState(0);
