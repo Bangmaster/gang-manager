@@ -25,23 +25,38 @@ export function getMessagingInstance() {
 
 // VAPID key z Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
 // ZMIEŃ TO na swój klucz VAPID!
-const VAPID_KEY = "BLF-0G9vBBjxVGimdfVxpBbEfnKME4uEQOc-m7seb5iTH2X3rQNcvE91aU89iudXAk_4u2V2zQW-YtYpXHpf_48";
+const VAPID_KEY = "WKLEJ_TUTAJ_SWÓJ_VAPID_KEY";
 
 // Rejestruj token FCM dla tego urządzenia i zapisz do Firestore
 export async function registerFCMToken(nick) {
   try {
+    // Sprawdź VAPID key
+    if (!VAPID_KEY || VAPID_KEY.includes("WKLEJ")) {
+      console.error("FCM: Brak VAPID key! Ustaw go w firebase.js");
+      throw new Error("Brak VAPID key");
+    }
+
     const messaging = getMessagingInstance();
-    if (!messaging) return null;
+    if (!messaging) throw new Error("Messaging niedostępny");
 
     // Sprawdź pozwolenie
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return null;
 
-    // Pobierz token
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
-    if (!token) return null;
+    // Upewnij się że service worker jest zarejestrowany
+    if ("serviceWorker" in navigator) {
+      await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    }
 
-    // Zapisz token w Firestore (nadpisz poprzedni dla tego nicka)
+    // Pobierz token
+    const sw = await navigator.serviceWorker.ready;
+    const token = await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: sw,
+    });
+    if (!token) throw new Error("Nie udało się pobrać tokenu FCM");
+
+    // Zapisz token w Firestore
     const tokenDoc = doc(db, "fcm_tokens", nick.replace(/[^a-zA-Z0-9]/g, "_"));
     await setDoc(tokenDoc, {
       token,
@@ -52,8 +67,8 @@ export async function registerFCMToken(nick) {
 
     return token;
   } catch(e) {
-    console.error("Błąd rejestracji FCM:", e);
-    return null;
+    console.error("Błąd rejestracji FCM:", e.message);
+    throw e;
   }
 }
 
