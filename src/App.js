@@ -976,6 +976,7 @@ function App() {
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
           przejdzDoAktywnej={()=>setZakładka("aktywna")}
           historiaWymian={historiaWymian}
+          paczkiDiament={paczkiDiament} setPaczkiDiament={setPaczkiDiament}
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
@@ -2581,7 +2582,7 @@ function opisFazy(faza, typWymiany) {
   };
 }
 
-function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej,historiaWymian=[]}) {
+function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej,historiaWymian=[],paczkiDiament={},setPaczkiDiament=()=>{}}) {
   const [skopiowano,setSkopiowano]=useState(false);
   const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
