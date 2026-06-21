@@ -294,7 +294,7 @@ const CYTATY=[
   "Sonny wyszedł na chwilę. Wrócił po 4 godzinach z uśmiechem i bez karty. Klasyk.",
   // BUBU
   "BUBU zdezerterował do AnyFam. Wrócił. Nikt nie pyta dlaczego. Wszyscy wiedzą dlaczego.",
-  "BUBU i Sonia — weterani AnyFam, którzy wrócili. Gang przyjął. Gang nie zapomniał.",
+  "BUBU i Bastek — weterani AnyFam, którzy wrócili. Gang przyjął. Gang nie zapomniał.",
   "BUBU wrócił jak pies z podkulonym ogonem. Pies jest teraz w gangu i wysyła karty. Psie.",
   // Kickboxer
   "Kickboxer kopie w powietrze z pełnym zaangażowaniem. Powietrze jeszcze nie złożyło skargi.",
@@ -302,7 +302,7 @@ const CYTATY=[
   "Kickboxer lubi Sonię. Sonia uciekła do AnyFam. Kickboxer kopie w powietrze z żalu.",
   // Kristoforo
   "Kristoforo jest wiatrakiem z Holandii. Kręci się, kręci i jakoś zawsze wysyła karty.",
-  "Kristoforo robi turnieje po 20 osób i uważa że to genialny pomysł. Nikt mu nie powiedział.",
+  "Kristoforo robił turnieje po 10 osób i myślał że to hit. Było 3 chętnych. Zrozumiał.",
   "Kristoforo i Artatuś — holenderskie tulipany w gangu. Jeden mówi, drugi milczy. Razem: jeden normalny.",
   // Artatuś
   "Artatuś siedzi w Hadze i milczy. Mówi tylko: 'Wysłałem' i 'Napiję się'. W tej kolejności.",
@@ -337,23 +337,36 @@ const CYTATY=[
   "Bangmasta stworzył tę apkę. Jeśli coś nie działa — jego wina. Jeśli działa — jego zasługa.",
   "Bangmasta: spec od AI, twórca apki, Pinglorz z okularami. Przystojny. Sam tak mówi.",
   // Krystian i Domcia
-  "Krystka jest przydupasem Domci od lat. Magazynier z ripostą jak brzytwa i lojalnością jak skała.",
+  "Krystek i Domcia w Anglii — oboje na emeryturze gangowej. Wspominają stare czasy i nie wysyłają kart.",
   "Domcia założyła gang i odeszła. Zostawiła Krystiana, tabletki i Sonny'ego z jego uczuciami.",
   "Domcia nie gra już z nami. Specjalistka od białych proszków ma ważniejsze sprawy. Poważne.",
-  "Krystka i Domcia w Anglii — on wysyła karty, ona doradza. Gang działa zdalnie.",
+  "Krystek i Domcia siedzą w Anglii i wspominają jak pięknie było w FAM. Kart nie wysyłają. Przynajmniej jest o czym gadać.",
   "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
   // Sonia i Bastek
-  "Sonia: piękna, uciekła do AnyFam i jeszcze tam siedzi. Kickboxer kopie w powietrze z tęsknoty.",
-  "Bastek uciekł do AnyFam i tam pozostał. Niektórzy wychodzą. Niektórzy nie.",
-  "Sonia siedzi w AnyFam. BUBU wrócił. Jeden z nich podjął właściwą decyzję.",
+  "Sonia: siedzi w AnyFam z Devilem i Marysią. Kickboxer przestał kopić z tęsknoty. Zaczął z przyzwyczajenia.",
+  "Bastek wyszedł z AnyFam i wrócił do FAM. Devil i Marysia zostali. Każdy robi swoje.",
+  "Sonia siedzi w AnyFam. BUBU wrócił. Bastek wrócił. Dwie właściwe decyzje i jedna nie.",
   // Kombinowane
   "Holenderskie trio: Kristoforo, Artatuś, Młody. Jeden kręci, drugi milczy, trzeci szuka drogi do domu.",
-  "Sonny kocha Domcię. Domcia wzięła tabletkę. Krystka patrzy i ostrzy ripostę.",
+  "Sonny kocha Domcię. Domcia wzięła tabletkę i wyjechała do Anglii. Krystek tam już był. Siedzą i wspominają.",
   "Kickboxer, Sonny i Młody to trio które razem mogłoby nie trafić do własnych mieszkań.",
   "Ponton, KaY4k i gebelsy — historia rodziny która podcięła sobie razem.",
   "SaMaNtA z wiertłem, Bangmasta z aplikacją, Tatuś z analizą — gang ma narzędzia. Użyjcie ich.",
-  "BUBU wrócił. Sonia i Bastek zostali w AnyFam. ™FAM™ nie dla każdego. Widać.",
+  "BUBU wrócił. Bastek wrócił. Sonia, Devil i Marysia zostali w AnyFam. ™FAM™ nie dla każdego. Widać.",
   "Kasia obserwuje, Krime milczy, Bodek topi, Joker kasuje. ™FAM™ — różnorodność to nasza siła.",
+  // Nowe po powrocie Bastka
+  "Bastek wrócił. Gang nie pytał dlaczego. Zapytał tylko czy karty idą na czas. Idą.",
+  "Devil założył AnyFam bo się obraził. Marysia poszła z nim. Oboje siedzą i się obrażają. Gang gra dalej.",
+  "AnyFam: Devil, Marysia, Sonia. Założone z dumy. Utrzymywane z uporu. Bez kart do wymiany.",
+  "Bastek wrócił do korzeni. W AnyFam zostali tylko założyciele — Devil z Marysią. I tak lepiej.",
+  "Devil stworzył AnyFam z obrazy. ™FAM™ stworzyło Bastka z powrotem. Różne wyniki.",
+  "Krystek i Domcia w Anglii — ona odeszła, on odszedł, oboje wspominają. Gang gra dalej bez nostalgii.",
+  "Kristoforo zrobił turniej na 10 osób. Przyszły 3. Turniej odwołany. Wiatrak zakręcił się ze wstydu.",
+  "Marysia i Devil w AnyFam — para która się obraziła i postanowiła grać na własny rachunek. Rachunek pusty.",
+  "Krystek i Domcia w Anglii — siedzą, piją herbatę i wspominają jak FAM wygrywał. Gang nie potrzebuje wspomnień. Potrzebuje kart.",
+  "Domcia założyła FAM, Krystek był wierny jak pies. Oboje odeszli. Bastek wrócił. Różne priorytety.",
+  "Krystek i Domcia na gangowej emeryturze w Anglii. Mają czas. Kart nie mają.",
+  "Domcia mówi Krystowi o starych czasach w FAM. Krystek słucha. Żadne z nich nie wysyła kart. Piękna historia.",
   // Więcej o CHMARSONN
   "CHMARSONN to Tomeczek który nie ogląda TV. Zamiast tego bije. I bije dobrze. I tyle o tym.",
   "Tomeczek powiedział kiedyś że TV to opium dla mas. Gang przytaknął i poszedł bić.",
@@ -365,9 +378,9 @@ const CYTATY=[
   "Młody, Kristoforo i Artatuś — holenderska mafia. Jeden pali, drugi kręci wiatrakiem, trzeci milczy i pije.",
   "Holenderskie trio: Kristoforo organizuje turnieje, Artatuś milczy, Młody szuka wyjścia z pokoju.",
   // Więcej o Bastku i Sonii
-  "Bastek uciekł do AnyFam i siedzi tam cicho. Widocznie tam kart nie wysyłają — czuje się jak w domu.",
-  "Sonia i Bastek w AnyFam. Kickboxer kopie w powietrze. Tatuś analizuje. Gang gra dalej.",
-  "Bastek i Sonia — dezerterzy pierwszej klasy. ™FAM™ wystawiło im pomnik z napisem: wróćcie.",
+  "Bastek wrócił do FAM. W AnyFam zostali tylko Devil i Marysia — założyciele którzy się obrazili. Widocznie tam kart nie wysyłają.",
+  "Sonia, Devil i Marysia w AnyFam. Kickboxer kopie w powietrze. Tatuś analizuje. Gang gra dalej.",
+  "Bastek wrócił! ™FAM™ pomnik przemianowało na: Sonia i Devil — wy jeszcze zostańcie.",
   // Więcej o Szczawie
   "Szczawo i Artatuś — obaj mają słabość do trunku. Jeden mówi o tym głośno, drugi milczy i pije.",
   "Szczawo Szczawiński. Gorzała Gorzałowa. Dwie strony tego samego człowieka.",
@@ -382,11 +395,11 @@ const CYTATY=[
   "Kasia milczy więcej niż Artatuś. A to jest bardzo wysoka poprzeczka.",
   // Więcej kombinowanych
   "Tatuś analizuje, Bangmasta koduje, SaMaNtA wierci — gang ma specjalistów od wszystkiego.",
-  "Sonny szuka Domci. Domcia wzięła tabletkę. Krystka patrzy. Kickboxer kopie. Gang gra.",
+  "Sonny szuka Domci. Domcia i Krystek w Anglii, na emeryturze. Kickboxer kopie. Gang gra.",
   "Ponton, KaY4k i gebels — familijny biznes bez pensji i bez żalu. Przynajmniej jeden z dwóch.",
   "SaMaNtA wyrwieje ząb, Szczawo to przepije, Sonny tego nie zauważy. Trójca gangowa.",
   "Joker na kasie, Bangmasta przy kodzie, Kickboxer w powietrzu — każdy robi co umie.",
-  "BUBU wrócił, Krystka ripostuje, Tatuś analizuje, Krime milczy. Normalny dzień w FAMILY.",
+  "BUBU wrócił, Krystek wspomina w Anglii, Tatuś analizuje, Krime milczy. Normalny dzień w FAMILY.",
 ];
 
 // Teksty do rozpiski — pokazywane przy aktywnej wymianie
@@ -402,16 +415,16 @@ const TEKSTY_ROZPISKI = [
   "Joker jest na kasie w Lidlu. Zdążył potwierdzić. Zastanów się nad swoim życiem.",
   "Szczawo wysłał między pierwszym a drugim. Chwila precyzji w morzu gorzały.",
   "Artatuś nic nie mówi. Po prostu wysyła. Naśladować. Nie podziwiać. Wysyłać.",
-  "Domcia odeszła ale zostawiła zasadę: wysyłasz kartę albo Krystka przyjedzie z ripostą.",
+  "Domcia odeszła i Krystek za nią. Zasada została: wysyłasz kartę bo inaczej kto przyjedzie? Nikt. Wysyłasz kartę.",
   "Kasia jest wszędzie. Zwłaszcza tutaj. Zwłaszcza teraz. Wyślij.",
   "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
   "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
   "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
-  "Bastek uciekł i nie wrócił. Sonia też. Kickboxer kopie w powietrze i wysyła kartę za nich.",
+  "Bastek wrócił i wysyła karty. Sonia w AnyFam z Devilem i Marysią. Kickboxer kopie już tylko za połowę.",
   "KaY4k nie dostaje pensji od Pontona, ale kartę wysyła. Charakter.",
   "CHMARSONN nie marnuje słów. Ani na pogaduszki, ani na wymówki. Wyślij kartę.",
   "Młody jest nowy. Jeszcze się uczy. Mimo to wysłał. Ty grasz dłużej — co masz do powiedzenia?",
-  "Krystka ma ripostę gotową. Nie testuj. Po prostu wyślij kartę.",
+  "Krystek ma ripostę gotową ale siedzi w Anglii i jej nie używa. Wysyłasz kartę bez strachu.",
   "Szczawo wysłał między kieliszkami. Trzeźwy czy nie — obowiązek obowiązuje.",
   "Krime wysłał bez słowa. Bez pytania. Bez wymówki. Weź przykład z człowieka-zagadki.",
   "Tatuś przeanalizował Twój brak akcji. Wyniki: nieoptymalne. Rozwiązanie: wyślij kartę.",
@@ -578,6 +591,7 @@ function App() {
   }, []);
   const [wynik, setWynik] = useState(null);
   const [trybWymiany, setTrybWymiany] = useState("priorytet");
+  const [paczkiDiament, setPaczkiDiament] = useState({}); // {osobaId: liczba paczek nowych diamentowych}
   const [statusZapisu, setStatusZapisu] = useState("");
 
   const [statusOnline, setStatusOnline] = useState({});
@@ -896,7 +910,7 @@ function App() {
       <div style={{
         background:"rgba(184,134,11,0.06)",borderBottom:"1px solid rgba(184,134,11,0.15)",
         padding:"4px 16px",fontSize:11,color:"var(--muted)",fontStyle:"italic",
-        textAlign:"center",minHeight:22,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",
+        textAlign:"center",minHeight:"auto",overflow:"hidden",whiteSpace:"normal",wordBreak:"break-word",
       }}>
         {CYTATY[Math.floor(Date.now()/3600000)%CYTATY.length]}
       </div>
@@ -1626,13 +1640,24 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
   );
 }
 
-function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0,limitKartOsoby={}}) {
+function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0,limitKartOsoby={},paczkiDiament={}}) {
   // czlonkowie = odbiorcy (aktywni), wszyscyCzlonkowie = dawcy (wszyscy łącznie z wyłączonymi)
   const dawcy = wszyscyCzlonkowie || czlonkowie;
   // Licznik kart przydzielonych per odbiorca (do limitu maxKartNaOsobe)
   const kartDlaosoby = {}; // osobaId -> count
+  // Oblicz ile kart diamentowych brakuje danej osobie (do zamknięcia kręgu)
+  const brakDiamentOsoby = (osobaId) => {
+    if (typWymiany !== "diamentowe" || Object.keys(paczkiDiament).length === 0) return null;
+    return talie.reduce((sum,t)=>sum+(t.karty.filter(k=>k.typ==="diamentowa"&&!posiadane[osobaId+"_"+t.id+"_"+k.nazwa]).length),0);
+  };
+
   const czyMozeDostac = (osobaId) => {
     const ile = kartDlaosoby[osobaId] || 0;
+    // Tryb paczki: jeśli osoba ma wystarczająco paczek żeby zamknąć krąg -> wyklucz jako odbiorcę
+    if (tryb === "paczki_diament" && paczkiDiament[osobaId] !== undefined) {
+      const brak = brakDiamentOsoby(osobaId);
+      if (brak !== null && paczkiDiament[osobaId] >= brak && brak > 0) return false;
+    }
     // Indywidualny limit per osoba — priorytet nad globalnym
     if (limitKartOsoby[osobaId] !== undefined) return ile < limitKartOsoby[osobaId];
     return maxKartNaOsobe <= 0 || ile < maxKartNaOsobe;
@@ -2734,7 +2759,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     }); // odbiorcy
     // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
     const aktywniDawcy=czlonkowie.filter(c=>!wylaczoneDawcy.has(c.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby}));
+    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby,paczkiDiament:trybWymiany==="paczki_diament"?paczkiDiament:{}}));
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -2770,6 +2795,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           {id:"celowany",label:"🎯 Celowany — wybierz osoby"},
           {id:"wylacz110",label:"🚫 Wyłącz 110-120"},
           {id:"krag79",label:"7️⃣ Tryb 7-9"},
+          {id:"paczki_diament",label:"📦 Paczki nowych diamentowych"},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTrybWymiany(t.id)} style={{
             padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
@@ -2779,6 +2805,40 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           }}>{t.label}</button>
         ))}
       </div>
+
+      {/* Panel paczek diamentowych */}
+      {trybWymiany==="paczki_diament"&&typWymiany==="diamentowe"&&(
+        <div style={{marginBottom:12,background:"var(--card)",border:"1px solid #87CEEB33",borderRadius:10,padding:12}}>
+          <div style={{fontSize:12,color:"#87CEEB",fontWeight:"bold",marginBottom:8}}>
+            📦 Nowe diamentowe w paczkach — wpisz ile kto ma
+          </div>
+          <div style={{fontSize:10,color:"var(--muted)",marginBottom:10}}>
+            Osoby które mają wystarczająco paczek żeby zamknąć krąg są <strong style={{color:"#0c6"}}>wykluczone z wymiany</strong> jako odbiorcy. Reszta dostaje karty z niskim priorytetem.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {czlonkowie.map(c=>{
+              const brakDiam = talie.reduce((sum,t)=>sum+(t.karty.filter(k=>k.typ==="diamentowa"&&!posiadane[c.id+"_"+t.id+"_"+k.nazwa]).length),0);
+              const ilePaczek = paczkiDiament[c.id]||0;
+              const zamknieCrag = brakDiam>0 && ilePaczek>=brakDiam;
+              return(
+                <div key={c.id} style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{flex:1,fontSize:11,color:zamknieCrag?"#0c6":"var(--text)"}}>{c.nazwa.replace(/™FAM™|fAM™|FAM™/g,"")}</span>
+                  <span style={{fontSize:10,color:"var(--muted)",minWidth:60}}>brak: {brakDiam}💎</span>
+                  <input type="number" min="0" max="99"
+                    value={ilePaczek||""}
+                    placeholder="0"
+                    onChange={e=>setPaczkiDiament(p=>({...p,[c.id]:parseInt(e.target.value)||0}))}
+                    style={{width:50,padding:"3px 6px",borderRadius:5,border:"1px solid #87CEEB44",background:"rgba(135,206,235,0.08)",color:"#87CEEB",fontSize:12,textAlign:"center"}}
+                  />
+                  <span style={{fontSize:10,minWidth:70,color:zamknieCrag?"#0c6":"#fa0"}}>
+                    {zamknieCrag?"✓ zamknie sam":"📦 paczki"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Opcje dodatkowe */}
       <div style={{marginBottom:12,display:"flex",gap:8,flexWrap:"wrap"}}>
