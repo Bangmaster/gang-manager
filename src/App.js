@@ -780,9 +780,9 @@ function App() {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--text)",position:"relative",overflow:"hidden",fontSize:"var(--fnt)"}}>
+    <div style={{height:"100dvh",display:"flex",flexDirection:"column",background:"var(--bg)",color:"var(--text)",overflow:"hidden"}}>
       <MotywStyle motyw={motyw} rozmiar={wyglad.rozmiar}/>
-      <div style={{flex:1,overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch"}}>
+      <div style={{flex:1,overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch",minHeight:0}}>
 
       {/* Tło */}
       <div style={{
