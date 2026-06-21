@@ -25,7 +25,7 @@ export function getMessagingInstance() {
 
 // VAPID key z Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
 // ZMIEŃ TO na swój klucz VAPID!
-const VAPID_KEY = "b7UBBy6QMxx_24kSFqwLdrTIbR3lgvkP7sSjOfdPerA";
+const VAPID_KEY = "BLF-0G9vBBjxVGimdfVxpBbEfnKME4uEQOc-m7seb5iTH2X3rQNcvE91aU89iudXAk_4u2V2zQW-YtYpXHpf_48";
 
 // Rejestruj token FCM dla tego urządzenia i zapisz do Firestore
 export async function registerFCMToken(nick) {
