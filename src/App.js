@@ -3419,6 +3419,99 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         })()}
         {/* ── KONIEC PODSUMOWANIA ODBIORCÓW ── */}
 
+        {/* ── PODSUMOWANIE ODBIORCÓW ── */}
+        {(()=>{
+          const perOdbiorca = {};
+          wynik.planoweWymiany.forEach(w=>{
+            if(!perOdbiorca[w.do]) perOdbiorca[w.do]=[];
+            perOdbiorca[w.do].push(w);
+          });
+
+          const symPos={...posiadane};
+          wynik.planoweWymiany.forEach(w=>{
+            const o=czlonkowie.find(c=>c.nazwa===w.do);
+            const t=talie.find(t2=>t2.nazwa===w.talia);
+            if(o&&t){
+              const k=t.karty.find(k2=>k2.nazwa===w.karta);
+              if(k) symPos[`${o.id}_${t.id}_${k.nazwa}`]=true;
+            }
+          });
+
+          const typ    = typWymiany==="złote" ? "złota"     : "diamentowa";
+          const oppTyp = typWymiany==="złote" ? "diamentowa": "złota";
+          const ikonaT = typWymiany==="złote" ? "⭐" : "💎";
+          const ikonaO = typWymiany==="złote" ? "💎" : "⭐";
+
+          return (
+            <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:14}}>
+              <div style={{fontWeight:"bold",color:"var(--accent)",fontSize:13,marginBottom:10}}>
+                👥 Podsumowanie odbiorców
+              </div>
+              {Object.entries(perOdbiorca).map(([nazwa, wymianyOsoby])=>{
+                const osoba=czlonkowie.find(c=>c.nazwa===nazwa);
+                const oId=osoba?.id;
+
+                const kartyPrzed=osoba?liczKartyOsoby(oId,talie,posiadane):0;
+                const kartyPo   =osoba?liczKartyOsoby(oId,talie,symPos)   :0;
+                const progPrzed =obliczProg(kartyPrzed);
+                const progPo    =obliczProg(kartyPo);
+                const nowyProg  =progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
+
+                return (
+                  <div key={nazwa} style={{padding:"8px 0",borderBottom:"1px solid #12122a"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                      <span style={{fontWeight:"bold",color:"var(--accent)",fontSize:13}}>{nazwa}</span>
+                      <span style={{fontSize:11,color:"#777"}}>
+                        dostaje <strong style={{color:"#fff"}}>{wymianyOsoby.length}</strong> {wymianyOsoby.length===1?"kartę":wymianyOsoby.length<5?"karty":"kart"}
+                      </span>
+                      {nowyProg&&(
+                        <span style={{fontSize:11,color:"#fa0",background:"rgba(255,165,0,0.12)",padding:"2px 8px",borderRadius:10,border:"1px solid #fa033",fontWeight:"bold"}}>
+                          🎯 PRÓG {progPo.ostatniProg.prog}! +{progPo.ostatniProg.ammo.toLocaleString()} 💰
+                        </span>
+                      )}
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5,marginLeft:8}}>
+                      {wymianyOsoby.map((w,i)=>{
+                        const t=talie.find(t2=>t2.nazwa===w.talia);
+                        const kartyT=t?t.karty.filter(k=>k.typ===typ):[];
+                        const kartyO=t?t.karty.filter(k=>k.typ===oppTyp):[];
+                        const brakTPrzed=t?kartyT.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+                        const brakOPrzed=t?kartyO.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+                        const brakTPo=t?kartyT.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+                        const brakOPo=t?kartyO.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+
+                        const zamknieTalie=brakTPo===0&&brakOPo===0;
+                        const tylkoOppBrakuje=brakTPo===0&&brakOPo>0;
+
+                        const kolorBadge=zamknieTalie?"#0c6":brakTPrzed===1&&brakOPrzed===0?"#f55":brakTPrzed<=2?"#fa0":"#6af";
+                        const bgBadge=zamknieTalie?"rgba(0,200,100,0.12)":brakTPrzed===1&&brakOPrzed===0?"rgba(255,50,50,0.1)":brakTPrzed<=2?"rgba(255,165,0,0.08)":"rgba(100,170,255,0.08)";
+
+                        return (
+                          <div key={i} style={{fontSize:11,padding:"4px 9px",borderRadius:6,background:bgBadge,border:`1px solid ${kolorBadge}55`,color:"var(--text)"}}>
+                            <span style={{fontWeight:"bold"}}>{w.karta}</span>
+                            <span style={{color:"#555",marginLeft:4}}>[{w.talia}]</span>
+                            <span style={{marginLeft:6,color:kolorBadge,fontWeight:"bold"}}>
+                              {zamknieTalie
+                                ? "🏆 KOMPLET!"
+                                : tylkoOppBrakuje
+                                  ? `brak ${brakOPo}${ikonaO}`
+                                  : brakTPo===0
+                                    ? `komplet ${ikonaT}`
+                                    : `po wymianie: −${brakTPo}${ikonaT}${brakOPo>0?` −${brakOPo}${ikonaO}`:` komplet${ikonaO}`}`
+                              }
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+        {/* ── KONIEC PODSUMOWANIA ODBIORCÓW ── */}
+
         <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid var(--border)",borderRadius:10,padding:14,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
             <div style={{fontWeight:"bold",color:"var(--accent)",fontSize:13}}>📋 Tekst na Messengera</div>
@@ -4555,6 +4648,7 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
           const key = `${c.id}_${t.id}_${k.nazwa}`;
           if (posiadane[key]) {
             await zapiszKarte("posiadane", key, null);
+            if (duplikaty[key]) await zapiszKarte("duplikaty", key, null); // FIX: czyść duplikat razem z posiadanym
             count++;
           }
         }
@@ -4580,13 +4674,19 @@ To doda ${talie.reduce((s,t)=>s+t.karty.filter(k=>k.typ===typ).length,0)} kart �
     karty.forEach(k=>{
       const key=`${osoba.id}_${talia.id}_${k.nazwa}`;
       if(posiadane[key]) zapiszKarte("posiadane",key,null);
+      if(duplikaty[key]) zapiszKarte("duplikaty",key,null); // FIX: czyść duplikat razem z posiadanym
     });
   };
 
   const toggle=(kartaNazwa)=>{
     if(!osoba||!talia) return;
     const key=`${osoba.id}_${talia.id}_${kartaNazwa}`;
-    zapiszKarte("posiadane",key,posiadane[key]?null:true);
+    if(posiadane[key]){
+      zapiszKarte("posiadane",key,null);
+      if(duplikaty[key]) zapiszKarte("duplikaty",key,null); // FIX: czyść duplikat razem z posiadanym
+    } else {
+      zapiszKarte("posiadane",key,true);
+    }
   };
 
   const kartyZlote=talia?.karty.filter(k=>k.typ==="złota")||[];
