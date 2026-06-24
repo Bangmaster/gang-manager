@@ -592,38 +592,36 @@ function App() {
   }, []);
 
   // Foreground FCM handler — gdy apka jest otwarta FCM nie pokazuje powiadomienia,
-  // musimy to zrobić ręcznie
+  // musimy to zrobić ręcznie. Na Androidzie new Notification() jest zablokowane —
+  // używamy SW.showNotification() który działa wszędzie.
   useEffect(() => {
     try {
       const unsub = onForegroundMessage((payload) => {
-        // LOG diagnostyczny — zapisz do Firestore że foreground message dotarł
-        Promise.all([import("firebase/firestore"), import("firebase/app")]).then(([fs, fa]) => {
-          const db2 = fs.getFirestore(fa.getApp());
-          fs.addDoc(fs.collection(db2, "fcm_logi"), {
-            nick: zalogowany?.login || "nieznany",
-            zdarzenie: "FOREGROUND_OTRZYMANO",
-            dane: {
-              title: payload.notification?.title,
-              body: payload.notification?.body,
-              permission: Notification.permission,
-            },
-            timestamp: Date.now(),
-            userAgent: navigator.userAgent,
-            platforma: /Android|iPhone|iPad/i.test(navigator.userAgent) ? "mobile" : "desktop",
-          }).catch(()=>{});
-        }).catch(()=>{});
-
-        if (Notification.permission === "granted") {
-          new Notification(payload.notification?.title || "™FAM™", {
-            body: payload.notification?.body || "",
-            icon: "/logo192.png",
-            badge: "/logo192.png",
+        if (Notification.permission !== "granted") return;
+        const title = payload.notification?.title || "™FAM™";
+        const opts = {
+          body: payload.notification?.body || "",
+          icon: "/logo192.png",
+          badge: "/logo192.png",
+          vibrate: [200, 100, 200],
+        };
+        // SW.showNotification działa na mobile i desktop
+        // new Notification() jest zablokowane na Androidzie Chrome
+        navigator.serviceWorker.getRegistration("/firebase-messaging-sw.js")
+          .then(reg => {
+            if (reg) {
+              reg.showNotification(title, opts);
+            } else {
+              new Notification(title, opts); // fallback desktop
+            }
+          })
+          .catch(() => {
+            try { new Notification(title, opts); } catch(e2) { /* Safari bez SW */ }
           });
-        }
       });
       return () => unsub();
     } catch(e) { /* messaging niedostępny (np. Safari) */ }
-  }, [zalogowany]);
+  }, []);
   const [wynik, setWynik] = useState(null);
   const [trybWymiany, setTrybWymiany] = useState("priorytet");
   const [paczkiDiament, setPaczkiDiament] = useState({}); // {osobaId: liczba paczek nowych diamentowych}
@@ -6036,98 +6034,6 @@ function PowiadomieniaPush({ zalogowany, isAdmin, historiaPush }) {
           )}
         </div>
       )}
-
-      {isAdmin && <LogiFCM/>}
-    </div>
-  );
-}
-
-function LogiFCM() {
-  const [logi, setLogi] = useState([]);
-  const [ladowanie, setLadowanie] = useState(false);
-  const [pokazane, setPokazane] = useState(false);
-
-  const pobierzLogi = () => {
-    setLadowanie(true);
-    Promise.all([import("firebase/firestore"), import("firebase/app")]).then(([fs, fa]) => {
-      const db2 = fs.getFirestore(fa.getApp());
-      const q = fs.query(fs.collection(db2, "fcm_logi"), fs.orderBy("timestamp", "desc"), fs.limit(50));
-      return fs.getDocs(q);
-    }).then(snap => {
-      setLogi(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setPokazane(true);
-    }).catch(e => console.error("Błąd logów FCM:", e))
-      .finally(() => setLadowanie(false));
-  };
-
-  const wyczyscLogi = () => {
-    if (!window.confirm("Wyczyścić wszystkie logi FCM?")) return;
-    Promise.all([import("firebase/firestore"), import("firebase/app")]).then(([fs, fa]) => {
-      const db2 = fs.getFirestore(fa.getApp());
-      return fs.getDocs(fs.collection(db2, "fcm_logi")).then(snap =>
-        Promise.all(snap.docs.map(d => fs.deleteDoc(d.ref)))
-      );
-    }).then(() => setLogi([])).catch(e => console.error(e));
-  };
-
-  const kolorZdarzenia = (z) => {
-    if (!z) return "#888";
-    if (z.includes("BŁĄD")) return "#f55";
-    if (z.includes("OK") || z.includes("POBRANY")) return "#0c6";
-    if (z.includes("FOREGROUND")) return "#6af";
-    return "#fa0";
-  };
-
-  return (
-    <div style={{marginTop:16,background:"rgba(0,0,0,0.3)",border:"1px solid #333",borderRadius:10,padding:14}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
-        <div style={{fontWeight:"bold",color:"#fa0",fontSize:13}}>🔍 Logi diagnostyczne FCM</div>
-        <div style={{display:"flex",gap:6}}>
-          <button onClick={pobierzLogi} disabled={ladowanie} style={{padding:"5px 12px",fontSize:11,borderRadius:6,background:"rgba(255,165,0,0.12)",border:"1px solid #fa055",color:"#fa0",cursor:"pointer"}}>
-            {ladowanie?"⏳ Ładuję...":"📥 Pobierz logi"}
-          </button>
-          {logi.length>0&&(
-            <button onClick={wyczyscLogi} style={{padding:"5px 12px",fontSize:11,borderRadius:6,background:"rgba(255,50,50,0.1)",border:"1px solid #f5544455",color:"#f55",cursor:"pointer"}}>
-              🗑️ Wyczyść
-            </button>
-          )}
-        </div>
-      </div>
-      <div style={{fontSize:11,color:"#555",marginBottom:8}}>
-        Logi zapisywane przy rejestracji tokenu i odbiorze powiadomień. Sprawdź co się dzieje na telefonie.
-      </div>
-      {pokazane&&logi.length===0&&(
-        <div style={{fontSize:12,color:"#555",textAlign:"center",padding:16}}>Brak logów.</div>
-      )}
-      {logi.map(log=>(
-        <div key={log.id} style={{padding:"7px 10px",marginBottom:5,borderRadius:7,background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",fontSize:11}}>
-          <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:4,marginBottom:3}}>
-            <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-              <span style={{fontWeight:"bold",padding:"1px 7px",borderRadius:10,fontSize:10,background:`${kolorZdarzenia(log.zdarzenie)}22`,border:`1px solid ${kolorZdarzenia(log.zdarzenie)}55`,color:kolorZdarzenia(log.zdarzenie)}}>
-                {log.zdarzenie}
-              </span>
-              <span style={{color:"var(--accent)",fontWeight:"bold"}}>{log.nick}</span>
-              <span style={{color:"#555",fontSize:10}}>{log.platforma==="mobile"?"📱":"💻"} {log.platforma}</span>
-            </div>
-            <span style={{color:"#444",fontSize:10}}>
-              {log.timestamp?new Date(log.timestamp).toLocaleString("pl-PL"):"—"}
-            </span>
-          </div>
-          {log.dane&&Object.keys(log.dane).length>0&&(
-            <div style={{color:"#666",fontSize:10,fontFamily:"monospace",marginTop:2}}>
-              {Object.entries(log.dane).map(([k,v])=>(
-                <span key={k} style={{marginRight:10}}>
-                  <span style={{color:"#444"}}>{k}:</span>{" "}
-                  <span style={{color:"#888"}}>{String(v)}</span>
-                </span>
-              ))}
-            </div>
-          )}
-          {log.userAgent&&(
-            <div style={{color:"#333",fontSize:9,marginTop:2,wordBreak:"break-all"}}>{String(log.userAgent).substring(0,100)}...</div>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
