@@ -104,11 +104,15 @@ export async function registerFCMToken(nick) {
 
     await zapiszLogFCM(nick, "TOKEN_POBRANY", { tokenPrefix: token.substring(0, 20) + "..." });
 
-    // Zapisz token w Firestore
-    const tokenDoc = doc(db, "fcm_tokens", nick.replace(/[^a-zA-Z0-9]/g, "_"));
+    // Zapisz token w Firestore — osobny dokument per urządzenie (fingerprint)
+    // żeby laptop i telefon dostawały powiadomienia niezależnie
+    const fp = getFingerprint();
+    const docId = nick.replace(/[^a-zA-Z0-9]/g, "_") + "_" + fp;
+    const tokenDoc = doc(db, "fcm_tokens", docId);
     await setDoc(tokenDoc, {
       token,
       nick,
+      fingerprint: fp,
       timestamp: Date.now(),
       userAgent: navigator.userAgent,
     });
@@ -125,7 +129,9 @@ export async function registerFCMToken(nick) {
 // Usuń token FCM (wylogowanie)
 export async function unregisterFCMToken(nick) {
   try {
-    const tokenDoc = doc(db, "fcm_tokens", nick.replace(/[^a-zA-Z0-9]/g, "_"));
+    const fp = getFingerprint();
+    const docId = nick.replace(/[^a-zA-Z0-9]/g, "_") + "_" + fp;
+    const tokenDoc = doc(db, "fcm_tokens", docId);
     await deleteDoc(tokenDoc);
   } catch(e) { console.error(e); }
 }
