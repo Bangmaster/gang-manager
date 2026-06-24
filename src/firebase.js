@@ -43,16 +43,28 @@ export async function registerFCMToken(nick) {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return null;
 
-    // Upewnij się że service worker jest zarejestrowany
-    if ("serviceWorker" in navigator) {
-      await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-    }
+    // Zarejestruj FCM service worker i przypnij token do tej konkretnej rejestracji
+    // (NIE używamy navigator.serviceWorker.ready — może zwrócić domyślny CRA SW!)
+    if (!("serviceWorker" in navigator)) throw new Error("Service Worker niedostępny");
+    const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    // Poczekaj aż SW będzie aktywny
+    await new Promise(resolve => {
+      if (swReg.active) { resolve(); return; }
+      const sw = swReg.installing || swReg.waiting;
+      if (sw) {
+        sw.addEventListener("statechange", e => { if (e.target.state === "activated") resolve(); });
+      } else {
+        swReg.addEventListener("updatefound", () => {
+          swReg.installing.addEventListener("statechange", e => { if (e.target.state === "activated") resolve(); });
+        });
+      }
+      setTimeout(resolve, 3000); // safety timeout
+    });
 
-    // Pobierz token
-    const sw = await navigator.serviceWorker.ready;
+    // Pobierz token przypisany do FCM SW (nie CRA SW)
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: sw,
+      serviceWorkerRegistration: swReg,
     });
     if (!token) throw new Error("Nie udało się pobrać tokenu FCM");
 
