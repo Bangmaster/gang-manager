@@ -578,9 +578,6 @@ function App() {
   const [historiaPush, setHistoriaPush] = useState([]); // eslint-disable-line no-unused-vars
 
   const [dane, setDane] = useState(null); // null = loading
-  const [logoKlik, setLogoKlik] = useState(0);
-  const [logoKlikTimer, setLogoKlikTimer] = useState(null);
-  const [easterEgg, setEasterEgg] = useState(false);
   const [zakładka, setZakładka] = useState(() => {
     // Jeśli jest aktywna wymiana — otwórz od razu rozpiskę
     // (sprawdzimy po załadowaniu danych przez useEffect)
@@ -592,6 +589,23 @@ function App() {
   useEffect(() => {
     const unsub = subscribeHistoria(d => startTransition(() => setHistoriaWymian(d)));
     return () => unsub();
+  }, []);
+
+  // Foreground FCM handler — gdy apka jest otwarta FCM nie pokazuje powiadomienia,
+  // musimy to zrobić ręcznie
+  useEffect(() => {
+    try {
+      const unsub = onForegroundMessage((payload) => {
+        if (Notification.permission === "granted") {
+          new Notification(payload.notification?.title || "™FAM™", {
+            body: payload.notification?.body || "",
+            icon: "/logo192.png",
+            badge: "/logo192.png",
+          });
+        }
+      });
+      return () => unsub();
+    } catch(e) { /* messaging niedostępny (np. Safari) */ }
   }, []);
   const [wynik, setWynik] = useState(null);
   const [trybWymiany, setTrybWymiany] = useState("priorytet");
@@ -845,179 +859,6 @@ function App() {
         </div>
       )}
 
-      {/* ══ EASTER EGG — SEKRETNY PANEL ™FAM™ ══ */}
-      {easterEgg&&(()=>{
-        const czlonkowie = dane?.czlonkowie||[];
-        const aktywna = dane?.aktywnaWymiana;
-        const potwierdzone = aktywna?.potwierdzone||{};
-        const wymiany = aktywna?.wymiany||[];
-
-        // Hall of Shame — kto nie potwierdził aktywnej wymiany
-        const nadawcy = [...new Set(wymiany.map(w=>w.od))];
-        const niepotwierdzeni = nadawcy.filter(n=>!Object.keys(potwierdzone).some(k=>normalizuj(k)===normalizuj(n)&&potwierdzone[k]));
-
-        // Losowy "ranking leniwych" (hardcoded dramatyzm)
-        const KOMENTARZE_LENISTWO = [
-          "Legenda bezczelności 🏆", "Zawodowy ignorant 🎖️", "Rekord wszechczasów ⚡",
-          "Mistrz zwlekania 🥇", "Niepokonany w nicnierobieniu 💀", "Speedrun w odwrotnym kierunku 🐢",
-        ];
-        const UKRYTE_OSIAGNIECIA = [
-          {ikona:"🐢", nazwa:"Żółw Gangu", opis:"Potwierdź wymianę po tygodniu od wysłania karty"},
-          {ikona:"👻", nazwa:"Duch FAM", opis:"Nie loguj się przez 14 dni podczas aktywnej wymiany"},
-          {ikona:"🧊", nazwa:"Zimna krew", opis:"Wyślij kartę do kogoś kto nigdy Ci nie podziękował"},
-          {ikona:"🎭", nazwa:"MetaFAMowy", opis:"Otwórz tę zakładkę 3 razy w ciągu godziny"},
-          {ikona:"🔮", nazwa:"Wróżbita Bangmasty", opis:"Wygeneruj wymianę w której sam dostaniesz kartę"},
-          {ikona:"🍕", nazwa:"Joker z Lidla", opis:"Potwierdź wymianę między 23:00 a 4:00 w nocy"},
-          {ikona:"🦁", nazwa:"Leonidas Mode", opis:"Bądź na kręgu 3 i nadal marudzić że za mało ammo"},
-          {ikona:"💜", nazwa:"SaMaNtA Approved", opis:"Zamknij talię bez ani jednego duplikatu do dania"},
-          {ikona:"🇪🇸", nazwa:"Fallven Vibes", opis:"Analizuj wymianę dłużej niż algorytm ją generował"},
-          {ikona:"🏴‍☠️", nazwa:"Dezerter", opis:"Wyjdź z gangu i wróć w tej samej randze (patrz: Bastek)"},
-          {ikona:"🧮", nazwa:"Tatuś Krypto", opis:"Sprawdź kalkulator eventu trzy razy z rzędu bez zapisania"},
-          {ikona:"😤", nazwa:"Krime Silence", opis:"Bądź w gangu miesiąc i nie napisać ani słowa na chacie"},
-          {ikona:"🏋️", nazwa:"Kickboxer Meta", opis:"Wyślij kartę przed potrzebującym w ciągu 1 minuty od wymiany"},
-          {ikona:"🛒", nazwa:"Bodek Deals", opis:"Wymień kartę wartą 10x więcej niż ta którą dostałeś"},
-          {ikona:"🌸", nazwa:"Kasia Obserwuje", opis:"Sprawdź zakładkę DANE 20 razy bez edytowania niczego"},
-        ];
-
-        const LORE = [
-          {era:"Epoka Założycieli", kolor:"#ffd700", tekst:"Domcia i Devil stworzyli FAMILY. Domcia z wizją, Devil z ambicją. Razem wygrywali. Razem odeszli. Różne drogi, ta sama legenda."},
-          {era:"Wielka Schizma", kolor:"#f55", tekst:"Devil i Marysia zakładają AnyFam z obrazy. ™FAM™ zostaje z Bangmastą. Gang się podzielił, ammo nie."},
-          {era:"Era Krystka i Domci", kolor:"#87CEEB", tekst:"Krystek — wierny jak pies, teraz w Anglii z Domcią. Piją herbatę, wspominają glory days. Kart nie wysyłają. Przynajmniej jest o czym gadać."},
-          {era:"Powrót Bastka", kolor:"#0c6", tekst:"Bastek wyszedł. Bastek wrócił. Bastek jest jak Wi-Fi w bloku — zawsze znajdzie drogę do domu. AnyFam tego nie rozumie."},
-          {era:"BUBU — Zagadka Sezonu", kolor:"#da70d6", tekst:"BUBU wrócił cicho, bez fanfar. Jakby nigdy nie wychodził. Gang przyjął z otwartymi ramionami i zamkniętymi pytaniami."},
-          {era:"Dziś: ™FAM™ Silniejsza Niż Kiedykolwiek", kolor:"#0c6", tekst:"Bangmasta na kręgu lider. SaMaNtA otwiera zęby i talie. Leonidas na kręgu 3, nadal marudzi. Fallven analizuje. Joker kasuje w Lidlu. To jest FAMILY."},
-        ];
-
-        return (
-          <div style={{
-            position:"fixed",inset:0,zIndex:9999,
-            background:"rgba(0,0,0,0.97)",
-            overflowY:"auto",
-            padding:20,
-            animation:"fadeIn 0.3s ease",
-          }}>
-            <style>{`@keyframes fadeIn{from{opacity:0;transform:scale(0.97)}to{opacity:1;transform:scale(1)}} @keyframes glow{0%,100%{text-shadow:0 0 10px #ffd700,0 0 20px #ffd700}50%{text-shadow:0 0 20px #ffd700,0 0 40px #fff8dc,0 0 60px #ffd700}}`}</style>
-
-            {/* Nagłówek */}
-            <div style={{textAlign:"center",marginBottom:28}}>
-              <div style={{fontSize:36,marginBottom:6}}>🔐</div>
-              <div style={{
-                fontSize:22,fontWeight:"bold",letterSpacing:4,
-                background:"linear-gradient(90deg,#ffd700,#fff8dc,#ffd700)",
-                WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
-                animation:"glow 2s infinite",
-              }}>SEKRETNY PANEL ™FAM™</div>
-              <div style={{fontSize:11,color:"#555",marginTop:4}}>Znałeś kod. Znasz prawdę.</div>
-              <button onClick={()=>setEasterEgg(false)} style={{
-                marginTop:16,padding:"8px 24px",borderRadius:20,
-                background:"rgba(255,50,50,0.15)",border:"1px solid #f554",
-                color:"#f55",cursor:"pointer",fontSize:12,
-              }}>✕ Zamknij i zapomnij że tu byłeś</button>
-            </div>
-
-            {/* HALL OF SHAME */}
-            <div style={{background:"rgba(255,50,50,0.06)",border:"1px solid #f5544433",borderRadius:12,padding:16,marginBottom:16}}>
-              <div style={{fontSize:14,fontWeight:"bold",color:"#f55",marginBottom:12}}>🏛️ Hall of Shame — Aktualna Edycja</div>
-              {!aktywna ? (
-                <div style={{fontSize:12,color:"#555",fontStyle:"italic"}}>Brak aktywnej wymiany — wszyscy tymczasowo niewinni.</div>
-              ) : niepotwierdzeni.length === 0 ? (
-                <div style={{fontSize:12,color:"#0c6"}}>✅ Wszyscy potwierdzili. Cud. Zapisujemy datę.</div>
-              ) : (
-                <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                  {niepotwierdzeni.map((nick,i)=>(
-                    <div key={nick} style={{
-                      background:"rgba(255,50,50,0.1)",border:"1px solid #f5544455",
-                      borderRadius:8,padding:"8px 12px",minWidth:140,
-                    }}>
-                      <div style={{fontSize:13,fontWeight:"bold",color:"#f88",marginBottom:2}}>💀 {nick}</div>
-                      <div style={{fontSize:10,color:"#f554"}}>{KOMENTARZE_LENISTWO[i % KOMENTARZE_LENISTWO.length]}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* UKRYTE OSIĄGNIĘCIA */}
-            <div style={{background:"rgba(255,215,0,0.05)",border:"1px solid #b8860b44",borderRadius:12,padding:16,marginBottom:16}}>
-              <div style={{fontSize:14,fontWeight:"bold",color:"var(--accent)",marginBottom:12}}>🏆 Ukryte Osiągnięcia (nikt ich nie odblokował)</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
-                {UKRYTE_OSIAGNIECIA.map((o,i)=>(
-                  <div key={i} style={{
-                    background:"rgba(0,0,0,0.3)",border:"1px solid #b8860b22",
-                    borderRadius:8,padding:"10px 12px",
-                    opacity:0.7,
-                  }}>
-                    <div style={{fontSize:20,marginBottom:4}}>{o.ikona}</div>
-                    <div style={{fontSize:12,fontWeight:"bold",color:"var(--accent)",marginBottom:2}}>{o.nazwa}</div>
-                    <div style={{fontSize:10,color:"#555",fontStyle:"italic"}}>{o.opis}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* LORE GANGU */}
-            <div style={{background:"rgba(138,43,226,0.06)",border:"1px solid #8a2be244",borderRadius:12,padding:16,marginBottom:16}}>
-              <div style={{fontSize:14,fontWeight:"bold",color:"#da70d6",marginBottom:12}}>📜 Kronika ™FAM™ — Prawdziwa Historia</div>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                {LORE.map((l,i)=>(
-                  <div key={i} style={{
-                    borderLeft:`3px solid ${l.kolor}`,paddingLeft:12,
-                  }}>
-                    <div style={{fontSize:11,fontWeight:"bold",color:l.kolor,marginBottom:3,letterSpacing:1}}>{l.era.toUpperCase()}</div>
-                    <div style={{fontSize:12,color:"#aaa",lineHeight:1.6}}>{l.tekst}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* STATYSTYKI ABSURDU */}
-            <div style={{background:"rgba(0,200,100,0.05)",border:"1px solid #0c6333",borderRadius:12,padding:16,marginBottom:16}}>
-              <div style={{fontSize:14,fontWeight:"bold",color:"#0c6",marginBottom:12}}>📊 Statystyki Których Nikt Nie Prosił</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:8}}>
-                {[
-                  {v: dane?.posiadane ? Object.keys(dane.posiadane).length : 0, label:"kliknięć w karty (łącznie)", ikona:"🖱️"},
-                  {v: dane?.duplikaty ? Object.keys(dane.duplikaty).length : 0, label:"duplikatów czekających na właściciela", ikona:"💎"},
-                  {v: czlonkowie.length, label:"dusz w FAMILY", ikona:"👥"},
-                  {v: dane?.talie ? dane.talie.reduce((s,t)=>s+t.karty.length,0) : 0, label:"kart w obiegu", ikona:"🃏"},
-                  {v: aktywna ? nadawcy.length : 0, label:"nadawców w tej wymianie", ikona:"📤"},
-                  {v: aktywna ? Object.values(potwierdzone).filter(Boolean).length : 0, label:"potwierdzeń (nie licząc leniwych)", ikona:"✅"},
-                ].map((s,i)=>(
-                  <div key={i} style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 12px",textAlign:"center"}}>
-                    <div style={{fontSize:22}}>{s.ikona}</div>
-                    <div style={{fontSize:20,fontWeight:"bold",color:"#0c6"}}>{s.v}</div>
-                    <div style={{fontSize:10,color:"#555",marginTop:2}}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* PRAWDZIWE ZASADY FAM */}
-            <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid #333",borderRadius:12,padding:16,marginBottom:16}}>
-              <div style={{fontSize:14,fontWeight:"bold",color:"#aaa",marginBottom:12}}>📋 Prawdziwy Kodeks ™FAM™ (wersja uncensored)</div>
-              {[
-                "§1 — Karta wysłana to karta zapomniana. Dopóki nie potwierdzisz.",
-                "§2 — Algorytm zawsze ma rację. Nawet gdy się mylisz w tym co masz zaznaczone.",
-                "§3 — SaMaNtA mówi 'otwórz szerzej' i nie wiadomo o co chodzi. Najlepiej zrobić obie rzeczy.",
-                "§4 — Leonidas na kręgu 3 i nadal narzeka. Szanuj tradycję.",
-                "§5 — Joker potwierdza z kasy w Lidlu. Ty nie masz wymówki.",
-                "§6 — Krystek i Domcia są w Anglii. Ich karty są w niebie. Amen.",
-                "§7 — Bastek wrócił. Zawsze wróci. To prawo natury.",
-                "§8 — Fallven analizuje dłużej niż algorytm. To też jest strategia.",
-                "§9 — Krime milczy. Krime wie. Krime ocenia.",
-                "§10 — Bangmasta widzi wszystko. Łącznie z tym że czytasz ten panel.",
-              ].map((p,i)=>(
-                <div key={i} style={{fontSize:11,color:"#555",padding:"5px 0",borderBottom:"1px solid #1a1a1a",fontStyle:"italic"}}>{p}</div>
-              ))}
-            </div>
-
-            <div style={{textAlign:"center",padding:"20px 0",fontSize:11,color:"#333",fontStyle:"italic"}}>
-              Ten panel nie istnieje. Nigdy tu nie byłeś. ™FAM™ 🔐
-            </div>
-          </div>
-        );
-      })()}
-      {/* ══ KONIEC EASTER EGG ══ */}
-
       <div style={{
         background:"rgba(0,0,0,0.95)",
         padding:"12px 16px",
@@ -1028,25 +869,11 @@ function App() {
         willChange:"transform",
       }}>
         <div>
-          <div
-            onClick={()=>{
-              const nowyKlik = logoKlik + 1;
-              setLogoKlik(nowyKlik);
-              if (logoKlikTimer) clearTimeout(logoKlikTimer);
-              if (nowyKlik >= 3) {
-                setLogoKlik(0);
-                setEasterEgg(true);
-              } else {
-                const t = setTimeout(() => setLogoKlik(0), 1000);
-                setLogoKlikTimer(t);
-              }
-            }}
-            style={{
+          <div style={{
             fontSize:18,fontWeight:"bold",letterSpacing:3,
             background:"linear-gradient(90deg,#ffd700,#fff8dc,#ffd700)",
             WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
-            cursor:"default",userSelect:"none",
-          }}>⚔ FAMILY — MENADŻER{logoKlik>0&&<span style={{fontSize:10,WebkitTextFillColor:"#b8860b",opacity:0.5,marginLeft:4}}>{"·".repeat(logoKlik)}</span>}</div>
+          }}>⚔ FAMILY — MENADŻER</div>
           <div style={{fontSize:11,color:"var(--muted)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:2}}>
             <span><span style={{color:"var(--accent)"}}>{zalogowany.login}</span> <span style={{color:"var(--muted)"}}>({zalogowany.rola})</span></span>
             {statusZapisu && <span style={{color:statusZapisu.includes("✓")?"#0c6":statusZapisu.includes("❌")?"#f55":"#fa0"}}>{statusZapisu}</span>}
@@ -6022,11 +5849,16 @@ function PowiadomieniaPush({ zalogowany, isAdmin, historiaPush }) {
   const [sendResult, setSendResult] = useState(null);
 
   useEffect(() => {
-    if ("Notification" in window) {
-      if (Notification.permission === "granted") setStatus("granted");
-      else if (Notification.permission === "denied") setStatus("denied");
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "denied") { setStatus("denied"); return; }
+    if (Notification.permission === "granted") {
+      // Pozwolenie już jest — zarejestruj token automatycznie (może być nowy SW)
+      setStatus("requesting");
+      registerFCMToken(zalogowany?.login || "unknown")
+        .then(token => setStatus(token ? "granted" : "error"))
+        .catch(() => setStatus("error"));
     }
-  }, []);
+  }, [zalogowany]);
 
   const wlaczPowiadomienia = async () => {
     if (!("Notification" in window)) { setStatus("denied"); return; }
