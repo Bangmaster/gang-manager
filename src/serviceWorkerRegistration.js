@@ -1,4 +1,5 @@
-// Rejestracja Service Workera dla PWA
+// Rejestracja Service Workera — używamy firebase-messaging-sw.js
+// który obsługuje zarówno FCM push notyfikacje jak i PWA cache
 
 const isLocalhost = Boolean(
   window.location.hostname === "localhost" ||
@@ -6,18 +7,20 @@ const isLocalhost = Boolean(
   window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
 );
 
-export function register() {
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`;
+// Używamy FCM SW zamiast domyślnego CRA SW
+// Dzięki temu FCM token jest przypisany do właściwego SW
+const SW_URL = "/firebase-messaging-sw.js";
 
-      if (isLocalhost) {
-        checkValidServiceWorker(swUrl);
-      } else {
-        registerValidSW(swUrl);
-      }
-    });
-  }
+export function register() {
+  if (!("serviceWorker" in navigator)) return;
+
+  window.addEventListener("load", () => {
+    if (isLocalhost) {
+      checkValidServiceWorker(SW_URL);
+    } else {
+      registerValidSW(SW_URL);
+    }
+  });
 }
 
 function registerValidSW(swUrl) {
