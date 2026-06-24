@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -28,6 +28,21 @@ export function getMessagingInstance() {
 const VAPID_KEY = "BLF-0G9vBBjxVGimdfVxpBbEfnKME4uEQOc-m7seb5iTH2X3rQNcvE91aU89iudXAk_4u2V2zQW-YtYpXHpf_48";
 
 // Rejestruj token FCM dla tego urządzenia i zapisz do Firestore
+// Pomocnicza funkcja do zapisu logów FCM do Firestore (diagnostyka)
+async function zapiszLogFCM(nick, zdarzenie, dane = {}) {
+  try {
+    const logiCol = collection(db, "fcm_logi");
+    await addDoc(logiCol, {
+      nick: nick || "nieznany",
+      zdarzenie,
+      dane,
+      timestamp: Date.now(),
+      userAgent: navigator.userAgent,
+      platforma: /Android|iPhone|iPad/i.test(navigator.userAgent) ? "mobile" : "desktop",
+    });
+  } catch(e) { /* nie blokuj głównej logiki jeśli log się nie zapisze */ }
+}
+
 export async function registerFCMToken(nick) {
   try {
     // Sprawdź VAPID key
@@ -37,16 +52,30 @@ export async function registerFCMToken(nick) {
     }
 
     const messaging = getMessagingInstance();
-    if (!messaging) throw new Error("Messaging niedostępny");
+    if (!messaging) {
+      await zapiszLogFCM(nick, "BŁĄD_MESSAGING_NIEDOSTĘPNY");
+      throw new Error("Messaging niedostępny");
+    }
 
     // Sprawdź pozwolenie
     const permission = await Notification.requestPermission();
+    await zapiszLogFCM(nick, "PERMISSION", { permission });
     if (permission !== "granted") return null;
 
     // Zarejestruj FCM service worker i przypnij token do tej konkretnej rejestracji
     // (NIE używamy navigator.serviceWorker.ready — może zwrócić domyślny CRA SW!)
-    if (!("serviceWorker" in navigator)) throw new Error("Service Worker niedostępny");
+    if (!("serviceWorker" in navigator)) {
+      await zapiszLogFCM(nick, "BŁĄD_BRAK_SW");
+      throw new Error("Service Worker niedostępny");
+    }
     const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    await zapiszLogFCM(nick, "SW_ZAREJESTROWANY", {
+      scope: swReg.scope,
+      active: !!swReg.active,
+      installing: !!swReg.installing,
+      waiting: !!swReg.waiting,
+    });
+
     // Poczekaj aż SW będzie aktywny
     await new Promise(resolve => {
       if (swReg.active) { resolve(); return; }
@@ -61,12 +90,19 @@ export async function registerFCMToken(nick) {
       setTimeout(resolve, 3000); // safety timeout
     });
 
+    await zapiszLogFCM(nick, "SW_AKTYWNY", { activeScriptURL: swReg.active?.scriptURL });
+
     // Pobierz token przypisany do FCM SW (nie CRA SW)
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: swReg,
     });
-    if (!token) throw new Error("Nie udało się pobrać tokenu FCM");
+    if (!token) {
+      await zapiszLogFCM(nick, "BŁĄD_BRAK_TOKENU");
+      throw new Error("Nie udało się pobrać tokenu FCM");
+    }
+
+    await zapiszLogFCM(nick, "TOKEN_POBRANY", { tokenPrefix: token.substring(0, 20) + "..." });
 
     // Zapisz token w Firestore
     const tokenDoc = doc(db, "fcm_tokens", nick.replace(/[^a-zA-Z0-9]/g, "_"));
@@ -77,8 +113,10 @@ export async function registerFCMToken(nick) {
       userAgent: navigator.userAgent,
     });
 
+    await zapiszLogFCM(nick, "REJESTRACJA_OK");
     return token;
   } catch(e) {
+    await zapiszLogFCM(nick, "BŁĄD_REJESTRACJI", { error: e.message });
     console.error("Błąd rejestracji FCM:", e.message);
     throw e;
   }
