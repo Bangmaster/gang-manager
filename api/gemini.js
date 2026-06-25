@@ -45,9 +45,12 @@ export default async function handler(req, res) {
   try {
     const { prompt, base64, mimeType, fileUri, kluczIdx = 0 } = req.body;
 
-    if (!prompt || (!base64 && !fileUri) || (!mimeType && !fileUri)) {
-      return res.status(400).json({ error: "Brak wymaganych pól: prompt + (base64+mimeType lub fileUri)" });
+    if (!prompt) {
+      return res.status(400).json({ error: "Brak wymaganych pól: prompt" });
     }
+
+    // Tryb tekstowy — bez obrazka/wideo (np. generator ogłoszeń)
+    const trybTekstowy = !base64 && !fileUri;
 
     const klucz = pobierzKlucz(kluczIdx);
     if (!klucz) {
@@ -56,20 +59,22 @@ export default async function handler(req, res) {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${klucz}`;
 
-    // Buduj part z media — albo inline base64 (obrazki) albo fileUri (wideo)
-    const mediaPart = fileUri
-      ? { file_data: { mime_type: mimeType || "video/mp4", file_uri: fileUri } }
-      : { inline_data: { mime_type: mimeType, data: base64 } };
+    // Buduj parts — sam tekst lub tekst + media
+    const parts = trybTekstowy
+      ? [{ text: prompt }]
+      : [
+          { text: prompt },
+          fileUri
+            ? { file_data: { mime_type: mimeType || "video/mp4", file_uri: fileUri } }
+            : { inline_data: { mime_type: mimeType, data: base64 } }
+        ];
 
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{
-          parts: [
-            { text: prompt },
-            mediaPart
-          ]
+          parts
         }],
         generationConfig: { temperature: 0, maxOutputTokens: 8192 }
       })
