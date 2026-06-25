@@ -5991,18 +5991,16 @@ Zasady:
 - Możesz użyć charakterystycznych zwrotów gangu jak "Bracia", "FAM", "™FAM™"
 - Nie pisz nic poza samym ogłoszeniem (bez "Oto ogłoszenie:" itp.)`;
 
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
-      const tekst = data.content?.map(c => c.text || "").join("") || "";
-      setWynik(tekst.trim());
+      if (!res.ok) throw new Error(data.error || "Błąd serwera");
+      const tekst = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      if (!tekst) throw new Error("Pusta odpowiedź");
+      setWynik(tekst);
     } catch(e) {
       setWynik("❌ Błąd generowania. Spróbuj ponownie.");
     }
