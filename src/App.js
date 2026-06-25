@@ -5941,13 +5941,169 @@ function PowiadomieniaPush({ zalogowany, isAdmin, historiaPush }) {
           )}
         </div>
       )}
+
+      {isAdmin && <GeneratorOgloszen/>}
     </div>
   );
 }
 
-
 // ============================================================
-// OSIĄGNIĘCIA
+// GENERATOR OGŁOSZEŃ AI
+// ============================================================
+const TEMATY_OGLOSZEN = [
+  { id:"wymiana",    emoji:"🔄", label:"Aktywna wymiana",      opis:"Nowa wymiana jest gotowa, sprawdźcie rozpiskę w apce" },
+  { id:"ammo",       emoji:"📊", label:"Prośba o stan ammo",   opis:"Poproś członków o aktualizację stanu kart w apce" },
+  { id:"event",      emoji:"⚔️",  label:"Nadchodzący event",    opis:"Informacja o nadchodzącym evencie/wojnie w grze" },
+  { id:"karty",      emoji:"🃏", label:"Nowe karty w sezonie", opis:"Nowe karty w sezonie, aktualizujcie dane w apce" },
+  { id:"przypomnienie", emoji:"⏰", label:"Przypomnienie",     opis:"Ogólne przypomnienie dla członków gangu" },
+  { id:"gratulacje", emoji:"🏆", label:"Gratulacje",           opis:"Pochwal kogoś za wynik lub zamknięcie talii" },
+  { id:"inne",       emoji:"📝", label:"Inne",                 opis:"Własny temat — opisz co chcesz ogłosić" },
+];
+
+function GeneratorOgloszen() {
+  const [temat, setTemat]       = useState(null);
+  const [opis, setOpis]         = useState("");
+  const [wynik, setWynik]       = useState("");
+  const [ladowanie, setLadowanie] = useState(false);
+  const [skopiowano, setSkopiowano] = useState(false);
+
+  const generuj = async () => {
+    if (!temat) return;
+    setLadowanie(true);
+    setWynik("");
+    setSkopiowano(false);
+    try {
+      const tematObj = TEMATY_OGLOSZEN.find(t => t.id === temat);
+      const prompt = `Jesteś administratorem gangu ™FAM™ w grze mobilnej "The Gang: Street Mafia Wars". 
+Musisz napisać ogłoszenie na grupę Messenger dla ~20 członków gangu.
+
+Temat ogłoszenia: ${tematObj?.label}
+${opis ? `Dodatkowe informacje od admina: ${opis}` : `Kontekst: ${tematObj?.opis}`}
+
+Link do apki Gang Managera: https://gang-manager-beta.vercel.app
+
+Zasady:
+- Pisz po polsku, w stylu gangsterskim ale przyjaznym
+- Użyj emoji żeby było czytelne
+- Maksymalnie 6-8 linijek
+- Na końcu daj link do apki jeśli pasuje do tematu
+- Bądź konkretny i na temat
+- Możesz użyć charakterystycznych zwrotów gangu jak "Bracia", "FAM", "™FAM™"
+- Nie pisz nic poza samym ogłoszeniem (bez "Oto ogłoszenie:" itp.)`;
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      const tekst = data.content?.map(c => c.text || "").join("") || "";
+      setWynik(tekst.trim());
+    } catch(e) {
+      setWynik("❌ Błąd generowania. Spróbuj ponownie.");
+    }
+    setLadowanie(false);
+  };
+
+  const kopiuj = () => {
+    navigator.clipboard.writeText(wynik).then(() => {
+      setSkopiowano(true);
+      setTimeout(() => setSkopiowano(false), 2000);
+    });
+  };
+
+  return (
+    <div style={{marginTop:16,background:"rgba(0,0,0,0.3)",border:"1px solid var(--border)",borderRadius:10,padding:14}}>
+      <div style={{fontWeight:"bold",color:"var(--accent)",fontSize:14,marginBottom:12}}>
+        ✍️ Generator ogłoszeń AI
+      </div>
+
+      {/* Wybór tematu */}
+      <div style={{fontSize:11,color:"var(--muted)",marginBottom:8}}>Wybierz temat:</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+        {TEMATY_OGLOSZEN.map(t => (
+          <button key={t.id} onClick={() => { setTemat(t.id); setWynik(""); }}
+            style={{
+              padding:"6px 12px",borderRadius:8,fontSize:12,cursor:"pointer",
+              background: temat===t.id ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.04)",
+              border: temat===t.id ? "1px solid var(--accent)" : "1px solid var(--border)",
+              color: temat===t.id ? "var(--accent)" : "var(--text)",
+              fontWeight: temat===t.id ? "bold" : "normal",
+            }}>
+            {t.emoji} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Opcjonalny opis */}
+      {temat && (
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>
+            Dodaj szczegóły <span style={{color:"#555"}}>(opcjonalnie)</span>:
+          </div>
+          <textarea
+            value={opis}
+            onChange={e => setOpis(e.target.value)}
+            placeholder={TEMATY_OGLOSZEN.find(t=>t.id===temat)?.opis || "Opisz co chcesz ogłosić..."}
+            rows={2}
+            style={{
+              width:"100%",boxSizing:"border-box",
+              background:"rgba(0,0,0,0.3)",border:"1px solid var(--border)",
+              borderRadius:8,padding:"8px 10px",color:"var(--text)",
+              fontSize:12,resize:"none",fontFamily:"inherit",
+            }}
+          />
+        </div>
+      )}
+
+      {/* Przycisk generuj */}
+      {temat && (
+        <button onClick={generuj} disabled={ladowanie} style={{
+          width:"100%",padding:"10px",borderRadius:8,fontSize:13,
+          fontWeight:"bold",cursor:ladowanie?"wait":"pointer",
+          background: ladowanie ? "rgba(255,215,0,0.08)" : "rgba(255,215,0,0.15)",
+          border:"1px solid var(--accent)",color:"var(--accent)",
+          marginBottom:12,
+        }}>
+          {ladowanie ? "⏳ Generuję ogłoszenie..." : "✨ Generuj ogłoszenie"}
+        </button>
+      )}
+
+      {/* Wynik */}
+      {wynik && (
+        <div>
+          <div style={{
+            background:"rgba(0,0,0,0.4)",border:"1px solid var(--border)",
+            borderRadius:8,padding:12,fontSize:13,color:"var(--text)",
+            whiteSpace:"pre-wrap",lineHeight:1.6,marginBottom:8,fontFamily:"inherit",
+          }}>
+            {wynik}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={kopiuj} style={{
+              flex:1,padding:"8px",borderRadius:8,fontSize:12,fontWeight:"bold",cursor:"pointer",
+              background: skopiowano?"rgba(0,200,100,0.2)":"rgba(255,215,0,0.12)",
+              border:`1px solid ${skopiowano?"#0c6":"var(--accent)"}`,
+              color: skopiowano?"#0c6":"var(--accent)",
+            }}>
+              {skopiowano ? "✓ Skopiowano!" : "📋 Kopiuj"}
+            </button>
+            <button onClick={generuj} disabled={ladowanie} style={{
+              flex:1,padding:"8px",borderRadius:8,fontSize:12,cursor:"pointer",
+              background:"rgba(255,255,255,0.04)",border:"1px solid var(--border)",color:"var(--muted)",
+            }}>
+              🔄 Generuj ponownie
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ============================================================
 const OSIAGNIECIA_DEF=[
   {id:"kolekcjoner",ikona:"🏆",nazwa:"Kolekcjoner",opis:"Zamknij 5 talii",check:(s)=>s.zamkniete>=5},
