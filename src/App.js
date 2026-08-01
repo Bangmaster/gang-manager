@@ -993,7 +993,11 @@ function App() {
           </div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>setTypWymiany(t=>t==="złote"?"diamentowe":t==="diamentowe"?"event":"złote")} style={{
+          <button onClick={()=>setTypWymiany(t=>{
+            const nowy = t==="złote"?"diamentowe":t==="diamentowe"?"event":"złote";
+            if(nowy==="event" && trybWymiany==="progi") setTrybWymiany("priorytet");
+            return nowy;
+          })} style={{
             padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:"bold",cursor:"pointer",border:"none",
             background:typWymiany==="złote"?"linear-gradient(135deg,#b8860b,#ffd700)":typWymiany==="diamentowe"?"linear-gradient(135deg,#1a3a8f,#87CEEB)":"linear-gradient(135deg,#1a6b3a,#00e676)",
             color:typWymiany==="złote"?"#000":"#fff",
@@ -1827,10 +1831,18 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
   const oppTyp=typWymiany==="złote"?"diamentowa":isEvent?null:"złota";
 
   // Oblicz progi dla każdej osoby
+  // W EVENCIE progi celowo NIE są brane pod uwagę przy generowaniu rozpiski —
+  // zwracamy neutralny obiekt (brak "następnego progu"), co automatycznie wyłącza
+  // bonus za zbliżanie się do progu, sortowanie po progu i tryb "Dobij progi".
+  // Tryb zwykły (złote/diamentowe) działa bez zmian.
   const progiOsob={};
   czlonkowie.forEach(osoba=>{
-    const liczba=liczKartyOsoby(osoba.id,talie,posiadane);
-    progiOsob[osoba.id]=isEvent?obliczProgEvent(liczba):obliczProg(liczba);
+    if(isEvent){
+      progiOsob[osoba.id]={obecna:0,nastepnyProg:null,brakujeDoProg:0,ostatniProg:null,ammoProg:0};
+    } else {
+      const liczba=liczKartyOsoby(osoba.id,talie,posiadane);
+      progiOsob[osoba.id]=obliczProg(liczba);
+    }
   });
 
   // Oblicz efektywną nagrodę: nagroda talii + ewentualna nagroda za próg
@@ -2954,7 +2966,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           {id:"wylacz110",label:"🚫 Wyłącz 110-120"},
           {id:"krag79",label:"7️⃣ Tryb 7-9"},
           {id:"paczki_diament",label:"📦 Paczki nowych diamentowych"},
-        ].map(t=>(
+        ].filter(t=>!(t.id==="progi"&&typWymiany==="event")).map(t=>(
           <button key={t.id} onClick={()=>setTrybWymiany(t.id)} style={{
             padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:12,
             background:trybWymiany===t.id?"rgba(255,215,0,0.14)":"var(--card)",
