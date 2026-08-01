@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, startTransition } from "re
 
 import { createPortal } from "react-dom";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, subscribePowiadomienia } from "./firebase"; // eslint-disable-line no-unused-vars
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, subscribeTaktyka, zapiszTaktyke, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, subscribePowiadomienia, loadEventData, saveEventData, setEventCardField, setEventStructure, subscribeEventData } from "./firebase"; // eslint-disable-line no-unused-vars
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -138,6 +138,16 @@ const PROGI = [
   {prog:135, ammo:2000}, // KOMPLET — wszystkie karty
 ];
 
+const PROGI_EVENT = [
+  {prog:5,  ammo:100},
+  {prog:15, ammo:250},
+  {prog:25, ammo:500},
+  {prog:35, ammo:0},
+  {prog:45, ammo:0},
+  {prog:55, ammo:2000},
+  {prog:63, ammo:0, komplet:true}, // KOMPLET — nowy diament
+];
+
 // Liczy unikalne posiadane karty osoby (bez duplikatów)
 function liczKartyOsoby(osobaId, talie, posiadane) {
   let count=0;
@@ -153,6 +163,18 @@ function liczKartyOsoby(osobaId, talie, posiadane) {
 function obliczProg(obecnaLiczba) {
   const nastepny = PROGI.find(p => p.prog > obecnaLiczba);
   const ostatni = [...PROGI].reverse().find(p => p.prog <= obecnaLiczba);
+  return {
+    obecna: obecnaLiczba,
+    nastepnyProg: nastepny || null,
+    brakujeDoProg: nastepny ? nastepny.prog - obecnaLiczba : 0,
+    ostatniProg: ostatni || null,
+    ammoProg: nastepny ? nastepny.ammo : 0,
+  };
+}
+
+function obliczProgEvent(obecnaLiczba) {
+  const nastepny = PROGI_EVENT.find(p => p.prog > obecnaLiczba);
+  const ostatni = [...PROGI_EVENT].reverse().find(p => p.prog <= obecnaLiczba);
   return {
     obecna: obecnaLiczba,
     nastepnyProg: nastepny || null,
@@ -586,6 +608,24 @@ function App() {
   const [typWymiany, setTypWymiany] = useState("złote");
   const [historiaWymian, setHistoriaWymian] = useState([]);
 
+  // === DANE EVENTOWE ===
+  const [daneEvent, setDaneEvent] = useState(null);
+
+  useEffect(() => {
+    let unsub = null;
+    (async () => {
+      try {
+        const start = await loadEventData();
+        if (start) setDaneEvent(start);
+        else setDaneEvent({ talieEvent: [], posiadaneEvent: {}, duplikatyEvent: {} });
+      } catch(e) { setDaneEvent({ talieEvent: [], posiadaneEvent: {}, duplikatyEvent: {} }); }
+      unsub = subscribeEventData((d) => {
+        if (d) startTransition(() => setDaneEvent(d));
+      });
+    })();
+    return () => { if (unsub) unsub(); };
+  }, []);
+
   useEffect(() => {
     const unsub = subscribeHistoria(d => startTransition(() => setHistoriaWymian(d)));
     return () => unsub();
@@ -762,6 +802,22 @@ function App() {
     setTimeout(() => setStatusZapisu(""), 1200);
   };
 
+  // Zapis kart eventowych
+  const zapiszKarteEvent = async (typ, key, value) => {
+    setStatusZapisu("⏳ Zapisywanie...");
+    const ok = await setEventCardField(typ, key, value);
+    setStatusZapisu(ok ? "✓ Zapisano" : "❌ Błąd");
+    setTimeout(() => setStatusZapisu(""), 1200);
+  };
+
+  // Zapis struktury eventowej (talieEvent)
+  const zapiszStrukturEvent = async (pole, wartosc) => {
+    setStatusZapisu("⏳ Zapisywanie...");
+    const ok = await setEventStructure(pole, wartosc);
+    setStatusZapisu(ok ? "✓ Zapisano" : "❌ Błąd");
+    setTimeout(() => setStatusZapisu(""), 1200);
+  };
+
   // Zapis loginu
   useEffect(() => {
     try {
@@ -787,6 +843,14 @@ function App() {
   const posiadaneMemo = useMemo(() => dane?.posiadane || {}, [dane]);
   const duplikatyMemo = useMemo(() => dane?.duplikaty || {}, [dane]);
   const czlonkowieMemo = useMemo(() => dane?.czlonkowie || [], [dane]);
+
+  // Memoizuj dane eventowe
+  const talieEventSorted = useMemo(
+    () => daneEvent ? [...(daneEvent.talieEvent||[])].sort((a,b)=>(a.numer||99)-(b.numer||99)) : [],
+    [daneEvent]
+  );
+  const posiadaneEventMemo = useMemo(() => daneEvent?.posiadaneEvent || {}, [daneEvent]);
+  const duplikatyEventMemo = useMemo(() => daneEvent?.duplikatyEvent || {}, [daneEvent]);
 
   // Przełącz na rozpiskę przy pierwszym załadowaniu jeśli jest aktywna wymiana
   useEffect(()=>{
@@ -814,6 +878,7 @@ function App() {
       {id:"wynik",label:"⚡ Generuj"},
       {id:"ocr",label:"📸 OCR talii"},
       {id:"edycja",label:"⚙️ Talie"},
+      {id:"edycja_event",label:"🎉 Talie EVENT"},
       {id:"czlonkowie",label:"👥 Członkowie"},
       {id:"testy",label:"🧪 TESTY"},
     ]:[]),
@@ -923,11 +988,11 @@ function App() {
           </div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>setTypWymiany(t=>t==="złote"?"diamentowe":"złote")} style={{
+          <button onClick={()=>setTypWymiany(t=>t==="złote"?"diamentowe":t==="diamentowe"?"event":"złote")} style={{
             padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:"bold",cursor:"pointer",border:"none",
-            background:typWymiany==="złote"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)",
+            background:typWymiany==="złote"?"linear-gradient(135deg,#b8860b,#ffd700)":typWymiany==="diamentowe"?"linear-gradient(135deg,#1a3a8f,#87CEEB)":"linear-gradient(135deg,#1a6b3a,#00e676)",
             color:typWymiany==="złote"?"#000":"#fff",
-          }}>{typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}</button>
+          }}>{typWymiany==="złote"?"⭐ ZŁOTE":typWymiany==="diamentowe"?"💎 DIAMENTOWE":"🎉 EVENT"}</button>
           <button onClick={()=>setZakładka("wyglad")} style={{
             padding:"5px 10px",
             background:zakładka==="wyglad"?`${motyw.accent}22`:"var(--card)",
@@ -972,9 +1037,13 @@ function App() {
       <div className="gang-main-content" style={{padding:14,maxWidth:900,margin:"0 auto"}}>
         {zakładka==="wyglad"&&<WygladView wyglad={wyglad} setWyglad={setWyglad} motyw={motyw}/>}
         {zakładka==="dane"&&<DaneView
-          talie={talieSorted} czlonkowie={czlonkowieMemo}
-          posiadane={posiadaneMemo} duplikaty={duplikatyMemo}
-          zalogowany={zalogowany} zapiszKarte={zapiszKarte}
+          talie={typWymiany==="event" ? talieEventSorted : talieSorted}
+          czlonkowie={czlonkowieMemo}
+          posiadane={typWymiany==="event" ? posiadaneEventMemo : posiadaneMemo}
+          duplikaty={typWymiany==="event" ? duplikatyEventMemo : duplikatyMemo}
+          zalogowany={zalogowany}
+          zapiszKarte={typWymiany==="event" ? zapiszKarteEvent : zapiszKarte}
+          trybEvent={typWymiany==="event"}
         />}
         {zakładka==="duplikaty"&&<DuplikatyView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
@@ -1002,8 +1071,10 @@ function App() {
         />}
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
         {zakładka==="wynik"&&isAdmin&&<WynikView
-          talie={talieSorted} czlonkowie={dane.czlonkowie}
-          posiadane={dane.posiadane||{}} duplikaty={dane.duplikaty||{}}
+          talie={typWymiany==="event" ? talieEventSorted : talieSorted}
+          czlonkowie={dane.czlonkowie}
+          posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
+          duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
           typWymiany={typWymiany} wynik={wynik} setWynik={setWynik}
           trybWymiany={trybWymiany} setTrybWymiany={setTrybWymiany}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
@@ -1013,6 +1084,10 @@ function App() {
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
+        />}
+        {zakładka==="edycja_event"&&isAdmin&&<EdycjaTaliiEvent
+          talieEvent={daneEvent?.talieEvent||[]}
+          zapisz={(noweTalie)=>zapiszStrukturEvent("talieEvent",noweTalie)}
         />}
         {zakładka==="ocr"&&isAdmin&&<OcrView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
@@ -1742,14 +1817,15 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
     if (!sprawiedliwe) return 0;
     return dlugOsob[nazwaosoby] || 0;
   };
-  const typ=typWymiany==="złote"?"złota":"diamentowa";
-  const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
+  const isEvent = typWymiany === "event";
+  const typ=typWymiany==="złote"?"złota":isEvent?"diamentowa":"diamentowa";
+  const oppTyp=typWymiany==="złote"?"diamentowa":isEvent?null:"złota";
 
   // Oblicz progi dla każdej osoby
   const progiOsob={};
   czlonkowie.forEach(osoba=>{
     const liczba=liczKartyOsoby(osoba.id,talie,posiadane);
-    progiOsob[osoba.id]=obliczProg(liczba);
+    progiOsob[osoba.id]=isEvent?obliczProgEvent(liczba):obliczProg(liczba);
   });
 
   // Oblicz efektywną nagrodę: nagroda talii + ewentualna nagroda za próg
@@ -2593,8 +2669,9 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
       if(!kPrzed&&kPo){
         // Sprawdź czy przy okazji przekroczy próg
         const liczbaPoWymianie=liczKartyOsoby(osoba.id,talie,symPos);
-        const progPrzed=obliczProg(liczKartyOsoby(osoba.id,talie,posiadane));
-        const progPo=obliczProg(liczbaPoWymianie);
+        const obliczProgFn = isEvent ? obliczProgEvent : obliczProg;
+        const progPrzed=obliczProgFn(liczKartyOsoby(osoba.id,talie,posiadane));
+        const progPo=obliczProgFn(liczbaPoWymianie);
         const nowyProg=progPo.ostatniProg?.prog > (progPrzed.ostatniProg?.prog||0);
         zamknieciaInfo.push({
           osoba:osoba.nazwa, talia:talia.nazwa, nagroda:pobierzNagrode(talia,osoba.krag),
@@ -2616,33 +2693,42 @@ function obliczFaze(brakT, brakO, typWymiany) {
 }
 
 function opisFazy(faza, typWymiany) {
-  const isDiament = typWymiany === "diamentowe";
+  const isDiament = typWymiany === "diamentowe" || typWymiany === "event";
+  const isEvent = typWymiany === "event";
   const brakT = Math.floor(faza / 10);
   const brakO = faza % 10;
   const typT = isDiament ? "💎" : "⭐";
   const typO = isDiament ? "⭐" : "💎";
 
   if (brakT === 1 && brakO === 0) return {
-    t: `🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 ${typT} + komplet ${typO}`, k: "#f55"
+    t: isEvent
+      ? `🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 ${typT}`
+      : `🔴 FAZA 1 — ZAMKNIE TALIĘ! Brakuje 1 ${typT} + komplet ${typO}`, k: "#f55"
   };
   if (brakT === 2 && brakO === 0) return {
-    t: isDiament
-      ? `🟠 FAZA 2 — Brakuje 2 ${typT} + komplet ${typO} → 2 osoby wyślą po 1 ${typT} = ZAMKNIE TALIĘ`
-      : `🟠 FAZA 2 — Brakuje 2 ${typT} + komplet ${typO} → 2 wymiany do zamknięcia`,
+    t: isEvent
+      ? `🟠 FAZA 2 — Brakuje 2 ${typT} → 2 wymiany do zamknięcia`
+      : isDiament
+        ? `🟠 FAZA 2 — Brakuje 2 ${typT} + komplet ${typO} → 2 osoby wyślą po 1 ${typT} = ZAMKNIE TALIĘ`
+        : `🟠 FAZA 2 — Brakuje 2 ${typT} + komplet ${typO} → 2 wymiany do zamknięcia`,
     k: "#ff7a00"
   };
   if (brakT === 1 && brakO === 1) return {
-    t: isDiament
-      ? `💎 FAZA 3 — Brakuje 1 ${typT} + 1 ${typO} → wyślij ${typT} teraz, ${typO} w następnej wymianie`
-      : `🟡 FAZA 3 — Brakuje 1 ${typT} + 1 ${typO}`,
-    k: isDiament ? "#ff4488" : "#fa0"
+    t: isEvent
+      ? `🟡 FAZA 3 — Brakuje 1 ${typT}`
+      : isDiament
+        ? `💎 FAZA 3 — Brakuje 1 ${typT} + 1 ${typO} → wyślij ${typT} teraz, ${typO} w następnej wymianie`
+        : `🟡 FAZA 3 — Brakuje 1 ${typT} + 1 ${typO}`,
+    k: isDiament && !isEvent ? "#ff4488" : "#fa0"
   };
 
   // Generyczne etykiety dla pozostałych faz
   const kolorFazy = brakT <= 2 ? "#fa0" : brakT <= 3 ? "#d4b800" : "#6af";
   const nrFazy = brakT === 1 ? (brakO + 2) : brakT === 2 ? (brakO + 4) : brakT === 3 ? (brakO + 6) : (brakT * 2 + brakO);
   return {
-    t: `FAZA ${nrFazy} — Brakuje ${brakT} ${typT} + ${brakO} ${typO}`,
+    t: isEvent
+      ? `FAZA ${nrFazy} — Brakuje ${brakT} ${typT}`
+      : `FAZA ${nrFazy} — Brakuje ${brakT} ${typT} + ${brakO} ${typO}`,
     k: kolorFazy
   };
 }
@@ -2772,8 +2858,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         const kPo=talia.karty.every(k=>symPos[`${osoba.id}_${talia.id}_${k.nazwa}`]);
         if(!kPrzed&&kPo){
           const liczbaPoWymianie=liczKartyOsoby(osoba.id,talie,symPos);
-          const progPrzed=obliczProg(liczKartyOsoby(osoba.id,talie,posiadane));
-          const progPo=obliczProg(liczbaPoWymianie);
+          const obliczProgFn = typWymiany==="event" ? obliczProgEvent : obliczProg;
+          const progPrzed=obliczProgFn(liczKartyOsoby(osoba.id,talie,posiadane));
+          const progPo=obliczProgFn(liczbaPoWymianie);
           const nowyProg=progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
           zamknieciaInfo.push({
             osoba:osoba.nazwa, talia:talia.nazwa, nagroda:pobierzNagrode(talia,osoba.krag),
@@ -3057,7 +3144,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                 const brakCount=talie.filter(t=>!wylaczoneTalie.has(t.id)).reduce((s,talia)=>
                   s+talia.karty.filter(k=>k.typ===typ&&!posiadane[`${id}_${talia.id}_${k.nazwa}`]).length
                 ,0);
-                const progInfo=obliczProg(liczKartyOsoby(id,talie,posiadane));
+                const progInfo=(typWymiany==="event"?obliczProgEvent:obliczProg)(liczKartyOsoby(id,talie,posiadane));
                 // Breakdown talii per faza dla VIP
                 const aktywneT = talie.filter(t=>!wylaczoneTalie.has(t.id));
                 const vipOppTyp = typWymiany==="złote"?"diamentowa":"złota";
@@ -3380,8 +3467,9 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
 
                 const kartyPrzed=osoba?liczKartyOsoby(oId,talie,posiadane):0;
                 const kartyPo   =osoba?liczKartyOsoby(oId,talie,symPos)   :0;
-                const progPrzed =obliczProg(kartyPrzed);
-                const progPo    =obliczProg(kartyPo);
+                const obliczProgFn = typWymiany==="event" ? obliczProgEvent : obliczProg;
+                const progPrzed =obliczProgFn(kartyPrzed);
+                const progPo    =obliczProgFn(kartyPo);
                 const nowyProg  =progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
 
                 return (
@@ -8975,6 +9063,168 @@ function DupleView({czlonkowie, talie, duplikaty}) {
       {filtered.length===0&&(
         <div style={{textAlign:"center",padding:30,color:"#555",fontSize:13}}>
           Brak duplikatów dla wybranych filtrów
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// EDYCJA TALII EVENTOWYCH
+// ============================================================
+function EdycjaTaliiEvent({ talieEvent, zapisz }) {
+  const [wybranaIdx, setWybranaIdx] = useState(0);
+  const [nowyModal, setNowyModal] = useState(false);
+  const [nowaTalia, setNowaTalia] = useState({ nazwa: "", numer: "", nagroda_amunicja: "" });
+  const [nowaKarta, setNowaKarta] = useState("");
+
+  const sorted = [...talieEvent].sort((a, b) => (a.numer || 99) - (b.numer || 99));
+  const talia = sorted[wybranaIdx] || null;
+
+  const dodajTalie = () => {
+    if (!nowaTalia.nazwa.trim()) return;
+    const id = "event_" + nowaTalia.nazwa.toLowerCase().replace(/\s+/g, "_") + "_" + Date.now();
+    zapisz([...talieEvent, {
+      id, nazwa: nowaTalia.nazwa.trim(),
+      numer: parseInt(nowaTalia.numer) || 99,
+      nagroda_amunicja: parseInt(nowaTalia.nagroda_amunicja) || 0,
+      karty: [],
+    }]);
+    setNowaTalia({ nazwa: "", numer: "", nagroda_amunicja: "" });
+    setNowyModal(false);
+    setWybranaIdx(talieEvent.length);
+  };
+
+  const usunTalie = (id) => {
+    if (!window.confirm("Usunąć tę talię eventową?")) return;
+    const nowe = talieEvent.filter(t => t.id !== id);
+    zapisz(nowe);
+    setWybranaIdx(0);
+  };
+
+  const dodajKarte = () => {
+    const nazwa = nowaKarta.trim();
+    if (!nazwa || !talia) return;
+    if (talia.karty.find(k => k.nazwa === nazwa)) { alert("Karta już istnieje!"); return; }
+    zapisz(talieEvent.map(t => t.id === talia.id
+      ? { ...t, karty: [...t.karty, { nazwa, typ: "diamentowa" }] }
+      : t
+    ));
+    setNowaKarta("");
+  };
+
+  const usunKarte = (nazwa) => {
+    zapisz(talieEvent.map(t => t.id === talia.id
+      ? { ...t, karty: t.karty.filter(k => k.nazwa !== nazwa) }
+      : t
+    ));
+  };
+
+  const dodaj9Kart = () => {
+    if (!talia) return;
+    const nazwy = Array.from({ length: 9 }, (_, i) => `Karta ${i + 1}`);
+    const noweKarty = nazwy
+      .filter(n => !talia.karty.find(k => k.nazwa === n))
+      .map(n => ({ nazwa: n, typ: "diamentowa" }));
+    if (!noweKarty.length) { alert("Wszystkie karty już istnieją!"); return; }
+    zapisz(talieEvent.map(t => t.id === talia.id
+      ? { ...t, karty: [...t.karty, ...noweKarty] }
+      : t
+    ));
+  };
+
+  return (
+    <div style={{ padding: 16 }}>
+      <div style={{ fontWeight: "bold", color: "var(--accent)", fontSize: 15, marginBottom: 12 }}>
+        🎉 Talie eventowe
+      </div>
+      <div style={{ fontSize: 12, color: "#666", marginBottom: 14 }}>
+        Karty eventowe są niezależne od zwykłych talii. Wszystkie karty są diamentowe.<br />
+        Po przełączeniu na tryb <strong style={{ color: "#00e676" }}>EVENT</strong> w zakładce Dane i Generuj używane są tylko te talie.
+      </div>
+
+      {/* Lista talii */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+        {sorted.map((t, i) => (
+          <button key={t.id} onClick={() => setWybranaIdx(i)} style={{
+            padding: "6px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+            background: wybranaIdx === i ? "rgba(0,230,118,0.15)" : "rgba(255,255,255,0.04)",
+            border: wybranaIdx === i ? "1px solid #00e676" : "1px solid var(--border)",
+            color: wybranaIdx === i ? "#00e676" : "var(--text)",
+            fontWeight: wybranaIdx === i ? "bold" : "normal",
+          }}>
+            {t.numer}. {t.nazwa} <span style={{ color: "#555" }}>({t.karty.length}/9)</span>
+          </button>
+        ))}
+        <button onClick={() => setNowyModal(true)} style={{
+          padding: "6px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+          background: "rgba(0,230,118,0.08)", border: "1px dashed #00e67655", color: "#00e676",
+        }}>+ Nowa talia</button>
+      </div>
+
+      {/* Modal nowej talii */}
+      {nowyModal && (
+        <div style={{ background: "rgba(0,0,0,0.4)", border: "1px solid #00e67655", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontWeight: "bold", color: "#00e676", marginBottom: 10 }}>Nowa talia eventowa</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+            <input value={nowaTalia.nazwa} onChange={e => setNowaTalia(p => ({ ...p, nazwa: e.target.value }))}
+              placeholder="Nazwa talii" style={{ flex: 2, minWidth: 150, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13 }} />
+            <input value={nowaTalia.numer} onChange={e => setNowaTalia(p => ({ ...p, numer: e.target.value }))}
+              placeholder="Nr" type="number" style={{ width: 60, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13 }} />
+            <input value={nowaTalia.nagroda_amunicja} onChange={e => setNowaTalia(p => ({ ...p, nagroda_amunicja: e.target.value }))}
+              placeholder="Nagroda ammo" type="number" style={{ width: 110, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13 }} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={dodajTalie} style={{ padding: "7px 16px", borderRadius: 7, background: "rgba(0,230,118,0.15)", border: "1px solid #00e676", color: "#00e676", cursor: "pointer", fontWeight: "bold" }}>✓ Dodaj</button>
+            <button onClick={() => setNowyModal(false)} style={{ padding: "7px 16px", borderRadius: 7, background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", color: "#f55", cursor: "pointer" }}>✗ Anuluj</button>
+          </div>
+        </div>
+      )}
+
+      {/* Edycja wybranej talii */}
+      {talia && (
+        <div style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #00e67633", borderRadius: 10, padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div>
+              <span style={{ fontWeight: "bold", color: "#00e676", fontSize: 14 }}>{talia.numer}. {talia.nazwa}</span>
+              <span style={{ fontSize: 11, color: "#666", marginLeft: 8 }}>{talia.karty.length}/9 kart</span>
+              <span style={{ fontSize: 11, color: "#fa0", marginLeft: 8 }}>💰 {talia.nagroda_amunicja?.toLocaleString() || 0} ammo</span>
+            </div>
+            <button onClick={() => usunTalie(talia.id)} style={{ padding: "4px 12px", borderRadius: 6, background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", color: "#f55", cursor: "pointer", fontSize: 11 }}>🗑️ Usuń talię</button>
+          </div>
+
+          {/* Lista kart */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {talia.karty.map((k, i) => (
+              <div key={k.nazwa} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, background: "rgba(135,206,235,0.08)", border: "1px solid #87CEEB33", fontSize: 12 }}>
+                <span style={{ color: "#87CEEB" }}>💎</span>
+                <span>{i + 1}. {k.nazwa}</span>
+                <button onClick={() => usunKarte(k.nazwa)} style={{ marginLeft: 4, background: "none", border: "none", color: "#f55", cursor: "pointer", fontSize: 12, padding: 0 }}>✗</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Dodaj kartę */}
+          {talia.karty.length < 9 && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+              <input value={nowaKarta} onChange={e => setNowaKarta(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && dodajKarte()}
+                placeholder="Nazwa karty..." style={{ flex: 1, minWidth: 150, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13 }} />
+              <button onClick={dodajKarte} style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(0,230,118,0.12)", border: "1px solid #00e67655", color: "#00e676", cursor: "pointer", fontWeight: "bold" }}>+ Dodaj</button>
+              {talia.karty.length === 0 && (
+                <button onClick={dodaj9Kart} style={{ padding: "7px 14px", borderRadius: 7, background: "rgba(255,165,0,0.1)", border: "1px solid #fa055", color: "#fa0", cursor: "pointer", fontSize: 12 }}>⚡ Dodaj 9 pustych</button>
+              )}
+            </div>
+          )}
+          {talia.karty.length >= 9 && (
+            <div style={{ fontSize: 12, color: "#0c6", textAlign: "center", padding: 8 }}>✅ Talia kompletna (9/9 kart)</div>
+          )}
+        </div>
+      )}
+
+      {talieEvent.length === 0 && !nowyModal && (
+        <div style={{ textAlign: "center", padding: 40, color: "#555", fontSize: 13 }}>
+          Brak talii eventowych. Dodaj pierwszą talię przyciskiem powyżej.
         </div>
       )}
     </div>

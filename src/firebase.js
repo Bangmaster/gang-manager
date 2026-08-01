@@ -155,6 +155,61 @@ export function subscribePowiadomienia(callback) {
 const GANG_DOC = doc(db, "gang", "main");
 const ONLINE_DOC = doc(db, "gang", "online");
 const KALENDARZ_DOC = doc(db, "gang", "kalendarz"); // osobny dokument dla kalendarza
+const EVENT_DOC = doc(db, "gang", "event"); // osobny dokument dla danych eventowych
+
+// === EVENT ===
+export async function loadEventData() {
+  try {
+    const snap = await getDoc(EVENT_DOC);
+    if (snap.exists()) return snap.data();
+    return null;
+  } catch(e) {
+    console.error("Błąd ładowania danych eventu:", e);
+    throw e;
+  }
+}
+
+export async function saveEventData(data) {
+  try {
+    await setDoc(EVENT_DOC, data, { merge: true });
+    return true;
+  } catch(e) {
+    console.error("Błąd zapisu eventu:", e);
+    return false;
+  }
+}
+
+export async function setEventCardField(typ, key, value) {
+  try {
+    const fieldPath = `${typ}.${key}`;
+    if (value === null) {
+      await updateDoc(EVENT_DOC, { [fieldPath]: deleteField() });
+    } else {
+      await updateDoc(EVENT_DOC, { [fieldPath]: value });
+    }
+    return true;
+  } catch(e) {
+    console.error("Błąd ustawienia karty eventowej:", e);
+    return false;
+  }
+}
+
+export async function setEventStructure(pole, wartosc) {
+  try {
+    await setDoc(EVENT_DOC, { [pole]: wartosc }, { merge: true });
+    return true;
+  } catch(e) {
+    console.error("Błąd zapisu struktury eventu:", e);
+    return false;
+  }
+}
+
+export function subscribeEventData(callback) {
+  return onSnapshot(EVENT_DOC, (snap) => {
+    if (snap.exists()) callback(snap.data());
+    else callback(null);
+  }, (err) => console.error("Błąd subskrypcji eventu:", err));
+}
 
 // === KALENDARZ ===
 export async function zapiszKalendarz(eventy) {
