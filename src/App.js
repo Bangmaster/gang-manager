@@ -803,9 +803,14 @@ function App() {
   };
 
   // Zapis kart eventowych
+  // WAŻNE: dokument eventowy trzyma dane pod polami "posiadaneEvent"/"duplikatyEvent",
+  // a wspólny komponent DaneView zawsze woła zapiszKarte z typem "posiadane"/"duplikaty"
+  // (tak samo jak w trybie zwykłym) — trzeba więc przemapować nazwę pola przed zapisem,
+  // inaczej zapis trafia do nieistniejącego (nieczytanego przez UI) pola.
   const zapiszKarteEvent = async (typ, key, value) => {
+    const pole = typ === "posiadane" ? "posiadaneEvent" : typ === "duplikaty" ? "duplikatyEvent" : typ;
     setStatusZapisu("⏳ Zapisywanie...");
-    const ok = await setEventCardField(typ, key, value);
+    const ok = await setEventCardField(pole, key, value);
     setStatusZapisu(ok ? "✓ Zapisano" : "❌ Błąd");
     setTimeout(() => setStatusZapisu(""), 1200);
   };
@@ -1043,7 +1048,6 @@ function App() {
           duplikaty={typWymiany==="event" ? duplikatyEventMemo : duplikatyMemo}
           zalogowany={zalogowany}
           zapiszKarte={typWymiany==="event" ? zapiszKarteEvent : zapiszKarte}
-          trybEvent={typWymiany==="event"}
         />}
         {zakładka==="duplikaty"&&<DuplikatyView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
