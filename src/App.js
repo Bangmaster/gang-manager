@@ -9206,10 +9206,21 @@ function EdycjaTaliiEvent({ talieEvent, zapisz }) {
       {talia && (
         <div style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #00e67633", borderRadius: 10, padding: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-            <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontWeight: "bold", color: "#00e676", fontSize: 14 }}>{talia.numer}. {talia.nazwa}</span>
-              <span style={{ fontSize: 11, color: "#666", marginLeft: 8 }}>{talia.karty.length}/9 kart</span>
-              <span style={{ fontSize: 11, color: "#fa0", marginLeft: 8 }}>💰 {talia.nagroda_amunicja?.toLocaleString() || 0} ammo</span>
+              <span style={{ fontSize: 11, color: "#666" }}>{talia.karty.length}/9 kart</span>
+              <label style={{ fontSize: 11, color: "#fa0", display: "flex", alignItems: "center", gap: 4 }}>
+                Nr:
+                <input type="number" defaultValue={talia.numer} key={`nr-${talia.id}`}
+                  onBlur={e => zapisz(talieEvent.map(t => t.id === talia.id ? { ...t, numer: parseInt(e.target.value) || t.numer } : t))}
+                  style={{ width: 45, padding: "2px 5px", background: "rgba(0,0,0,0.3)", border: "1px solid #333", borderRadius: 4, color: "#fff", fontSize: 11 }} />
+              </label>
+              <label style={{ fontSize: 11, color: "#fa0", display: "flex", alignItems: "center", gap: 4 }}>
+                💰 Nagroda:
+                <input type="number" defaultValue={talia.nagroda_amunicja || 0} key={`nagroda-${talia.id}`}
+                  onBlur={e => zapisz(talieEvent.map(t => t.id === talia.id ? { ...t, nagroda_amunicja: parseInt(e.target.value) || 0 } : t))}
+                  style={{ width: 80, padding: "2px 5px", background: "rgba(0,0,0,0.3)", border: "1px solid #fa055", borderRadius: 4, color: "#fa0", fontSize: 11 }} />
+              </label>
             </div>
             <button onClick={() => usunTalie(talia.id)} style={{ padding: "4px 12px", borderRadius: 6, background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", color: "#f55", cursor: "pointer", fontSize: 11 }}>🗑️ Usuń talię</button>
           </div>
