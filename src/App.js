@@ -1084,6 +1084,7 @@ function App() {
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
+          talieEvent={daneEvent?.talieEvent||[]} zapiszEvent={(noweTalie)=>zapiszStrukturEvent("talieEvent",noweTalie)}
         />}
         {zakładka==="edycja_event"&&isAdmin&&<EdycjaTaliiEvent
           talieEvent={daneEvent?.talieEvent||[]}
@@ -3698,7 +3699,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
   );
 }
 
-function EdycjaTalii({talie,zapisz}) {
+function EdycjaTalii({talie,zapisz,talieEvent=[],zapiszEvent=()=>{}}) {
   const [wybranaIdx,setWybranaIdx]=useState(0);
   const [nowaKarta,setNowaKarta]=useState({nazwa:"",typ:"złota"});
   const [nowyModal,setNowyModal]=useState(false);
@@ -3708,6 +3709,7 @@ function EdycjaTalii({talie,zapisz}) {
   const [ocrWynik,setOcrWynik]=useState(null); // {talia, karty}
   const [ocrNumer,setOcrNumer]=useState("");
   const [ocrNagroda,setOcrNagroda]=useState("");
+  const [ocrEvent,setOcrEvent]=useState(false); // czy zapisać jako eventową
 
   const analizujScreenTalii=async(e)=>{
     const file=e.target.files?.[0];
@@ -3727,20 +3729,31 @@ function EdycjaTalii({talie,zapisz}) {
 
   const zatwierdzeOcrTalie=()=>{
     if(!ocrWynik) return;
-    const id=ocrWynik.talia.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now();
+    const id=(ocrEvent?"event_":"")+ocrWynik.talia.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now();
     const nowaTaliaOcr={
       id, nazwa:ocrWynik.talia,
       numer:parseInt(ocrNumer)||99,
       nagroda_amunicja:parseInt(ocrNagroda)||0,
-      karty:ocrWynik.karty.map(k=>({nazwa:k.nazwa,typ:k.typ}))
+      karty:ocrWynik.karty.map(k=>({nazwa:k.nazwa,typ:ocrEvent?"diamentowa":k.typ}))
     };
-    // Sprawdź czy talia już istnieje
-    const istnieje=talie.find(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia));
-    if(istnieje){
-      if(!window.confirm(`Talia "${ocrWynik.talia}" już istnieje. Nadpisać karty?`)) return;
-      zapisz(talie.map(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia)?{...t,karty:nowaTaliaOcr.karty}:t));
+    if(ocrEvent){
+      // Zapisz do talii eventowych
+      const istnieje=talieEvent.find(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia));
+      if(istnieje){
+        if(!window.confirm(`Talia eventowa "${ocrWynik.talia}" już istnieje. Nadpisać karty?`)) return;
+        zapiszEvent(talieEvent.map(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia)?{...t,karty:nowaTaliaOcr.karty}:t));
+      } else {
+        zapiszEvent([...talieEvent,nowaTaliaOcr]);
+      }
     } else {
-      zapisz([...talie,nowaTaliaOcr]);
+      // Zapisz do zwykłych talii
+      const istnieje=talie.find(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia));
+      if(istnieje){
+        if(!window.confirm(`Talia "${ocrWynik.talia}" już istnieje. Nadpisać karty?`)) return;
+        zapisz(talie.map(t=>normalizuj(t.nazwa)===normalizuj(ocrWynik.talia)?{...t,karty:nowaTaliaOcr.karty}:t));
+      } else {
+        zapisz([...talie,nowaTaliaOcr]);
+      }
     }
     setOcrWynik(null);
     setOcrMode(false);
@@ -3828,8 +3841,16 @@ function EdycjaTalii({talie,zapisz}) {
                   </div>
                 ))}
               </div>
-              <button onClick={zatwierdzeOcrTalie} style={{width:"100%",padding:10,background:"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
-                ✓ Zatwierdź i dodaj talię
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"8px 12px",background:"rgba(0,230,118,0.06)",border:"1px solid #00e67633",borderRadius:8}}>
+                <input type="checkbox" id="ocrEventChk" checked={ocrEvent} onChange={e=>setOcrEvent(e.target.checked)}
+                  style={{width:16,height:16,cursor:"pointer",accentColor:"#00e676"}}/>
+                <label htmlFor="ocrEventChk" style={{cursor:"pointer",fontSize:12,color:ocrEvent?"#00e676":"var(--muted)",fontWeight:ocrEvent?"bold":"normal"}}>
+                  🎉 Zapisz jako talia <strong>EVENTOWA</strong>
+                  {ocrEvent&&<span style={{fontSize:10,color:"#555",marginLeft:6}}>(wszystkie karty → diamentowe, zapis do gang/event)</span>}
+                </label>
+              </div>
+              <button onClick={zatwierdzeOcrTalie} style={{width:"100%",padding:10,background:ocrEvent?"linear-gradient(135deg,#00e676,#0fa)":"linear-gradient(135deg,#0c6,#0fa)",border:"none",borderRadius:8,color:"#000",fontWeight:"bold",cursor:"pointer",fontSize:13}}>
+                ✓ Zatwierdź i dodaj {ocrEvent?"talię eventową":"talię"}
               </button>
             </div>
           )}
