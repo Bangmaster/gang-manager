@@ -1061,13 +1061,13 @@ function App() {
           aktywnaWymiana={dane.aktywnaWymiana}
           zalogowany={zalogowany}
           czlonkowie={dane.czlonkowie}
-          talie={talieSorted}
-          posiadane={dane.posiadane||{}}
-          duplikaty={dane.duplikaty||{}}
+          talie={typWymiany==="event" ? talieEventSorted : talieSorted}
+          posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
+          duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
           typWymiany={typWymiany}
           isAdmin={isAdmin}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
-          zapiszKarte={zapiszKarte}
+          zapiszKarte={typWymiany==="event" ? zapiszKarteEvent : zapiszKarte}
         />}
         {zakładka==="chat"&&<GangChat zalogowany={zalogowany} czlonkowie={dane.czlonkowie}/>}
 
@@ -2799,7 +2799,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     // Priorytet: fazy 1-2, największa nagroda
     const kandydaci=[];
     const typ=typWymiany==="złote"?"złota":"diamentowa";
-    const oppTyp=typWymiany==="złote"?"diamentowa":"złota";
+    const oppTyp=typWymiany==="złote"?"diamentowa":typWymiany==="event"?null:"złota";
 
     czlonkowie.forEach(odbiorca=>{
       if(odbiorca.id===dawca.id) return; // nie sam do siebie
@@ -2816,7 +2816,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
           const kartyOdbiorcyLacznie = talie.reduce((s,t)=>
             s+t.karty.filter(k=>posiadane[`${odbiorca.id}_${t.id}_${k.nazwa}`]).length, 0
           );
-          const progPoWymianie = PROGI.find(p=>p.prog>kartyOdbiorcyLacznie && p.prog<=kartyOdbiorcyLacznie+1);
+          const progPoWymianie = typWymiany==="event" ? null : PROGI.find(p=>p.prog>kartyOdbiorcyLacznie && p.prog<=kartyOdbiorcyLacznie+1);
           kandydaci.push({
             od:dawcaNazwa, do:odbiorca.nazwa,
             karta:karta.nazwa, talia:talia.nazwa,
@@ -4313,7 +4313,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
     const dawca=czlonkowie.find(c=>c.nazwa===dawcaNazwa);
     if(!dawca||!talie) return [];
     const typ=typAkt==="złote"?"złota":"diamentowa";
-    const oppTyp=typAkt==="złote"?"diamentowa":"złota";
+    const oppTyp=typAkt==="złote"?"diamentowa":typAkt==="event"?null:"złota";
 
     // Zbuduj mapę: kto już dostaje jaką kartę (z pominięciem podmienianej wymiany)
     const juzOtrzymuje=new Set();
@@ -4345,17 +4345,19 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
           if(juzOtrzymuje.has(`${odbiorca.nazwa}_${talia.nazwa}_${karta.nazwa}`)) return;
           const faza=obliczFaze(brakT.length,brakO.length,typWymiany);
           const zamknieTalie=brakT.length===1&&brakO.length===0;
-          // Prog liczony PO wszystkich wymianach w planie (symulacja)
+          // Prog liczony PO wszystkich wymianach w planie (symulacja) — pomijany w evencie
           const liczbaPoWymianach=liczKartyOsoby(odbiorca.id,talie,symPosiadane);
-          const progInfo=obliczProg(liczbaPoWymianach);
-          // Czy ta konkretna karta przekroczy próg?
           const liczbaPoTejKarcie=liczbaPoWymianach+(posiadane[`${odbiorca.id}_${talia.id}_${karta.nazwa}`]?0:1);
-          const progPrzed=obliczProg(liczbaPoWymianach);
-          const progPo=obliczProg(liczbaPoTejKarcie);
-          const nowyProgTaKarta=progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
-          const progBonus=nowyProgTaKarta?(progPo.ostatniProg?.ammo||0):0;
-          const brakujeDoProg=progInfo.brakujeDoProg;
-          const nastepnyProg=progInfo.nastepnyProg;
+          let progBonus=0,brakujeDoProg=null,nastepnyProg=null;
+          if(typAkt!=="event"){
+            const progInfo=obliczProg(liczbaPoWymianach);
+            const progPrzed=obliczProg(liczbaPoWymianach);
+            const progPo=obliczProg(liczbaPoTejKarcie);
+            const nowyProgTaKarta=progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
+            progBonus=nowyProgTaKarta?(progPo.ostatniProg?.ammo||0):0;
+            brakujeDoProg=progInfo.brakujeDoProg;
+            nastepnyProg=progInfo.nastepnyProg;
+          }
           kandydaci.push({
             od:dawcaNazwa,do:odbiorca.nazwa,karta:karta.nazwa,talia:talia.nazwa,
             nagroda:pobierzNagrode(talia,odbiorca?.krag||1),faza,brakTCount:brakT.length,
