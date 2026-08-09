@@ -1627,11 +1627,27 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                     <span style={{fontWeight:"bold",fontSize:13}}>{talia.nazwa}</span>
                     <span style={{fontSize:11,color:"var(--muted)"}}>🎯{talia.nagroda_amunicja?.toLocaleString()}</span>
                   </div>
-                  <div style={{fontSize:12}}>
-                    <span style={{color:brak===0?"#0c6":"var(--accent)"}}>{posC}/{kartyAll.length}</span>
-                    {dupC>0&&<span style={{color:"#87CEEB",marginLeft:6}}>+{dupC}dup</span>}
-                    {brak===0&&<span style={{color:"#0c6",marginLeft:8}}>✓</span>}
-                    {brak>0&&brak<=2&&<span style={{color:"#fa0",marginLeft:8}}>⚡{brak} brak</span>}
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <div style={{fontSize:12}}>
+                      <span style={{color:brak===0?"#0c6":"var(--accent)"}}>{posC}/{kartyAll.length}</span>
+                      {dupC>0&&<span style={{color:"#87CEEB",marginLeft:6}}>+{dupC}dup</span>}
+                      {brak===0&&<span style={{color:"#0c6",marginLeft:8}}>✓</span>}
+                      {brak>0&&brak<=2&&<span style={{color:"#fa0",marginLeft:8}}>⚡{brak} brak</span>}
+                    </div>
+                    {mozeEdytowac&&(
+                      <button onClick={()=>{
+                        if(!window.confirm(`Oznaczyć WSZYSTKIE karty talii "${talia.nazwa}" jako posiadane + duplikaty?`)) return;
+                        talia.karty.forEach(k=>{
+                          const key=`${osoba.id}_${talia.id}_${k.nazwa}`;
+                          if(!posiadane[key]) zapiszKarte("posiadane", key, true);
+                          if(!duplikaty[key]) zapiszKarte("duplikaty", key, true);
+                        });
+                      }} style={{
+                        padding:"2px 8px",fontSize:10,borderRadius:5,cursor:"pointer",
+                        background:"rgba(0,200,100,0.12)",border:"1px solid #0c644",
+                        color:"#0c6",whiteSpace:"nowrap",
+                      }}>⚡ Uzupełnij wszystko</button>
+                    )}
                   </div>
                 </div>
                 <div style={{height:3,background:"var(--card-solid)",borderRadius:2,marginBottom:8}}>
