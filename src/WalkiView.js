@@ -1018,6 +1018,8 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
   const [trybEdycji, setTrybEdycji] = useState(null); // id walki w trybie edycji obecności
   const [trybEdycjiLvl, setTrybEdycjiLvl] = useState(null); // id walki w trybie edycji lvl
   const [edytowaneLvl, setEdytowaneLvl] = useState({}); // {nazwa: lvl}
+  const [aiKomentarze, setAiKomentarze] = useState({}); // {walkaId: komentarz}
+  const [aiLadowanie, setAiLadowanie] = useState({}); // {walkaId: true}
 
   const otworzyjedycjeLvl = (walka) => {
     const init = {};
@@ -1074,9 +1076,6 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
       </div>
     );
   }
-
-  const [aiKomentarze, setAiKomentarze] = useState({}); // {walkaId: komentarz}
-  const [aiLadowanie, setAiLadowanie] = useState({}); // {walkaId: true}
 
   const generujKomentarz = async (w) => {
     if (aiLadowanie[w.id] || aiKomentarze[w.id]) return;
