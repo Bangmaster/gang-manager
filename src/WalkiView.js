@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { zapiszAutoBackup } from "./firebase";
 
 // Klucze API — te same co w gemini.js
@@ -1015,19 +1015,11 @@ function LigaView({ isAdmin, walki, zapiszWalki }) {
 
 function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
   const [rozwiniete, setRozwiniete] = useState(null);
-  const [trybEdycji, setTrybEdycji] = useState(null); // id walki w trybie edycji obecności
+  const [trybEdycji] = useState(null); // id walki w trybie edycji obecności
   const [trybEdycjiLvl, setTrybEdycjiLvl] = useState(null); // id walki w trybie edycji lvl
   const [edytowaneLvl, setEdytowaneLvl] = useState({}); // {nazwa: lvl}
   const [aiKomentarze, setAiKomentarze] = useState({}); // {walkaId: komentarz}
   const [aiLadowanie, setAiLadowanie] = useState({}); // {walkaId: true}
-
-  const otworzyjedycjeLvl = (walka) => {
-    const init = {};
-    walka.gracze.forEach(g => { init[g.nazwa] = String(g.poziomAkt || g.poziom || ""); });
-    setEdytowaneLvl(init);
-    setTrybEdycjiLvl(walka.id);
-    setRozwiniete(walka.id);
-  };
 
   const zapiszLvl = async (walkaId) => {
     const noweWalki = walki.map(w => {
@@ -1125,8 +1117,6 @@ Napisz tylko komentarz, bez żadnego wstępu.`;
           .filter(g => (g.obr || 0) > 0)
           .sort((a, b) => (b.obr || 0) - (a.obr || 0))
           .slice(0, 3);
-        const maxObr = top3[0]?.obr || 0;
-
         // Pasek postępu — nasza suma vs suma top3 przeciwników (szacunek)
         const naszeObr = w.gracze.reduce((s, g) => s + (g.obr || 0), 0);
 

@@ -7506,7 +7506,6 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
   const ONLINE_PROG = 90000;
 
   // === STATYSTYKI WALK ===
-  const ostatnie10Walk = walki.slice(-10).reverse(); // od najnowszej
   const wygraneCount = walki.filter(w => w.wynik === "wygrana").length;
   const przegraCount = walki.filter(w => w.wynik === "przegrana").length;
   const srPunkty = walki.length > 0
