@@ -1186,12 +1186,27 @@ function App() {
 
 function LoadingScreen() {
   return (
-    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at center,#0d0820 0%,#0a0a12 100%)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--accent)",fontFamily:"'Georgia',serif"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:44,marginBottom:10}}>🃏</div>
-        <div style={{fontSize:16}}>Ładowanie danych gangu...</div>
-        <div style={{fontSize:11,color:"var(--muted)",marginTop:8}}>Łączenie z bazą Firebase</div>
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at center,#0d0820 0%,#0a0a12 100%)",display:"flex",flexDirection:"column"}}>
+      {/* Nagłówek */}
+      <div style={{padding:"16px 16px 10px",borderBottom:"1px solid #1a1a2e"}}>
+        <div style={{height:18,width:"60%",borderRadius:6,background:"linear-gradient(90deg,#1a1a2e 25%,#252540 50%,#1a1a2e 75%)",backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite"}}/>
+        <div style={{height:10,width:"35%",borderRadius:4,marginTop:8,background:"linear-gradient(90deg,#12122a 25%,#1e1e35 50%,#12122a 75%)",backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite"}}/>
       </div>
+      {/* Skeleton cards */}
+      <div style={{padding:16,flex:1}}>
+        {[1,2,3,4].map(i=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+            <div style={{width:40,height:40,borderRadius:"50%",flexShrink:0,background:"linear-gradient(90deg,#12122a 25%,#1e1e35 50%,#12122a 75%)",backgroundSize:"200% 100%",animation:`shimmer 1.5s infinite ${i*0.15}s`}}/>
+            <div style={{flex:1}}>
+              <div style={{height:13,width:`${55+i*8}%`,borderRadius:5,marginBottom:7,background:"linear-gradient(90deg,#12122a 25%,#1e1e35 50%,#12122a 75%)",backgroundSize:"200% 100%",animation:`shimmer 1.5s infinite ${i*0.15}s`}}/>
+              <div style={{height:9,width:`${30+i*5}%`,borderRadius:4,background:"linear-gradient(90deg,#0e0e1e 25%,#181830 50%,#0e0e1e 75%)",backgroundSize:"200% 100%",animation:`shimmer 1.5s infinite ${i*0.15}s`}}/>
+            </div>
+          </div>
+        ))}
+        <div style={{height:80,borderRadius:10,marginBottom:10,background:"linear-gradient(90deg,#12122a 25%,#1e1e35 50%,#12122a 75%)",backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite 0.3s"}}/>
+        <div style={{height:80,borderRadius:10,background:"linear-gradient(90deg,#12122a 25%,#1e1e35 50%,#12122a 75%)",backgroundSize:"200% 100%",animation:"shimmer 1.5s infinite 0.45s"}}/>
+      </div>
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
     </div>
   );
 }
@@ -1545,7 +1560,13 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                   return (
                     <div key={karta.nazwa} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                       <button
-                        onClick={mozeEdytowac?()=>toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane"):undefined}
+                        onClick={mozeEdytowac?(e)=>{
+                          toggleKarta(osoba.id,talia.id,karta.nazwa,"posiadane");
+                          if(navigator.vibrate) navigator.vibrate(30);
+                          const btn=e.currentTarget;
+                          btn.style.transform="scale(1.15)";
+                          setTimeout(()=>{btn.style.transform="scale(1)";},150);
+                        }:undefined}
                         onMouseEnter={(e)=>{
                           if(ma) return;
                           const dawcy=czlonkowie.filter(c=>c.id!==osoba.id&&duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]).map(c=>c.nazwa);
@@ -1559,6 +1580,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                         style={{
                           padding:"3px 7px",fontSize:10,borderRadius:5,cursor:mozeEdytowac?"pointer":"not-allowed",
                           maxWidth:90,textAlign:"center",lineHeight:1.2,
+                          transition:"transform 0.15s ease, background 0.15s",
                           background:ma?(karta.typ==="złota"?"linear-gradient(135deg,#b8860b,#ffd700)":"linear-gradient(135deg,#1a3a8f,#87CEEB)"):"var(--card)",
                           border:ma?"none":(!ma&&czlonkowie.some(c=>c.id!==osoba.id&&duplikaty[`${c.id}_${talia.id}_${karta.nazwa}`]))?"1px solid #0c633":"1px solid var(--border)",
                           color:ma?(karta.typ==="złota"?"#000":"#fff"):"#444",
@@ -4394,6 +4416,19 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 
   return (
     <div>
+      {/* Badge typu wymiany */}
+      <div style={{
+        display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+        padding:"9px 14px",marginBottom:10,borderRadius:10,fontWeight:"bold",fontSize:13,
+        ...(typAkt==="złote"
+          ? {background:"linear-gradient(135deg,rgba(184,134,11,0.25),rgba(255,215,0,0.1))",border:"1px solid #ffd70055",color:"#ffd700"}
+          : typAkt==="event"
+          ? {background:"linear-gradient(135deg,rgba(0,200,100,0.2),rgba(0,230,118,0.1))",border:"1px solid #00e67655",color:"#00e676"}
+          : {background:"linear-gradient(135deg,rgba(26,58,143,0.25),rgba(135,206,235,0.1))",border:"1px solid #87CEEB55",color:"#87CEEB"}
+        )
+      }}>
+        {typAkt==="złote"?"⭐ WYMIANA ZŁOTYCH":typAkt==="event"?"🎉 WYMIANA EVENTOWA":"💎 WYMIANA DIAMENTOWYCH"}
+      </div>
       {/* Nagłówek */}
       <div style={{background:"linear-gradient(135deg,rgba(0,200,100,0.1),rgba(0,100,50,0.1))",border:"1px solid #0c6",borderRadius:10,padding:14,marginBottom:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
@@ -4661,6 +4696,8 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
         historiaWymian={historiaWymian}
         statusOnline={statusOnline}
         zapiszStrukture={zapiszStrukture}
+        walki={dane?.walki||[]}
+        archiwumWalk={archiwumWalk}
       />}
       {tryb==="kalkulator_event"&&<KalkulatorEventu/>}
       {tryb==="tracker_krecen"&&<TrackerKrecen/>}
@@ -7458,14 +7495,42 @@ function ZarzadzajiePinami({czlonkowie}) {
   );
 }
 
-function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukture}) {
+function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukture, walki=[], archiwumWalk=[]}) {
   const czlonkowie = dane?.czlonkowie || [];
   const posiadane = dane?.posiadane || {};
   const duplikaty = dane?.duplikaty || {};
   const aktywnaWymiana = dane?.aktywnaWymiana;
 
   const teraz = Date.now();
-  const ONLINE_PROG = 90000; // 90 sekund
+  const ONLINE_PROG = 90000;
+
+  // === STATYSTYKI WALK ===
+  const ostatnie10Walk = walki.slice(-10).reverse(); // od najnowszej
+  const wygraneCount = walki.filter(w => w.wynik === "wygrana").length;
+  const przegraCount = walki.filter(w => w.wynik === "przegrana").length;
+  const srPunkty = walki.length > 0
+    ? Math.round(walki.reduce((s,w) => s + (w.punktyNasze||0), 0) / walki.length)
+    : 0;
+  // Seria z rzędu
+  let seria = 0; let seriaTyp = null;
+  for (let i = walki.length - 1; i >= 0; i--) {
+    const w = walki[i];
+    if (seriaTyp === null) { seriaTyp = w.wynik; seria = 1; }
+    else if (w.wynik === seriaTyp) seria++;
+    else break;
+  }
+  // Ranking wojowników — uczestnictwo w walkach
+  const udzialWalkach = {};
+  walki.forEach(w => {
+    (w.uczestnicy || []).forEach(nick => {
+      if (!udzialWalkach[nick]) udzialWalkach[nick] = 0;
+      udzialWalkach[nick]++;
+    });
+  });
+  const rankingWojownikow = czlonkowie
+    .map(c => ({ c, udzial: udzialWalkach[c.nazwa] || 0 }))
+    .sort((a,b) => b.udzial - a.udzial);
+  const maxUdzial = Math.max(...rankingWojownikow.map(r => r.udzial), 1);
 
   // === ONLINE ===
   const onlineNicki = Object.entries(statusOnline)
@@ -7647,6 +7712,90 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
           );
         })}
       </div>
+
+      {/* === TREND WALK === */}
+      {walki.length > 0 && (
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+            <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)"}}>⚔️ Trend walk (ostatnie {Math.min(walki.length,10)})</div>
+            {seriaTyp && seria > 1 && (
+              <span style={{
+                fontSize:11,padding:"2px 10px",borderRadius:10,fontWeight:"bold",
+                background:seriaTyp==="wygrana"?"rgba(0,200,100,0.15)":"rgba(255,50,50,0.12)",
+                border:seriaTyp==="wygrana"?"1px solid #0c633":"1px solid #f5544433",
+                color:seriaTyp==="wygrana"?"#0c6":"#f55",
+              }}>{seriaTyp==="wygrana"?`🔥 Seria: ${seria}W z rzędu`:`💀 Seria: ${seria}P z rzędu`}</span>
+            )}
+          </div>
+          {/* Mini wykres słupkowy */}
+          <div style={{display:"flex",alignItems:"flex-end",gap:4,height:52,marginBottom:10,padding:"0 2px"}}>
+            {[...walki].reverse().slice(0,10).reverse().map((w,i) => {
+              const maxPkt = Math.max(...walki.map(x=>x.punktyNasze||0), 1);
+              const h = Math.max(18, Math.round(((w.punktyNasze||50)/maxPkt)*52));
+              const isW = w.wynik === "wygrana";
+              return (
+                <div key={i} title={`${isW?"🏆":"💀"} ${w.punktyNasze||"?"}:${w.punktyPrzeciwnika||"?"} vs ${w.przeciwnik||"?"}`}
+                  style={{
+                    flex:1,borderRadius:"3px 3px 0 0",height:h,cursor:"default",
+                    background:isW?"linear-gradient(180deg,#0c6,#064)":"linear-gradient(180deg,#f55,#800)",
+                    transition:"opacity 0.2s",opacity:0.85,
+                    boxShadow:isW?"0 0 6px #0c633":"0 0 6px #f5544433",
+                  }}/>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",gap:12,fontSize:10,color:"var(--muted)",marginBottom:8}}>
+            <span>■ <span style={{color:"#0c6"}}>Wygrane ({wygraneCount})</span></span>
+            <span>■ <span style={{color:"#f55"}}>Przegrane ({przegraCount})</span></span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+            {[
+              {label:"Wygrane",val:`${wygraneCount}/${walki.length}`,color:"#0c6",bg:"rgba(0,200,100,0.08)",border:"1px solid #0c633"},
+              {label:"Śr. punkty",val:srPunkty.toLocaleString(),color:"var(--accent)",bg:"rgba(255,215,0,0.08)",border:"1px solid #ffd70033"},
+              {label:"W/P ratio",val:przegraCount>0?(wygraneCount/przegraCount).toFixed(1)+"x":"∞",color:"#6af",bg:"rgba(100,170,255,0.08)",border:"1px solid #6af3"},
+            ].map(s=>(
+              <div key={s.label} style={{textAlign:"center",background:s.bg,border:s.border,borderRadius:8,padding:"8px 4px"}}>
+                <div style={{fontSize:16,fontWeight:"bold",color:s.color}}>{s.val}</div>
+                <div style={{fontSize:9,color:"#555",marginTop:2}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* === RANKING WOJOWNIKÓW === */}
+      {walki.length > 0 && czlonkowie.length > 0 && (
+        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
+          <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:10}}>
+            🏅 Ranking wojowników
+            <span style={{fontSize:10,color:"#555",fontWeight:"normal",marginLeft:6}}>uczestnictwo w walkach</span>
+          </div>
+          {rankingWojownikow.map((r,i) => {
+            const pct = Math.round(r.udzial / maxUdzial * 100);
+            const pctWalk = walki.length > 0 ? Math.round(r.udzial / walki.length * 100) : 0;
+            const kolor = pct >= 80 ? "#0c6" : pct >= 40 ? "#fa0" : "#f55";
+            const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
+            return (
+              <div key={r.c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",marginBottom:3,borderRadius:6,background:i<3?"rgba(255,255,255,0.03)":"transparent"}}>
+                <span style={{fontSize:i<3?14:11,width:22,textAlign:"center",flexShrink:0}}>{medal}</span>
+                <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{r.c.nazwa}</span>
+                <div style={{width:70,height:5,background:"var(--card-solid)",borderRadius:3,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:kolor,borderRadius:3}}/>
+                </div>
+                <span style={{fontSize:11,color:kolor,fontWeight:"bold",width:34,textAlign:"right"}}>{r.udzial}/{walki.length}</span>
+                {r.udzial === 0
+                  ? <span style={{fontSize:9,padding:"1px 6px",borderRadius:10,background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",color:"#f55"}}>🤔 nieobecny</span>
+                  : pctWalk >= 80
+                  ? <span style={{fontSize:9,padding:"1px 6px",borderRadius:10,background:"rgba(0,200,100,0.12)",border:"1px solid #0c633",color:"#0c6"}}>🔥 aktywny</span>
+                  : pctWalk < 40
+                  ? <span style={{fontSize:9,padding:"1px 6px",borderRadius:10,background:"rgba(255,165,0,0.1)",border:"1px solid #fa055",color:"#fa0"}}>😴 rzadki</span>
+                  : null
+                }
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* === AKTYWNOŚĆ WYMIAN === */}
       <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>

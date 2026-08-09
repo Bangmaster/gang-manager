@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { zapiszAutoBackup } from "./firebase";
 
 // Klucze API — te same co w gemini.js
@@ -1075,6 +1075,39 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
     );
   }
 
+  const [aiKomentarze, setAiKomentarze] = useState({}); // {walkaId: komentarz}
+  const [aiLadowanie, setAiLadowanie] = useState({}); // {walkaId: true}
+
+  const generujKomentarz = async (w) => {
+    if (aiLadowanie[w.id] || aiKomentarze[w.id]) return;
+    setAiLadowanie(p => ({ ...p, [w.id]: true }));
+    try {
+      const top3 = [...w.gracze]
+        .filter(g => g.bylNaWalce && (g.obr || 0) > 0)
+        .sort((a, b) => (b.obr || 0) - (a.obr || 0))
+        .slice(0, 3);
+      const prompt = `Jesteś komentatorem gangu ™FAM™ w grze mobilnej. Napisz jeden krótki, dramatyczny komentarz (max 2 zdania) po polsku do tej walki. Styl: gangsterski, z humorem, emoji. 
+Walka: ${w.nazwa || "Walka gangów"}
+Wynik: ${w.wygrana === true ? "WYGRANA 🏆" : w.wygrana === false ? "PRZEGRANA 💀" : "NIEZNANY"}
+Uczestniczyło: ${w.gracze.filter(g => g.bylNaWalce).length}/${w.gracze.length} graczy
+${top3.length > 0 ? `Top gracze: ${top3.map(g => `${g.nazwa} (${g.obr || 0} pkt)`).join(", ")}` : ""}
+Napisz tylko komentarz, bez żadnego wstępu.`;
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 150,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      const txt = data.content?.map(c => c.text || "").join("").trim();
+      if (txt) setAiKomentarze(p => ({ ...p, [w.id]: txt }));
+    } catch (e) { /* cicho */ }
+    setAiLadowanie(p => ({ ...p, [w.id]: false }));
+  };
+
   const sorted = [...walki].sort((a, b) => new Date(b.data) - new Date(a.data));
 
   return (
@@ -1084,66 +1117,133 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
         const bylaNaWalce = w.gracze.filter(g => g.bylNaWalce === true || g.bylNaWalce === "U").length;
         const niebylo = w.gracze.filter(g => g.bylNaWalce === false).length;
         const usprawiedliwieni = w.gracze.filter(g => g.bylNaWalce === "U").length;
-        const wygranaInfo = w.wygrana === true ? "🏆" : w.wygrana === false ? "💀" : null;
-        // Uwaga: Firebase może zwrócić null zamiast undefined
         const maObecnosc = w.gracze.some(g => g.bylNaWalce != null || g.bylNaWalce === false);
+        const isWygrana = w.wygrana === true;
+        const isPrzegrana = w.wygrana === false;
+
+        // Top 3 gracze wg obrażeń
+        const top3 = [...w.gracze]
+          .filter(g => (g.obr || 0) > 0)
+          .sort((a, b) => (b.obr || 0) - (a.obr || 0))
+          .slice(0, 3);
+        const maxObr = top3[0]?.obr || 0;
+
+        // Pasek postępu — nasza suma vs suma top3 przeciwników (szacunek)
+        const naszeObr = w.gracze.reduce((s, g) => s + (g.obr || 0), 0);
+
         return (
-          <div key={w.id} style={{ background: "rgba(0,0,0,0.25)", border: "1px solid #2a2a3a", borderRadius: 8, padding: 12, marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontWeight: "bold", color: "#ffd700", fontSize: 13 }}>{w.nazwa}</span>
-                  {wygranaInfo && <span style={{ fontSize: 14 }} title={w.wygrana ? "Wygrana" : "Przegrana"}>{wygranaInfo}</span>}
+          <div key={w.id} style={{
+            background: isWygrana
+              ? "linear-gradient(180deg,rgba(0,200,100,0.06),rgba(0,0,0,0.25))"
+              : isPrzegrana
+              ? "linear-gradient(180deg,rgba(255,50,50,0.06),rgba(0,0,0,0.25))"
+              : "rgba(0,0,0,0.25)",
+            border: `1px solid ${isWygrana ? "#0c633" : isPrzegrana ? "#f5544433" : "#2a2a3a"}`,
+            borderRadius: 10, marginBottom: 10, overflow: "hidden",
+          }}>
+            {/* === NAGŁÓWEK KARTY === */}
+            <div style={{
+              padding: "10px 14px",
+              borderBottom: `1px solid ${isWygrana ? "#0c622" : isPrzegrana ? "#f5544422" : "#1a1a2e"}`,
+              background: isWygrana ? "rgba(0,200,100,0.08)" : isPrzegrana ? "rgba(255,50,50,0.08)" : "rgba(255,255,255,0.02)",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap",
+            }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{
+                    fontWeight: "900", fontSize: 16,
+                    color: isWygrana ? "#0c6" : isPrzegrana ? "#f55" : "#888",
+                  }}>
+                    {isWygrana ? "🏆 WYGRANA" : isPrzegrana ? "💀 PRZEGRANA" : "⬜ WALKA"}
+                  </span>
                 </div>
-                <div style={{ fontSize: 10, color: "#666", marginTop: 2 }}>
-                  {new Date(w.data).toLocaleString("pl-PL")} • {w.gracze.length} graczy
-                  {maObecnosc && <span style={{ marginLeft: 8 }}>
-                    <span style={{ color: "#0c6" }}>🟢{bylaNaWalce}</span>
-                    <span style={{ color: "#f55", marginLeft: 4 }}>🔴{niebylo}</span>
-                    {usprawiedliwieni > 0 && <span style={{ color: "#fa0", marginLeft: 4 }}>⚠️{usprawiedliwieni}</span>}
-                  </span>}
+                <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>
+                  {new Date(w.data).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" })}
+                  {w.nazwa && <span style={{ color: "#666", marginLeft: 6 }}>• {w.nazwa}</span>}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 5 }}>
-                {isAdmin && (
-                  <button onClick={() => {
-                    const noweWalki = walki.map(x => x.id !== w.id ? x : {
-                      ...x, wygrana: x.wygrana == null ? true : x.wygrana === true ? false : null
-                    });
-                    zapiszWalki(noweWalki);
-                  }} style={{
-                    padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
-                    background: w.wygrana === true ? "rgba(0,200,100,0.2)" : w.wygrana === false ? "rgba(255,50,50,0.15)" : "rgba(255,255,255,0.05)",
-                    border: `1px solid ${w.wygrana === true ? "#0c6" : w.wygrana === false ? "#f55" : "#333"}`,
-                    color: w.wygrana === true ? "#0c6" : w.wygrana === false ? "#f55" : "#555",
-                  }}>{w.wygrana === true ? "🏆 Wygrana" : w.wygrana === false ? "💀 Przegrana" : "⬜ Wynik"}</button>
-                )}
-                {isAdmin && (
-                  <button onClick={() => otworzyjedycjeLvl(w)} style={{
-                    padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
-                    background: trybEdycjiLvl === w.id ? "rgba(100,200,255,0.2)" : "rgba(100,200,255,0.08)",
-                    border: `1px solid ${trybEdycjiLvl === w.id ? "#64c8ff" : "#64c8ff33"}`,
-                    color: "#64c8ff",
-                  }}>⚡ Lvl</button>
-                )}
-                {isAdmin && (
-                  <button onClick={() => setTrybEdycji(trybEdycji === w.id ? null : w.id)} style={{
-                    padding: "4px 8px", borderRadius: 5, cursor: "pointer", fontSize: 11,
-                    background: trybEdycji === w.id ? "rgba(100,150,255,0.2)" : "rgba(100,150,255,0.08)",
-                    border: `1px solid ${trybEdycji === w.id ? "#6496ff" : "#6496ff33"}`,
-                    color: "#6496ff",
-                  }}>👥 Obecność</button>
-                )}
-                <button onClick={() => setRozwiniete(rozwiniete === w.id ? null : w.id)} style={{
-                  padding: "4px 10px", background: "rgba(255,215,0,0.1)", border: "1px solid #b8860b55", borderRadius: 5, color: "#b8860b", cursor: "pointer", fontSize: 11,
-                }}>{rozwiniete === w.id ? "Zwiń" : "Pokaż"}</button>
-                {isAdmin && (
-                  <button onClick={() => usunWalke(w.id)} style={{
-                    padding: "4px 8px", background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", borderRadius: 5, color: "#f55", cursor: "pointer", fontSize: 11,
-                  }}>🗑</button>
-                )}
-              </div>
+              {/* Wynik numeryczny jeśli dostępny */}
+              {naszeObr > 0 && (
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 20, fontWeight: "900", color: isWygrana ? "#0c6" : isPrzegrana ? "#f55" : "#888", lineHeight: 1 }}>
+                    {naszeObr.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 9, color: "#444" }}>łączne obrażenia</div>
+                </div>
+              )}
             </div>
+
+            {/* === BODY === */}
+            <div style={{ padding: "10px 14px" }}>
+
+              {/* Uczestnictwo */}
+              {maObecnosc && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555", marginBottom: 4 }}>
+                    <span>Uczestnictwo</span>
+                    <span style={{ color: bylaNaWalce >= w.gracze.length * 0.75 ? "#0c6" : "#fa0" }}>
+                      {bylaNaWalce}/{w.gracze.length} 👥
+                      {usprawiedliwieni > 0 && <span style={{ color: "#fa0", marginLeft: 4 }}>({usprawiedliwieni} usprawiedl.)</span>}
+                      {niebylo > 0 && <span style={{ color: "#f55", marginLeft: 4 }}>{niebylo} nieob.</span>}
+                    </span>
+                  </div>
+                  <div style={{ height: 5, borderRadius: 3, background: "#1a1a2e", overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", borderRadius: 3,
+                      width: `${Math.round(bylaNaWalce / w.gracze.length * 100)}%`,
+                      background: bylaNaWalce >= w.gracze.length * 0.75
+                        ? "linear-gradient(90deg,#0c6,#0fa)"
+                        : "linear-gradient(90deg,#fa0,#f80)",
+                    }}/>
+                  </div>
+                </div>
+              )}
+
+              {/* Top 3 gracze */}
+              {top3.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: "#555", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.5px" }}>Top gracze</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {top3.map((g, i) => (
+                      <div key={g.nazwa} style={{
+                        flex: 1, padding: "6px 8px", borderRadius: 8, textAlign: "center",
+                        background: i === 0 ? "rgba(255,215,0,0.1)" : i === 1 ? "rgba(192,192,192,0.08)" : "rgba(205,127,50,0.08)",
+                        border: `1px solid ${i === 0 ? "#ffd70033" : i === 1 ? "#aaa3" : "#cd7f3233"}`,
+                      }}>
+                        <div style={{ fontSize: 14 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</div>
+                        <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: "bold", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {g.nazwa.replace(/™FAM™|fAM™|FAM™/gi, "").trim()}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#666", marginTop: 1 }}>{(g.obr || 0).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Komentarz AI */}
+              <div style={{ marginBottom: 10 }}>
+                {aiKomentarze[w.id] ? (
+                  <div style={{
+                    padding: "8px 10px",
+                    background: "rgba(255,215,0,0.05)",
+                    borderLeft: "2px solid #ffd70055",
+                    borderRadius: "0 6px 6px 0",
+                    fontSize: 11, color: "#ccc", fontStyle: "italic", lineHeight: 1.5,
+                  }}>
+                    "{aiKomentarze[w.id]}"
+                    <button onClick={() => setAiKomentarze(p => { const n = {...p}; delete n[w.id]; return n; })}
+                      style={{ marginLeft: 6, background: "none", border: "none", color: "#333", cursor: "pointer", fontSize: 10 }}>↺</button>
+                  </div>
+                ) : (
+                  <button onClick={() => generujKomentarz(w)} disabled={aiLadowanie[w.id]} style={{
+                    padding: "5px 12px", borderRadius: 6, fontSize: 10, cursor: "pointer",
+                    background: "rgba(255,215,0,0.06)", border: "1px solid #ffd70022", color: "#ffd70088",
+                  }}>
+                    {aiLadowanie[w.id] ? "⏳ Generuję..." : "✨ Komentarz AI"}
+                  </button>
+                )}
+              </div>
 
             {/* Edycja lvl */}
             {trybEdycjiLvl === w.id && (
