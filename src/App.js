@@ -1123,6 +1123,7 @@ function App() {
           onZablokuj={async(fp,nick)=>{if(!window.confirm(`Zablokować urządzenie ${fp} (${nick})?`)) return; await zablokujUrządzenie(fp,nick,"Zablokowane z logów"); alert("✅ Zablokowano");}}
           onOdblokuj={async(fp)=>{if(!window.confirm(`Odblokować urządzenie ${fp}?`)) return; await odblokujUrządzenie(fp); alert("✅ Odblokowano");}}
           historiaPush={historiaPush}
+          archiwumWalk={archiwumWalk}
         />}
       </div>
       </div>
@@ -4640,7 +4641,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 // ============================================================
 // TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={},historiaPush=[]}) {
+function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={},historiaPush=[],archiwumWalk=[]}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaTalia,setWybranaTalia]=useState(0);

@@ -1244,6 +1244,7 @@ Napisz tylko komentarz, bez żadnego wstępu.`;
                   </button>
                 )}
               </div>
+            </div>
 
             {/* Edycja lvl */}
             {trybEdycjiLvl === w.id && (
