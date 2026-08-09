@@ -1014,7 +1014,7 @@ function LigaView({ isAdmin, walki, zapiszWalki }) {
 }
 
 function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
-  const [rozwiniete, setRozwiniete] = useState(null);
+  const [rozwiniete] = useState(null);
   const [trybEdycji] = useState(null); // id walki w trybie edycji obecności
   const [trybEdycjiLvl, setTrybEdycjiLvl] = useState(null); // id walki w trybie edycji lvl
   const [edytowaneLvl, setEdytowaneLvl] = useState({}); // {nazwa: lvl}
