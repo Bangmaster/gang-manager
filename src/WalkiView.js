@@ -1032,39 +1032,40 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
 
   const generujKomentarz = async (w) => {
     if (aiLadowanie[w.id] || aiKomentarze[w.id]) return;
+    if (KLUCZE.length === 0) { alert("Brak klucza API — dodaj REACT_APP_GEMINI_API_KEY w .env"); return; }
     setAiLadowanie(p => ({ ...p, [w.id]: true }));
     try {
       const top3 = [...w.gracze]
-        .filter(g => g.bylNaWalce && (g.obr || 0) > 0)
-        .sort((a, b) => (b.obr || 0) - (a.obr || 0))
+        .filter(g => g.bylNaWalce && (g.obrazenia || 0) > 0)
+        .sort((a, b) => (b.obrazenia || 0) - (a.obrazenia || 0))
         .slice(0, 3);
-      const wszyscy = w.gracze.filter(g => g.bylNaWalce).map(g => `${g.nazwa.replace(/™FAM™|fAM™|FAM™/gi,"").trim()} (${g.obr||0} pkt)`).join(", ");
-      const prompt = `Jesteś legendarnym komentatorem gangu ™FAM™ w grze mobilnej Card Clash. Napisz śmieszny, dramatyczny, gangsterski komentarz po polsku podsumowujący tę walkę. Max 3 zdania. Używaj emoji. Możesz nawiązywać do konkretnych graczy i ich wyników. Bez żadnego wstępu — tylko komentarz.
+      const wszyscy = w.gracze.filter(g => g.bylNaWalce).map(g =>
+        `${g.nazwa.replace(/™FAM™|fAM™|FAM™/gi,"").trim()} (${(g.obrazenia||0).toLocaleString()} obr, ${g.tarcze||0} tarcz)`
+      ).join(", ");
+      const prompt = `Jesteś legendarnym komentatorem gangu ™FAM™ w grze mobilnej Card Clash. Napisz śmieszny, dramatyczny, gangsterski komentarz po polsku podsumowujący tę walkę. Max 3 zdania. Używaj emoji. Nawiązuj do konkretnych graczy i ich wyników. Bez żadnego wstępu — tylko komentarz.
 
 Walka: ${w.nazwa || "Walka gangów"}
 Data: ${new Date(w.data).toLocaleDateString("pl-PL")}
 Wynik: ${w.wygrana === true ? "WYGRANA 🏆" : w.wygrana === false ? "PRZEGRANA 💀" : "REMIS"}
 Uczestniczyło: ${w.gracze.filter(g => g.bylNaWalce).length}/${w.gracze.length} graczy
-Łączne obrażenia gangu: ${w.gracze.reduce((s,g)=>s+(g.obr||0),0).toLocaleString()}
-${top3.length > 0 ? `Bohaterowie walki: ${top3.map(g=>`${g.nazwa.replace(/™FAM™|fAM™|FAM™/gi,"").trim()} z ${(g.obr||0).toLocaleString()} obrażeniami`).join(", ")}` : ""}
+Łączne obrażenia gangu: ${w.gracze.reduce((s,g)=>s+(g.obrazenia||0),0).toLocaleString()}
+${top3.length > 0 ? `Bohaterowie walki: ${top3.map(g=>`${g.nazwa.replace(/™FAM™|fAM™|FAM™/gi,"").trim()} — ${(g.obrazenia||0).toLocaleString()} obr, ${g.tarcze||0} tarcz`).join("; ")}` : ""}
 ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 200,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-      const data = await res.json();
-      const txt = data.content?.map(c => c.text || "").join("").trim();
-      if (txt) setAiKomentarze(p => ({ ...p, [w.id]: txt }));
-      else if (data.error) console.error("AI error:", data.error);
-    } catch (e) { console.error("AI fetch error:", e); }
+      for (let proba = 0; proba < KLUCZE.length; proba++) {
+        try {
+          const url = pobierzURL();
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+          });
+          const data = await res.json();
+          const txt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (txt) { setAiKomentarze(p => ({ ...p, [w.id]: txt })); break; }
+          nastepnyKlucz();
+        } catch { nastepnyKlucz(); }
+      }
+    } catch (e) { console.error("AI komentarz błąd:", e); }
     setAiLadowanie(p => ({ ...p, [w.id]: false }));
   };
 
@@ -1076,9 +1077,9 @@ ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
     if (!w) return null;
     const isWygrana = w.wygrana === true;
     const isPrzegrana = w.wygrana === false;
-    const naszeObr = w.gracze.reduce((s, g) => s + (g.obr || 0), 0);
+    const naszeObr = w.gracze.reduce((s, g) => s + (g.obrazenia || 0), 0);
     const bylaNaWalce = w.gracze.filter(g => g.bylNaWalce === true || g.bylNaWalce === "U").length;
-    const top3 = [...w.gracze].filter(g=>(g.obr||0)>0).sort((a,b)=>(b.obr||0)-(a.obr||0)).slice(0,3);
+    const top3 = [...w.gracze].filter(g=>(g.obrazenia||0)>0).sort((a,b)=>(b.obrazenia||0)-(a.obrazenia||0)).slice(0,3);
 
     return (
       <div onClick={() => setOtwartaWalka(null)} style={{
@@ -1104,7 +1105,7 @@ ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
               </div>
               <div style={{fontSize:11,color:"#555",marginTop:2}}>
                 {new Date(w.data).toLocaleDateString("pl-PL",{day:"numeric",month:"long",year:"numeric"})}
-                {w.nazwa&&<span style={{color:"#666",marginLeft:6}}>• {w.nazwa}</span>}
+                {w.nazwa&&<span style={{color:"#ccc",marginLeft:6,fontWeight:"bold"}}>⚔️ vs {w.nazwa}</span>}
               </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1150,7 +1151,7 @@ ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:12}}>
               {[
                 {label:"Uczestnictwo",val:`${bylaNaWalce}/${w.gracze.length}`,color:"#6af"},
-                {label:"Top obrażenia",val:top3[0]?(top3[0].obr||0).toLocaleString():"—",color:"#ffd700"},
+                {label:"Top obrażenia",val:top3[0]?(top3[0].obrazenia||0).toLocaleString():"—",color:"#ffd700"},
                 {label:"Łącznie",val:naszeObr.toLocaleString(),color:isWygrana?"#0c6":isPrzegrana?"#f55":"#888"},
               ].map(s=>(
                 <div key={s.label} style={{textAlign:"center",background:"rgba(255,255,255,0.03)",border:"1px solid #1a1a2e",borderRadius:8,padding:"8px 4px"}}>
@@ -1240,7 +1241,7 @@ ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
 
               {/* Lista graczy */}
               <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                {[...w.gracze].sort((a,b)=>(b.obr||0)-(a.obr||0)).map((g,i)=>{
+                {[...w.gracze].sort((a,b)=>(b.obrazenia||0)-(a.obrazenia||0)).map((g,i)=>{
                   const byl = g.bylNaWalce;
                   const kolor = byl===true?"#0c6":byl===false?"#f55":byl==="U"?"#fa0":"#555";
                   const ikona = byl===true?"🟢":byl===false?"🔴":byl==="U"?"⚠️":"⚪";
@@ -1252,11 +1253,12 @@ ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
                     }}>
                       <span style={{fontSize:12,width:20,textAlign:"center",flexShrink:0}}>{ikona}</span>
                       <span style={{flex:1,fontSize:12,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {i===0&&(g.obr||0)>0?"🥇 ":i===1&&(g.obr||0)>0?"🥈 ":i===2&&(g.obr||0)>0?"🥉 ":""}
+                        {i===0&&(g.obrazenia||0)>0?"🥇 ":i===1&&(g.obrazenia||0)>0?"🥈 ":i===2&&(g.obrazenia||0)>0?"🥉 ":""}
                         {g.nazwa.replace(/™FAM™|fAM™|FAM™/gi,"").trim()}
                       </span>
                       {(g.poziomAkt||g.poziom)&&<span style={{fontSize:10,color:"#555",flexShrink:0}}>lvl {g.poziomAkt||g.poziom}</span>}
-                      {(g.obr||0)>0&&<span style={{fontSize:12,color:i===0?"#ffd700":i===1?"#aaa":i===2?"#cd7f32":"#666",fontWeight:"bold",flexShrink:0}}>{(g.obr||0).toLocaleString()}</span>}
+                      {(g.obrazenia||0)>0&&<span style={{fontSize:12,color:i===0?"#ffd700":i===1?"#aaa":i===2?"#cd7f32":"#666",fontWeight:"bold",flexShrink:0}}>{(g.obrazenia||0).toLocaleString()}</span>}
+                      {(g.tarcze||0)>0&&<span style={{fontSize:11,color:"#87CEEB",flexShrink:0}}>🛡️{g.tarcze}</span>}
                       {isAdmin&&(
                         <button onClick={()=>toggleObecnosc(w.id,g.nazwa)} title="Zmień obecność" style={{
                           background:"none",border:`1px solid ${kolor}44`,borderRadius:10,
@@ -1298,8 +1300,8 @@ ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
         const bylaNaWalce = w.gracze.filter(g => g.bylNaWalce === true || g.bylNaWalce === "U").length;
         const isWygrana = w.wygrana === true;
         const isPrzegrana = w.wygrana === false;
-        const naszeObr = w.gracze.reduce((s, g) => s + (g.obr || 0), 0);
-        const top3 = [...w.gracze].filter(g=>(g.obr||0)>0).sort((a,b)=>(b.obr||0)-(a.obr||0)).slice(0,3);
+        const naszeObr = w.gracze.reduce((s, g) => s + (g.obrazenia || 0), 0);
+        const top3 = [...w.gracze].filter(g=>(g.obrazenia||0)>0).sort((a,b)=>(b.obrazenia||0)-(a.obrazenia||0)).slice(0,3);
 
         return (
           <div key={w.id} onClick={()=>setOtwartaWalka(w.id)} style={{
@@ -1326,11 +1328,11 @@ ${wszyscy ? `Wszyscy uczestnicy: ${wszyscy}` : ""}`;
                 </div>
                 <div style={{ fontSize: 10, color: "#555", marginTop: 2 }}>
                   {new Date(w.data).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" })}
-                  {w.nazwa && <span style={{ color: "#666", marginLeft: 6 }}>• {w.nazwa}</span>}
+                  {w.nazwa && <span style={{ color: "#aaa", marginLeft: 6, fontWeight:"600" }}>⚔️ {w.nazwa}</span>}
                 </div>
                 <div style={{fontSize:10,color:"#444",marginTop:2}}>
                   👥 {bylaNaWalce}/{w.gracze?.length||0}
-                  {top3[0]&&<span style={{marginLeft:8}}>⚔️ top: {top3[0].nazwa.replace(/™FAM™|fAM™|FAM™/gi,"").trim()} ({(top3[0].obr||0).toLocaleString()})</span>}
+                  {top3[0]&&<span style={{marginLeft:8}}>⚔️ top: {top3[0].nazwa.replace(/™FAM™|fAM™|FAM™/gi,"").trim()} ({(top3[0].obrazenia||0).toLocaleString()})</span>}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
