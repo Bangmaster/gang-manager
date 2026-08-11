@@ -7729,56 +7729,6 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
         })}
       </div>
 
-      {/* === TREND WALK === */}
-      {walki.length > 0 && (
-        <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
-            <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)"}}>⚔️ Trend walk (ostatnie {Math.min(walki.length,10)})</div>
-            {seriaTyp && seria > 1 && (
-              <span style={{
-                fontSize:11,padding:"2px 10px",borderRadius:10,fontWeight:"bold",
-                background:seriaTyp==="wygrana"?"rgba(0,200,100,0.15)":"rgba(255,50,50,0.12)",
-                border:seriaTyp==="wygrana"?"1px solid #0c633":"1px solid #f5544433",
-                color:seriaTyp==="wygrana"?"#0c6":"#f55",
-              }}>{seriaTyp==="wygrana"?`🔥 Seria: ${seria}W z rzędu`:`💀 Seria: ${seria}P z rzędu`}</span>
-            )}
-          </div>
-          {/* Mini wykres słupkowy */}
-          <div style={{display:"flex",alignItems:"flex-end",gap:4,height:52,marginBottom:10,padding:"0 2px"}}>
-            {[...walki].reverse().slice(0,10).reverse().map((w,i) => {
-              const maxPkt = Math.max(...walki.map(x=>x.punktyNasze||0), 1);
-              const h = Math.max(18, Math.round(((w.punktyNasze||50)/maxPkt)*52));
-              const isW = w.wynik === "wygrana";
-              return (
-                <div key={i} title={`${isW?"🏆":"💀"} ${w.punktyNasze||"?"}:${w.punktyPrzeciwnika||"?"} vs ${w.przeciwnik||"?"}`}
-                  style={{
-                    flex:1,borderRadius:"3px 3px 0 0",height:h,cursor:"default",
-                    background:isW?"linear-gradient(180deg,#0c6,#064)":"linear-gradient(180deg,#f55,#800)",
-                    transition:"opacity 0.2s",opacity:0.85,
-                    boxShadow:isW?"0 0 6px #0c633":"0 0 6px #f5544433",
-                  }}/>
-              );
-            })}
-          </div>
-          <div style={{display:"flex",gap:12,fontSize:10,color:"var(--muted)",marginBottom:8}}>
-            <span>■ <span style={{color:"#0c6"}}>Wygrane ({wygraneCount})</span></span>
-            <span>■ <span style={{color:"#f55"}}>Przegrane ({przegraCount})</span></span>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
-            {[
-              {label:"Wygrane",val:`${wygraneCount}/${walki.length}`,color:"#0c6",bg:"rgba(0,200,100,0.08)",border:"1px solid #0c633"},
-              {label:"Śr. punkty",val:srPunkty.toLocaleString(),color:"var(--accent)",bg:"rgba(255,215,0,0.08)",border:"1px solid #ffd70033"},
-              {label:"W/P ratio",val:przegraCount>0?(wygraneCount/przegraCount).toFixed(1)+"x":"∞",color:"#6af",bg:"rgba(100,170,255,0.08)",border:"1px solid #6af3"},
-            ].map(s=>(
-              <div key={s.label} style={{textAlign:"center",background:s.bg,border:s.border,borderRadius:8,padding:"8px 4px"}}>
-                <div style={{fontSize:16,fontWeight:"bold",color:s.color}}>{s.val}</div>
-                <div style={{fontSize:9,color:"#555",marginTop:2}}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* === RANKING WOJOWNIKÓW === */}
       {walki.length > 0 && czlonkowie.length > 0 && (
         <div style={{background:"rgba(0,0,0,0.2)",border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:12}}>
