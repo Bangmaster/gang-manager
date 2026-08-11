@@ -743,46 +743,6 @@ function RankingTabelaEdycja({ gracze, edytowanyGracz, setEdytowanyGracz, onChan
   );
 }
 
-function RankingTabela({ gracze, edytowalne, onChange }) {
-  const fmt = (n) => {
-    if (n >= 1000000) return (n / 1000000).toFixed(2).replace(".", ",") + "M";
-    if (n >= 1000) return (n / 1000).toFixed(2).replace(".", ",") + "k";
-    return n.toString();
-  };
-  // Sortuj wg obrażeń malejąco
-  const posortowani = [...gracze].sort((a, b) => b.obrazenia - a.obrazenia);
-  const max = Math.max(1, ...posortowani.map(g => g.obrazenia));
-  return (
-    <div>
-      {posortowani.map((g, i) => {
-        const kolor = i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#888";
-        const obecnosc = g.bylNaWalce;
-        return (
-          <div key={i} style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
-            background: i < 3 ? `linear-gradient(90deg,${kolor}11,transparent)` : "rgba(255,255,255,0.02)",
-            borderLeft: `3px solid ${kolor}`, borderRadius: 6, marginBottom: 4, position: "relative", overflow: "hidden",
-          }}>
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(g.obrazenia / max) * 100}%`, background: `${kolor}08`, zIndex: 0 }} />
-            <span style={{ fontSize: 13, color: kolor, fontWeight: "bold", width: 24, zIndex: 1 }}>{i + 1}.</span>
-            {obecnosc !== undefined && (
-              <span style={{ fontSize: 9, zIndex: 1 }} title={obecnosc ? "Był na walce" : "Nie był na walce"}>
-                {obecnosc ? "🟢" : "🔴"}
-              </span>
-            )}
-            <span style={{ flex: 1, fontSize: 12, color: "#ddd", fontWeight: i < 3 ? "bold" : "normal", zIndex: 1 }}>
-              {g.nazwa} <span style={{ fontSize: 10, color: "#666" }}>L{g.poziom}</span>
-            </span>
-            <span style={{ fontSize: 12, color: "#ffd700", minWidth: 70, textAlign: "right", zIndex: 1 }}>🔫 {fmt(g.obrazenia)}</span>
-            <span style={{ fontSize: 12, color: "#87CEEB", minWidth: 40, textAlign: "right", zIndex: 1 }}>🛡️ {g.tarcze}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-
 // Prompt OCR dla screena ligi
 function buildLigaPrompt(ileScreenow) {
   const multi = ileScreenow > 1

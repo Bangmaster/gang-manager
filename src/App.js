@@ -7521,20 +7521,6 @@ function AdminDashboard({dane, talie, historiaWymian, statusOnline, zapiszStrukt
   const teraz = Date.now();
   const ONLINE_PROG = 90000;
 
-  // === STATYSTYKI WALK ===
-  const wygraneCount = walki.filter(w => w.wynik === "wygrana").length;
-  const przegraCount = walki.filter(w => w.wynik === "przegrana").length;
-  const srPunkty = walki.length > 0
-    ? Math.round(walki.reduce((s,w) => s + (w.punktyNasze||0), 0) / walki.length)
-    : 0;
-  // Seria z rzędu
-  let seria = 0; let seriaTyp = null;
-  for (let i = walki.length - 1; i >= 0; i--) {
-    const w = walki[i];
-    if (seriaTyp === null) { seriaTyp = w.wynik; seria = 1; }
-    else if (w.wynik === seriaTyp) seria++;
-    else break;
-  }
   // Ranking wojowników — uczestnictwo w walkach
   const udzialWalkach = {};
   walki.forEach(w => {
