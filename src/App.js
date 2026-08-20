@@ -119,8 +119,11 @@ function normalizuj(s) {
 const TRUDNE_NUMERY = [10, 11, 12, 14, 15];
 
 // Zwraca nagrodę amunicji uwzględniając krąg gracza
-// krag=1 → nagroda_amunicja, krag>=2 → nagroda_amunicja_k2 (zakładamy k2=k3+)
+// krag=1 → nagroda_amunicja, krag=2 → nagroda_amunicja_k2, krag>=3 → nagroda_amunicja_k3
 function pobierzNagrode(talia, krag) {
+  if ((krag || 1) >= 3 && talia.nagroda_amunicja_k3 !== undefined) {
+    return talia.nagroda_amunicja_k3;
+  }
   if ((krag || 1) >= 2 && talia.nagroda_amunicja_k2 !== undefined) {
     return talia.nagroda_amunicja_k2;
   }
@@ -185,81 +188,81 @@ function obliczProgEvent(obecnaLiczba) {
 }
 
 const DOMYSLNE_TALIE = [
-  { id: "miejskie_legendy", numer: 1, nazwa: "Miejskie legendy", nagroda_amunicja: 500, nagroda_amunicja_k2: 500, karty: [
+  { id: "miejskie_legendy", numer: 1, nazwa: "Miejskie legendy", nagroda_amunicja: 500, nagroda_amunicja_k2: 500, nagroda_amunicja_k3: 1000, karty: [
     {nazwa:"Tajemnicze zniknięcia",typ:"złota"},{nazwa:"Obserwacje kryptydów",typ:"złota"},{nazwa:"Nawiedzone lokacje",typ:"złota"},
     {nazwa:"Przeklęte przedmioty",typ:"złota"},{nazwa:"Istoty nadprzyrodzone",typ:"złota"},{nazwa:"Miejskie legendy",typ:"złota"},
     {nazwa:"Tajne stowarzyszenia",typ:"złota"},{nazwa:"Widmowe zjawy",typ:"złota"},{nazwa:"Niewyjaśnione zjawiska",typ:"złota"},
   ]},
-  { id: "szkolne_rywalizacje", numer: 2, nazwa: "Szkolne rywalizacje", nagroda_amunicja: 750, nagroda_amunicja_k2: 750, karty: [
+  { id: "szkolne_rywalizacje", numer: 2, nazwa: "Szkolne rywalizacje", nagroda_amunicja: 750, nagroda_amunicja_k2: 750, nagroda_amunicja_k3: 500, karty: [
     {nazwa:"Zawody Maskotek",typ:"złota"},{nazwa:"Tygodnie duchów",typ:"złota"},{nazwa:"Wiece motywacyjne",typ:"złota"},
     {nazwa:"Wojny na żarty",typ:"złota"},{nazwa:"Gry Powrotu do Domu",typ:"złota"},{nazwa:"Bitwy cheerleaderek",typ:"złota"},
     {nazwa:"Barwy szkoły",typ:"złota"},{nazwa:"Rywalizacje absolwentów",typ:"złota"},{nazwa:"Wyzwania akademickie",typ:"złota"},
   ]},
-  { id: "lokalne_firmy", numer: 3, nazwa: "Lokalne firmy", nagroda_amunicja: 1000, nagroda_amunicja_k2: 1000, karty: [
+  { id: "lokalne_firmy", numer: 3, nazwa: "Lokalne firmy", nagroda_amunicja: 1000, nagroda_amunicja_k2: 1000, nagroda_amunicja_k3: 1500, karty: [
     {nazwa:"Relacje z klientami",typ:"złota"},{nazwa:"Zaangażowanie społeczności",typ:"złota"},{nazwa:"Zrównoważone praktyki",typ:"złota"},
     {nazwa:"Lokalne zaopatrzenie",typ:"złota"},{nazwa:"Wyjątkowe oferty",typ:"złota"},{nazwa:"Reputacja na rynku",typ:"złota"},
     {nazwa:"Zdolność adaptacji biznesu",typ:"złota"},{nazwa:"Programy lojalnościowe dla klientów",typ:"złota"},
     {nazwa:"Satysfakcja pracowników",typ:"diamentowa"},
   ]},
-  { id: "ukryte_ogrody", numer: 4, nazwa: "Ukryte ogrody", nagroda_amunicja: 1500, nagroda_amunicja_k2: 1500, karty: [
+  { id: "ukryte_ogrody", numer: 4, nazwa: "Ukryte ogrody", nagroda_amunicja: 1500, nagroda_amunicja_k2: 1500, nagroda_amunicja_k3: 2500, karty: [
     {nazwa:"Sekretne ścieżki",typ:"złota"},{nazwa:"Szepczące listowie",typ:"złota"},{nazwa:"Zaczarowane kwiaty",typ:"złota"},
     {nazwa:"Ukryte zakamarki",typ:"złota"},{nazwa:"Ciche zakątki",typ:"złota"},{nazwa:"Botaniczne labirynty",typ:"złota"},
     {nazwa:"Zielone sanktuaria",typ:"złota"},{nazwa:"Spokojne kryjówki",typ:"diamentowa"},{nazwa:"Starożytna mądrość",typ:"diamentowa"},
   ]},
-  { id: "najgoretsze_miejsca", numer: 5, nazwa: "Najgorętsze miejsca nocnego życia", nagroda_amunicja: 1500, nagroda_amunicja_k2: 2500, karty: [
+  { id: "najgoretsze_miejsca", numer: 5, nazwa: "Najgorętsze miejsca nocnego życia", nagroda_amunicja: 1500, nagroda_amunicja_k2: 2500, nagroda_amunicja_k3: 4000, karty: [
     {nazwa:"Parkiety taneczne",typ:"złota"},{nazwa:"Popisowe koktajle",typ:"złota"},{nazwa:"Widoki z dachu",typ:"złota"},
     {nazwa:"Line-upy DJ-ów",typ:"złota"},{nazwa:"Dekoracja tematyczna",typ:"złota"},{nazwa:"Sekcje VIP",typ:"złota"},
     {nazwa:"Występy na żywo",typ:"złota"},{nazwa:"Neonowe oświetlenie",typ:"złota"},{nazwa:"Późnonocny posiłek",typ:"diamentowa"},
   ]},
-  { id: "kolorowe_murale", numer: 6, nazwa: "Kolorowe murale", nagroda_amunicja: 2500, nagroda_amunicja_k2: 3000, karty: [
+  { id: "kolorowe_murale", numer: 6, nazwa: "Kolorowe murale", nagroda_amunicja: 2500, nagroda_amunicja_k2: 3000, nagroda_amunicja_k3: 4000, karty: [
     {nazwa:"Miejska estetyka",typ:"złota"},{nazwa:"Historie społeczności",typ:"złota"},{nazwa:"Tożsamość kulturowa",typ:"złota"},
     {nazwa:"Techniki artystyczne",typ:"złota"},{nazwa:"Wpływ historyczny",typ:"złota"},{nazwa:"Tematy środowiskowe",typ:"złota"},
     {nazwa:"Zaangażowanie społeczne",typ:"diamentowa"},{nazwa:"Sztuka współpracy",typ:"diamentowa"},{nazwa:"Efekt wizualny",typ:"diamentowa"},
   ]},
-  { id: "miejska_dzika_przyroda", numer: 7, nazwa: "Miejska dzika przyroda", nagroda_amunicja: 3000, nagroda_amunicja_k2: 3500, karty: [
+  { id: "miejska_dzika_przyroda", numer: 7, nazwa: "Miejska dzika przyroda", nagroda_amunicja: 3000, nagroda_amunicja_k2: 3500, nagroda_amunicja_k3: 6000, karty: [
     {nazwa:"Przystosowania zwierząt",typ:"złota"},{nazwa:"Miejskie ekosystemy",typ:"złota"},{nazwa:"Nocne zachowanie",typ:"złota"},
     {nazwa:"Korytarze dla dzikiej przyrody",typ:"złota"},{nazwa:"Źródła żywności",typ:"złota"},
     {nazwa:"Lokalizacje schronów",typ:"diamentowa"},{nazwa:"Interakcja człowieka z dziką przyrodą",typ:"diamentowa"},
     {nazwa:"Ekosystemy na dachach",typ:"diamentowa"},{nazwa:"Zachowanie szopa",typ:"diamentowa"},
   ]},
-  { id: "artysci_uliczni", numer: 8, nazwa: "Artyści uliczni", nagroda_amunicja: 3500, nagroda_amunicja_k2: 4000, karty: [
+  { id: "artysci_uliczni", numer: 8, nazwa: "Artyści uliczni", nagroda_amunicja: 3500, nagroda_amunicja_k2: 4000, nagroda_amunicja_k3: 6000, karty: [
     {nazwa:"Busking",typ:"złota"},{nazwa:"Sztuka cyrku",typ:"złota"},{nazwa:"Żywe posągi",typ:"złota"},
     {nazwa:"Improwizacja teatralna",typ:"złota"},{nazwa:"Taniec uliczny",typ:"złota"},
     {nazwa:"Magia uliczna",typ:"diamentowa"},{nazwa:"Malarstwo na ciele",typ:"diamentowa"},
     {nazwa:"Muzyka etniczna",typ:"diamentowa"},{nazwa:"Akrobacje",typ:"diamentowa"},
   ]},
-  { id: "festiwale_sasiedzkie", numer: 9, nazwa: "Festiwale sąsiedzkie", nagroda_amunicja: 4000, nagroda_amunicja_k2: 6000, karty: [
+  { id: "festiwale_sasiedzkie", numer: 9, nazwa: "Festiwale sąsiedzkie", nagroda_amunicja: 4000, nagroda_amunicja_k2: 6000, nagroda_amunicja_k3: 6000, karty: [
     {nazwa:"Platformy paradne",typ:"złota"},{nazwa:"Parada zwierzaków",typ:"złota"},{nazwa:"Występy kulturalne",typ:"złota"},
     {nazwa:"Jarmarki rzemieślnicze",typ:"diamentowa"},{nazwa:"Tradycyjne gry",typ:"diamentowa"},{nazwa:"Warsztaty społeczności",typ:"diamentowa"},
     {nazwa:"Muzyka na żywo",typ:"diamentowa"},{nazwa:"Dekoracje uliczne",typ:"diamentowa"},{nazwa:"Aktywności rodzinne",typ:"diamentowa"},
   ]},
-  { id: "targowiska_uliczne", numer: 10, nazwa: "Targowiska uliczne", nagroda_amunicja: 4000, nagroda_amunicja_k2: 6000, karty: [
+  { id: "targowiska_uliczne", numer: 10, nazwa: "Targowiska uliczne", nagroda_amunicja: 4000, nagroda_amunicja_k2: 6000, nagroda_amunicja_k3: 10000, karty: [
     {nazwa:"Lokalne rzemiosło",typ:"złota"},{nazwa:"Świeże produkty",typ:"złota"},{nazwa:"Egzotyczne przyprawy",typ:"złota"},
     {nazwa:"Jedzenie uliczne",typ:"złota"},{nazwa:"Odzież vintage",typ:"złota"},{nazwa:"Ręcznie robiona biżuteria",typ:"złota"},
     {nazwa:"Stoiska z sztuką",typ:"diamentowa"},{nazwa:"Polowanie na okazje",typ:"diamentowa"},{nazwa:"Różnorodność kulturowa",typ:"diamentowa"},
   ]},
-  { id: "zabytki_historyczne", numer: 11, nazwa: "Zabytki historyczne", nagroda_amunicja: 4500, nagroda_amunicja_k2: 10000, karty: [
+  { id: "zabytki_historyczne", numer: 11, nazwa: "Zabytki historyczne", nagroda_amunicja: 4500, nagroda_amunicja_k2: 10000, nagroda_amunicja_k3: 12000, karty: [
     {nazwa:"Styl architektoniczny",typ:"złota"},{nazwa:"Znaczenie kulturowe",typ:"złota"},{nazwa:"Epoka historyczna",typ:"złota"},
     {nazwa:"Ewolucja architektoniczna",typ:"diamentowa"},{nazwa:"Atrakcja turystyczna",typ:"diamentowa"},
     {nazwa:"Obiekt światowego dziedzictwa",typ:"diamentowa"},{nazwa:"Wycieczki z przewodnikiem",typ:"diamentowa"},
     {nazwa:"Monumentalna skala",typ:"diamentowa"},{nazwa:"Projekty renowacji",typ:"diamentowa"},
   ]},
-  { id: "tradycyjne_rzemioslo", numer: 12, nazwa: "Tradycyjne rzemiosło", nagroda_amunicja: 6000, nagroda_amunicja_k2: 12000, karty: [
+  { id: "tradycyjne_rzemioslo", numer: 12, nazwa: "Tradycyjne rzemiosło", nagroda_amunicja: 6000, nagroda_amunicja_k2: 12000, nagroda_amunicja_k3: 15000, karty: [
     {nazwa:"Techniki tkackie",typ:"diamentowa"},{nazwa:"Szkliwienie ceramiki",typ:"diamentowa"},{nazwa:"Style plecionkarstwa",typ:"diamentowa"},
     {nazwa:"Garbarstwo",typ:"diamentowa"},{nazwa:"Kucie metalu",typ:"diamentowa"},{nazwa:"Rzeźbienie w drewnie",typ:"diamentowa"},
     {nazwa:"Barwienie tekstyliów",typ:"diamentowa"},{nazwa:"Wzory haftu",typ:"diamentowa"},{nazwa:"Wydmuchiwanie szkła",typ:"diamentowa"},
   ]},
-  { id: "liderzy_spolecznosci", numer: 13, nazwa: "Liderzy społeczności", nagroda_amunicja: 1500, nagroda_amunicja_k2: 2500, karty: [
+  { id: "liderzy_spolecznosci", numer: 13, nazwa: "Liderzy społeczności", nagroda_amunicja: 1500, nagroda_amunicja_k2: 2500, nagroda_amunicja_k3: 3000, karty: [
     {nazwa:"Empatia",typ:"złota"},{nazwa:"Wizja",typ:"złota"},{nazwa:"Wpływ",typ:"złota"},
     {nazwa:"Adaptacyjność",typ:"złota"},{nazwa:"Rozwiązywanie konfliktów",typ:"złota"},{nazwa:"Inkluzywność",typ:"złota"},
     {nazwa:"Współpraca",typ:"złota"},{nazwa:"Podejmowanie decyzji",typ:"złota"},{nazwa:"Mentoring",typ:"złota"},
   ]},
-  { id: "spotkania_rodzinne", numer: 14, nazwa: "Spotkania rodzinne", nagroda_amunicja: 6000, nagroda_amunicja_k2: 4500, karty: [
+  { id: "spotkania_rodzinne", numer: 14, nazwa: "Spotkania rodzinne", nagroda_amunicja: 6000, nagroda_amunicja_k2: 4500, nagroda_amunicja_k3: 6000, karty: [
     {nazwa:"Wspólne posiłki",typ:"diamentowa"},{nazwa:"Tradycje opowiadania historii",typ:"diamentowa"},{nazwa:"Więź międzypokoleniowa",typ:"diamentowa"},
     {nazwa:"Rytuały kulturowe",typ:"diamentowa"},{nazwa:"Rodzinne przepisy",typ:"diamentowa"},{nazwa:"Świąteczne uroczystości",typ:"diamentowa"},
     {nazwa:"Dyskusje o pochodzeniu",typ:"diamentowa"},{nazwa:"Albumy ze zdjęciami",typ:"diamentowa"},{nazwa:"Gry spotkania",typ:"diamentowa"},
   ]},
-  { id: "lokalna_kuchnia", numer: 15, nazwa: "Lokalna kuchnia", nagroda_amunicja: 10000, nagroda_amunicja_k2: 6000, karty: [
+  { id: "lokalna_kuchnia", numer: 15, nazwa: "Lokalna kuchnia", nagroda_amunicja: 10000, nagroda_amunicja_k2: 6000, nagroda_amunicja_k3: 6000, karty: [
     {nazwa:"Regionalne składniki",typ:"diamentowa"},{nazwa:"Techniki gotowania",typ:"diamentowa"},{nazwa:"Tradycyjne potrawy",typ:"diamentowa"},
     {nazwa:"Etykieta przy stole",typ:"diamentowa"},{nazwa:"Profil smakowy",typ:"diamentowa"},{nazwa:"Historia kulinarna",typ:"diamentowa"},
     {nazwa:"Lokalne produkty",typ:"diamentowa"},{nazwa:"Sezonowe warianty",typ:"diamentowa"},{nazwa:"Festiwale jedzenia",typ:"diamentowa"},
@@ -282,6 +285,9 @@ function uzupelnijTalie(talieZBazy) {
       nagroda_amunicja_k2: t.nagroda_amunicja_k2 !== undefined
         ? t.nagroda_amunicja_k2
         : domyslna.nagroda_amunicja_k2,
+      nagroda_amunicja_k3: t.nagroda_amunicja_k3 !== undefined
+        ? t.nagroda_amunicja_k3
+        : domyslna.nagroda_amunicja_k3,
     };
   });
 }
@@ -1052,6 +1058,7 @@ function App() {
           duplikaty={typWymiany==="event" ? duplikatyEventMemo : duplikatyMemo}
           zalogowany={zalogowany}
           zapiszKarte={typWymiany==="event" ? zapiszKarteEvent : zapiszKarte}
+          zapiszStrukture={zapiszStrukture}
         />}
         {zakładka==="duplikaty"&&<DuplikatyView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
@@ -1466,7 +1473,7 @@ function WygladView({ wyglad, setWyglad, motyw }) {
   );
 }
 
-function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany}) {
+function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany,zapiszStrukture}) {
   const isAdmin = zalogowany.rola==="admin"||zalogowany.rola==="zastepca";
   const swojaOsoba = czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(zalogowany.login));
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
@@ -1635,18 +1642,32 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                       {brak>0&&brak<=2&&<span style={{color:"#fa0",marginLeft:8}}>⚡{brak} brak</span>}
                     </div>
                     {mozeEdytowac&&(
-                      <button onClick={()=>{
-                        if(!window.confirm(`Oznaczyć WSZYSTKIE karty talii "${talia.nazwa}" jako posiadane + duplikaty?`)) return;
-                        talia.karty.forEach(k=>{
-                          const key=`${osoba.id}_${talia.id}_${k.nazwa}`;
-                          if(!posiadane[key]) zapiszKarte("posiadane", key, true);
-                          if(!duplikaty[key]) zapiszKarte("duplikaty", key, true);
-                        });
-                      }} style={{
-                        padding:"2px 8px",fontSize:10,borderRadius:5,cursor:"pointer",
-                        background:"rgba(0,200,100,0.12)",border:"1px solid #0c644",
-                        color:"#0c6",whiteSpace:"nowrap",
-                      }}>⚡ Uzupełnij wszystko</button>
+                      <div style={{display:"flex",gap:4}}>
+                        <button onClick={()=>{
+                          if(!window.confirm(`Oznaczyć WSZYSTKIE karty talii "${talia.nazwa}" jako posiadane + duplikaty?`)) return;
+                          talia.karty.forEach(k=>{
+                            const key=`${osoba.id}_${talia.id}_${k.nazwa}`;
+                            if(!posiadane[key]) zapiszKarte("posiadane", key, true);
+                            if(!duplikaty[key]) zapiszKarte("duplikaty", key, true);
+                          });
+                        }} style={{
+                          padding:"2px 8px",fontSize:10,borderRadius:5,cursor:"pointer",
+                          background:"rgba(0,200,100,0.12)",border:"1px solid #0c644",
+                          color:"#0c6",whiteSpace:"nowrap",
+                        }}>⚡ Uzupełnij</button>
+                        <button onClick={()=>{
+                          if(!window.confirm(`Usunąć WSZYSTKIE karty talii "${talia.nazwa}"?`)) return;
+                          talia.karty.forEach(k=>{
+                            const key=`${osoba.id}_${talia.id}_${k.nazwa}`;
+                            if(posiadane[key]) zapiszKarte("posiadane", key, null);
+                            if(duplikaty[key]) zapiszKarte("duplikaty", key, null);
+                          });
+                        }} style={{
+                          padding:"2px 8px",fontSize:10,borderRadius:5,cursor:"pointer",
+                          background:"rgba(255,50,50,0.1)",border:"1px solid #f5544433",
+                          color:"#f55",whiteSpace:"nowrap",
+                        }}>🗑 Usuń</button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1714,7 +1735,24 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany})
                   {os.nazwa[0]?.toUpperCase()}
                 </div>
                 <div style={{fontSize:20,fontWeight:"bold",color:"var(--accent)",letterSpacing:1}}>{os.nazwa}</div>
-                {krag>1&&<div style={{fontSize:11,color:"#da70d6",marginTop:2}}>💜 Krąg {krag}</div>}
+                {isAdmin && zapiszStrukture ? (
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:6}}>
+                    <span style={{fontSize:11,color:"#da70d6"}}>💜 Krąg:</span>
+                    {[1,2,3].map(k=>(
+                      <button key={k} onClick={()=>{
+                        const nowyList = czlonkowie.map(c=>c.id===os.id?{...c,krag:k}:c);
+                        zapiszStrukture("czlonkowie", nowyList);
+                      }} style={{
+                        padding:"2px 10px",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:"bold",
+                        background:krag===k?"rgba(138,43,226,0.35)":"rgba(255,255,255,0.05)",
+                        border:krag===k?"1px solid #da70d6":"1px solid #333",
+                        color:krag===k?"#da70d6":"#555",
+                      }}>{k}</button>
+                    ))}
+                  </div>
+                ) : (
+                  krag>1&&<div style={{fontSize:11,color:"#da70d6",marginTop:2}}>💜 Krąg {krag}</div>
+                )}
               </div>
 
               {/* Pasek postępu */}
@@ -3915,7 +3953,7 @@ function EdycjaTalii({talie,zapisz,talieEvent=[],zapiszEvent=()=>{}}) {
       {nowyModal&&(
         <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid #0c655",borderRadius:10,padding:16,marginBottom:14}}>
           <div style={{fontWeight:"bold",color:"#0c6",marginBottom:10}}>Nowa talia</div>
-          {[{p:"nazwa",l:"Nazwa"},{p:"numer",l:"Numer"},{p:"nagroda_amunicja",l:"Nagroda K1 (amunicja)"},{p:"nagroda_amunicja_k2",l:"Nagroda K2 (opcjonalnie)"}].map(f=>(
+          {[{p:"nazwa",l:"Nazwa"},{p:"numer",l:"Numer"},{p:"nagroda_amunicja",l:"Nagroda K1 (amunicja)"},{p:"nagroda_amunicja_k2",l:"Nagroda K2"},{p:"nagroda_amunicja_k3",l:"Nagroda K3"}].map(f=>(
             <input key={f.p} value={nowaTalia[f.p]||""} onChange={e=>setNowaTalia(n=>({...n,[f.p]:e.target.value}))} placeholder={f.l}
               style={{display:"block",width:"100%",marginBottom:8,padding:"8px 10px",background:"var(--card-solid)",border:`1px solid ${f.p==="nagroda_amunicja_k2"?"#da70d655":"#333"}`,borderRadius:6,color:f.p==="nagroda_amunicja_k2"?"#da70d6":"#fff",fontSize:13,boxSizing:"border-box"}}/>
           ))}
