@@ -1059,6 +1059,7 @@ function App() {
           zalogowany={zalogowany}
           zapiszKarte={typWymiany==="event" ? zapiszKarteEvent : zapiszKarte}
           zapiszStrukture={zapiszStrukture}
+          isAdmin={isAdmin}
         />}
         {zakładka==="duplikaty"&&<DuplikatyView
           talie={talieSorted} czlonkowie={dane.czlonkowie}
@@ -1473,7 +1474,7 @@ function WygladView({ wyglad, setWyglad, motyw }) {
   );
 }
 
-function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany,zapiszStrukture}) {
+function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany,zapiszStrukture,isAdmin}) {
   const isAdmin = zalogowany.rola==="admin"||zalogowany.rola==="zastepca";
   const swojaOsoba = czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(zalogowany.login));
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
