@@ -1474,7 +1474,7 @@ function WygladView({ wyglad, setWyglad, motyw }) {
   );
 }
 
-function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany,zapiszStrukture,isAdmin}) {
+function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany,zapiszStrukture}) {
   const isAdmin = zalogowany.rola==="admin"||zalogowany.rola==="zastepca";
   const swojaOsoba = czlonkowie.find(c=>normalizuj(c.nazwa)===normalizuj(zalogowany.login));
   const startIdx = swojaOsoba && !isAdmin ? czlonkowie.indexOf(swojaOsoba) : 0;
