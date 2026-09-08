@@ -2922,7 +2922,32 @@ function generujAlgorytmV2({talie, czlonkowie, posiadane, duplikaty, typWymiany}
 
   const nieobsluzone = czlonkowie.filter(c => !wyslane.has(c.id)).map(c => c.nazwa);
 
-  return { planoweWymiany, lancuchy, nieobsluzone, kandydaciCount: kandydaci.length };
+  // Zamknięcia talii — identyczna logika co w V1, dla porównywalności wyników
+  const symPos = { ...posiadane };
+  planoweWymiany.forEach(w => {
+    const o = czlonkowie.find(c => c.nazwa === w.do);
+    const t = talie.find(t2 => t2.nazwa === w.talia);
+    if (o && t) symPos[`${o.id}_${t.id}_${w.karta}`] = true;
+  });
+  const zamknieciaInfo = [];
+  czlonkowie.forEach(osoba => {
+    talie.forEach(talia => {
+      const kPrzed = talia.karty.every(k => posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+      const kPo = talia.karty.every(k => symPos[`${osoba.id}_${talia.id}_${k.nazwa}`]);
+      if (!kPrzed && kPo) {
+        const liczbaPoWymianie = liczKartyOsoby(osoba.id, talie, symPos);
+        const progPrzed = obliczProgFn(liczKartyOsoby(osoba.id, talie, posiadane));
+        const progPo = obliczProgFn(liczbaPoWymianie);
+        const nowyProg = progPo.ostatniProg?.prog > (progPrzed.ostatniProg?.prog || 0);
+        zamknieciaInfo.push({
+          osoba: osoba.nazwa, talia: talia.nazwa, nagroda: pobierzNagrode(talia, osoba.krag),
+          nowyProg: nowyProg ? progPo.ostatniProg : null,
+        });
+      }
+    });
+  });
+
+  return { planoweWymiany, lancuchy, nieobsluzone, kandydaciCount: kandydaci.length, zamknieciaInfo };
 }
 
 function WynikViewV2({ talie, czlonkowie, posiadane, duplikaty, typWymiany, zapiszAktywna, przejdzDoAktywnej }) {
@@ -3009,6 +3034,138 @@ function WynikViewV2({ talie, czlonkowie, posiadane, duplikaty, typWymiany, zapi
               <div style={{ fontSize: 9, color: "#666" }}>bez wymiany</div>
             </div>
           </div>
+
+          {/* Zamknięcia talii — identyczne dane jak w V1, fioletowy motyw */}
+          {wynik.zamknieciaInfo.length>0&&(
+            <div style={{background:"rgba(168,85,247,0.08)",border:"1px solid #a855f755",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
+              <div style={{fontWeight:"bold",color:"#c084fc",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
+              {wynik.zamknieciaInfo.map((z,i)=>(
+                <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #2a1a3a"}}>
+                  🎉 <strong style={{color:"#c084fc"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
+                  <span style={{color:"#0c6",marginLeft:6}}>+{z.nagroda?.toLocaleString()} 💰</span>
+                  {z.nowyProg&&(
+                    <span style={{marginLeft:8,background:"rgba(255,165,0,0.2)",border:"1px solid #fa0",borderRadius:6,padding:"1px 6px",fontSize:11,color:"#fa0"}}>
+                      🎯 PRÓG {z.nowyProg.prog} kart! +{z.nowyProg.ammo.toLocaleString()} 💰
+                    </span>
+                  )}
+                </div>
+              ))}
+              <div style={{marginTop:8,fontWeight:"bold",color:"#c084fc",fontSize:13}}>
+                Łącznie z talii: +{wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0).toLocaleString()} 💰
+                {wynik.zamknieciaInfo.some(z=>z.nowyProg)&&(
+                  <span style={{color:"#fa0",marginLeft:8}}>
+                    + progi: +{(()=>{
+                      const zaliczone=new Set();
+                      return wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>{
+                        const key=`${z.osoba}_${z.nowyProg.prog}`;
+                        if(zaliczone.has(key)) return s;
+                        zaliczone.add(key);
+                        return s+z.nowyProg.ammo;
+                      },0);
+                    })().toLocaleString()} 💰
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Podsumowanie odbiorców — identyczne dane jak w V1, fioletowy motyw */}
+          {(()=>{
+            const perOdbiorca = {};
+            wynik.planoweWymiany.forEach(w=>{
+              if(!perOdbiorca[w.do]) perOdbiorca[w.do]=[];
+              perOdbiorca[w.do].push(w);
+            });
+
+            const symPos={...posiadane};
+            wynik.planoweWymiany.forEach(w=>{
+              const o=czlonkowie.find(c=>c.nazwa===w.do);
+              const t=talie.find(t2=>t2.nazwa===w.talia);
+              if(o&&t){
+                const k=t.karty.find(k2=>k2.nazwa===w.karta);
+                if(k) symPos[`${o.id}_${t.id}_${k.nazwa}`]=true;
+              }
+            });
+
+            const typ    = typWymiany==="złote" ? "złota"     : "diamentowa";
+            const oppTyp = typWymiany==="złote" ? "diamentowa": "złota";
+            const ikonaT = typWymiany==="złote" ? "⭐" : "💎";
+            const ikonaO = typWymiany==="złote" ? "💎" : "⭐";
+            const obliczProgFnLokalny = typWymiany==="event" ? obliczProgEvent : obliczProg;
+
+            return Object.keys(perOdbiorca).length>0 ? (
+              <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a1a3a",borderRadius:10,padding:14,marginBottom:14}}>
+                <div style={{fontWeight:"bold",color:"#c084fc",fontSize:13,marginBottom:10}}>
+                  👥 Podsumowanie odbiorców
+                </div>
+                {Object.entries(perOdbiorca).map(([nazwa, wymianyOsoby])=>{
+                  const osoba=czlonkowie.find(c=>c.nazwa===nazwa);
+                  const oId=osoba?.id;
+
+                  const kartyPrzed=osoba?liczKartyOsoby(oId,talie,posiadane):0;
+                  const kartyPo   =osoba?liczKartyOsoby(oId,talie,symPos)   :0;
+                  const progPrzed =obliczProgFnLokalny(kartyPrzed);
+                  const progPo    =obliczProgFnLokalny(kartyPo);
+                  const nowyProg  =progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
+
+                  return (
+                    <div key={nazwa} style={{padding:"8px 0",borderBottom:"1px solid #1a1030"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                        <span style={{fontWeight:"bold",color:"#c084fc",fontSize:13}}>{nazwa}</span>
+                        <span style={{fontSize:11,color:"#777"}}>
+                          dostaje <strong style={{color:"#fff"}}>{wymianyOsoby.length}</strong> {wymianyOsoby.length===1?"kartę":wymianyOsoby.length<5?"karty":"kart"}
+                        </span>
+                        {nowyProg&&(
+                          <span style={{fontSize:11,color:"#fa0",background:"rgba(255,165,0,0.12)",padding:"2px 8px",borderRadius:10,border:"1px solid #fa033",fontWeight:"bold"}}>
+                            🎯 PRÓG {progPo.ostatniProg.prog}! +{progPo.ostatniProg.ammo.toLocaleString()} 💰
+                          </span>
+                        )}
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginLeft:8}}>
+                        {wymianyOsoby.map((w,i)=>{
+                          const t=talie.find(t2=>t2.nazwa===w.talia);
+                          const kartyT=t?t.karty.filter(k=>k.typ===typ):[];
+                          const kartyO=t?t.karty.filter(k=>k.typ===oppTyp):[];
+                          const brakTPrzed=t?kartyT.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+                          const brakOPrzed=t?kartyO.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+                          const brakTPo=t?kartyT.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+                          const brakOPo=t?kartyO.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
+
+                          const zamknieTalie=brakTPo===0&&brakOPo===0;
+                          const tylkoOppBrakuje=brakTPo===0&&brakOPo>0;
+
+                          const kolorBadge=zamknieTalie?"#0c6":brakTPrzed===1&&brakOPrzed===0?"#f55":brakTPrzed<=2?"#fa0":"#a855f7";
+                          const bgBadge=zamknieTalie?"rgba(0,200,100,0.12)":brakTPrzed===1&&brakOPrzed===0?"rgba(255,50,50,0.1)":brakTPrzed<=2?"rgba(255,165,0,0.08)":"rgba(168,85,247,0.08)";
+
+                          return (
+                            <div key={i} style={{
+                              fontSize:11,padding:"4px 9px",borderRadius:6,
+                              background:bgBadge,
+                              border:`1px solid ${kolorBadge}55`,
+                              color:"var(--text)",
+                            }}>
+                              <span style={{fontWeight:"bold"}}>{w.karta}</span>
+                              <span style={{color:"#555",marginLeft:4}}>[{w.talia}]</span>
+                              <span style={{marginLeft:6,color:kolorBadge,fontWeight:"bold"}}>
+                                {zamknieTalie
+                                  ? "🏆 KOMPLET!"
+                                  : tylkoOppBrakuje
+                                    ? `brak ${brakOPo}${ikonaO}`
+                                    : brakTPo===0
+                                      ? `komplet ${ikonaT}`
+                                      : `po wymianie: −${brakTPo}${ikonaT}${brakOPo>0?` −${brakOPo}${ikonaO}`:` komplet${ikonaO}`}`
+                                }
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null;
+          })()}
 
           {/* Łańcuchy wyróżnione */}
           {wynik.lancuchy.length > 0 && (
