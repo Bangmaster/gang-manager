@@ -887,6 +887,7 @@ function App() {
     {id:"chat",label:"💬 Chat"},
     ...(isAdmin?[
       {id:"wynik",label:"⚡ Generuj"},
+      {id:"wynikV2",label:"🧬 Generuj V2"},
       {id:"ocr",label:"📸 OCR talii"},
       {id:"edycja",label:"⚙️ Talie"},
       {id:"edycja_event",label:"🎉 Talie EVENT"},
@@ -1097,6 +1098,15 @@ function App() {
           przejdzDoAktywnej={()=>setZakładka("aktywna")}
           historiaWymian={historiaWymian}
           paczkiDiament={paczkiDiament} setPaczkiDiament={setPaczkiDiament}
+        />}
+        {zakładka==="wynikV2"&&isAdmin&&<WynikViewV2
+          talie={typWymiany==="event" ? talieEventSorted : talieSorted}
+          czlonkowie={dane.czlonkowie}
+          posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
+          duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
+          typWymiany={typWymiany}
+          zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
+          przejdzDoAktywnej={()=>setZakładka("aktywna")}
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
@@ -2777,6 +2787,281 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
   });
 
   return {planoweWymiany,nieobsluzone,zamknieciaInfo};
+}
+
+// ════════════════════════════════════════════════════════════════
+// GENERUJ V2 — algorytm eksperymentalny, CAŁKOWICIE NIEZALEŻNY od V1
+// Implementuje 3 ulepszenia:
+//   1. Waga duplikatu = ile osób w gangu wciąż potrzebuje tej karty
+//   2. Łańcuchy 3-osobowe (A→B→C→A) gdy nie ma bezpośredniego 1-do-1
+//   3. Dynamiczna waga progu = nagroda / liczba brakujących kart do progu
+// Nie modyfikuje, nie wywołuje i nie współdzieli stanu z generujAlgorytm (V1).
+// ════════════════════════════════════════════════════════════════
+function generujAlgorytmV2({talie, czlonkowie, posiadane, duplikaty, typWymiany}) {
+  const isEvent = typWymiany === "event";
+  const typ = typWymiany === "złote" ? "złota" : "diamentowa";
+  const oppTyp = typWymiany === "złote" ? "diamentowa" : isEvent ? null : "złota";
+  const obliczProgFn = isEvent ? obliczProgEvent : obliczProg;
+
+  // Progi per osoba (stan PRZED wymianą)
+  const progiOsob = {};
+  czlonkowie.forEach(o => {
+    progiOsob[o.id] = obliczProgFn(liczKartyOsoby(o.id, talie, posiadane));
+  });
+
+  // ULEPSZENIE 1 — globalna "wartość" karty = ilu odbiorców jej wciąż brakuje
+  const potrzebaKarty = {};
+  talie.forEach(talia => {
+    talia.karty.filter(k => k.typ === typ).forEach(karta => {
+      let cnt = 0;
+      czlonkowie.forEach(o => { if (!posiadane[`${o.id}_${talia.id}_${karta.nazwa}`]) cnt++; });
+      potrzebaKarty[`${talia.id}_${karta.nazwa}`] = cnt;
+    });
+  });
+
+  // Zbuduj listę wszystkich możliwych par dawca→odbiorca→karta
+  const kandydaci = [];
+  czlonkowie.forEach(dawca => {
+    talie.forEach(talia => {
+      talia.karty.filter(k => k.typ === typ).forEach(karta => {
+        const dKey = `${dawca.id}_${talia.id}_${karta.nazwa}`;
+        if (!duplikaty[dKey]) return;
+        czlonkowie.forEach(odbiorca => {
+          if (odbiorca.id === dawca.id) return;
+          const oKey = `${odbiorca.id}_${talia.id}_${karta.nazwa}`;
+          if (posiadane[oKey]) return;
+
+          const brakT = talia.karty.filter(k => k.typ === typ && !posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]).length;
+          const brakO = oppTyp ? talia.karty.filter(k => k.typ === oppTyp && !posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]).length : 0;
+          const nagroda = pobierzNagrode(talia, odbiorca.krag || 1);
+          const wartoscKarty = potrzebaKarty[`${talia.id}_${karta.nazwa}`] || 1;
+
+          // ULEPSZENIE 3 — im bliżej progu i im większa nagroda, tym wyższa waga
+          const prog = progiOsob[odbiorca.id];
+          let progWaga = 0;
+          if (prog.nastepnyProg) {
+            progWaga = prog.brakujeDoProg <= 1 ? prog.ammoProg : prog.ammoProg / prog.brakujeDoProg;
+          }
+
+          const priorytet = wartoscKarty * 60 + progWaga * 0.4 + nagroda * 0.01 + (brakT <= 2 ? 150 : 0) - brakT * 8;
+
+          kandydaci.push({ dawca, odbiorca, karta, talia, brakT, brakO, nagroda, wartoscKarty, progWaga, priorytet });
+        });
+      });
+    });
+  });
+
+  kandydaci.sort((a, b) => b.priorytet - a.priorytet);
+
+  // Przydział zachłanny — każdy dawca wysyła max 1 kartę
+  const wyslane = new Set();
+  const otrzymaneKlucz = new Set();
+  const planoweWymiany = [];
+
+  kandydaci.forEach(k => {
+    if (wyslane.has(k.dawca.id)) return;
+    const otrzKey = `${k.odbiorca.id}_${k.talia.id}_${k.karta.nazwa}`;
+    if (otrzymaneKlucz.has(otrzKey)) return;
+    wyslane.add(k.dawca.id);
+    otrzymaneKlucz.add(otrzKey);
+    planoweWymiany.push({
+      od: k.dawca.nazwa, do: k.odbiorca.nazwa,
+      karta: k.karta.nazwa, talia: k.talia.nazwa,
+      nagroda: k.nagroda, wartoscKarty: k.wartoscKarty,
+      progWaga: Math.round(k.progWaga), brakTCount: k.brakT, brakOCount: k.brakO,
+      lancuch: false,
+    });
+  });
+
+  // ULEPSZENIE 2 — łańcuchy 3-osobowe A→B→C→A dla dawców bez bezpośredniego matcha
+  const znajdzMatch = (dawcaId, odbiorcaId) => {
+    for (const talia of talie) {
+      for (const karta of talia.karty.filter(k => k.typ === typ)) {
+        const dKey = `${dawcaId}_${talia.id}_${karta.nazwa}`;
+        const oKey = `${odbiorcaId}_${talia.id}_${karta.nazwa}`;
+        if (duplikaty[dKey] && !posiadane[oKey]) return { karta, talia };
+      }
+    }
+    return null;
+  };
+
+  const lancuchy = [];
+  const niewyslani = czlonkowie.filter(c => !wyslane.has(c.id));
+  for (let i = 0; i < niewyslani.length; i++) {
+    const a = niewyslani[i];
+    if (wyslane.has(a.id)) continue;
+    for (let j = 0; j < niewyslani.length; j++) {
+      if (j === i || wyslane.has(niewyslani[j].id)) continue;
+      const b = niewyslani[j];
+      const abMatch = znajdzMatch(a.id, b.id);
+      if (!abMatch) continue;
+      for (let m = 0; m < niewyslani.length; m++) {
+        if (m === i || m === j || wyslane.has(niewyslani[m].id)) continue;
+        const c = niewyslani[m];
+        const bcMatch = znajdzMatch(b.id, c.id);
+        if (!bcMatch) continue;
+        const caMatch = znajdzMatch(c.id, a.id);
+        if (!caMatch) continue;
+        wyslane.add(a.id); wyslane.add(b.id); wyslane.add(c.id);
+        [[a, b, abMatch], [b, c, bcMatch], [c, a, caMatch]].forEach(([dawca, odbiorca, match]) => {
+          planoweWymiany.push({
+            od: dawca.nazwa, do: odbiorca.nazwa,
+            karta: match.karta.nazwa, talia: match.talia.nazwa,
+            nagroda: pobierzNagrode(match.talia, odbiorca.krag || 1),
+            wartoscKarty: potrzebaKarty[`${match.talia.id}_${match.karta.nazwa}`] || 1,
+            progWaga: 0, brakTCount: 0, brakOCount: 0,
+            lancuch: true,
+          });
+        });
+        lancuchy.push([a.nazwa, b.nazwa, c.nazwa]);
+        break;
+      }
+      if (wyslane.has(a.id)) break;
+    }
+  }
+
+  const nieobsluzone = czlonkowie.filter(c => !wyslane.has(c.id)).map(c => c.nazwa);
+
+  return { planoweWymiany, lancuchy, nieobsluzone, kandydaciCount: kandydaci.length };
+}
+
+function WynikViewV2({ talie, czlonkowie, posiadane, duplikaty, typWymiany, zapiszAktywna, przejdzDoAktywnej }) {
+  const [wynik, setWynik] = useState(null);
+  const [generujac, setGenerujac] = useState(false);
+  const [skopiowano, setSkopiowano] = useState(false);
+
+  const generuj = () => {
+    setGenerujac(true);
+    setTimeout(() => {
+      const r = generujAlgorytmV2({ talie, czlonkowie, posiadane, duplikaty, typWymiany });
+      setWynik(r);
+      setGenerujac(false);
+    }, 50);
+  };
+
+  const tekstMessenger = () => {
+    if (!wynik) return "";
+    const linie = wynik.planoweWymiany.map(w => `${w.od} ➜ ${w.do}: ${w.karta} [${w.talia}]${w.lancuch ? " 🔗" : ""}`);
+    return `🧬 WYMIANA V2 (test)\n\n${linie.join("\n")}`;
+  };
+
+  const kopiuj = () => {
+    navigator.clipboard.writeText(tekstMessenger()).then(() => {
+      setSkopiowano(true);
+      setTimeout(() => setSkopiowano(false), 2000);
+    });
+  };
+
+  const ustawJakoAktywna = () => {
+    if (!wynik) return;
+    zapiszAktywna({
+      data: new Date().toISOString(),
+      typWymiany,
+      wymiany: wynik.planoweWymiany,
+      potwierdzone: {},
+      wersja: "v2",
+    });
+    przejdzDoAktywnej();
+  };
+
+  return (
+    <div style={{ padding: 14 }}>
+      <div style={{
+        background: "linear-gradient(135deg,rgba(180,80,255,0.1),rgba(100,40,200,0.06))",
+        border: "1px solid #a855f755", borderRadius: 10, padding: 12, marginBottom: 14,
+      }}>
+        <div style={{ fontWeight: "bold", color: "#c084fc", fontSize: 14, marginBottom: 4 }}>🧬 Generuj V2 — algorytm eksperymentalny</div>
+        <div style={{ fontSize: 11, color: "#999", lineHeight: 1.5 }}>
+          Osobny algorytm, niezależny od zwykłego "Generuj". Testuje 3 usprawnienia:<br/>
+          <strong style={{ color: "#c084fc" }}>1)</strong> priorytet kart których brakuje wielu osobom<br/>
+          <strong style={{ color: "#c084fc" }}>2)</strong> łańcuchy wymian 3-osobowe (A→B→C→A) gdy nie ma bezpośredniego dopasowania<br/>
+          <strong style={{ color: "#c084fc" }}>3)</strong> priorytet dla osób blisko progu ammo (waga = nagroda / brakujące karty)
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12, fontSize: 12, color: "#888" }}>
+        Tryb: <strong style={{ color: typWymiany === "złote" ? "#ffd700" : typWymiany === "event" ? "#00e676" : "#87CEEB" }}>
+          {typWymiany === "złote" ? "⭐ ZŁOTE" : typWymiany === "event" ? "🎉 EVENT" : "💎 DIAMENTOWE"}
+        </strong> (zmień przełącznikiem na górze ekranu)
+      </div>
+
+      <button onClick={generuj} disabled={generujac} style={{
+        width: "100%", padding: 12, borderRadius: 10, fontWeight: "bold", fontSize: 14, cursor: "pointer",
+        background: "linear-gradient(135deg,#a855f7,#7c3aed)", border: "none", color: "#fff", marginBottom: 16,
+      }}>
+        {generujac ? "⏳ Generuję..." : "🧬 Generuj wymianę V2"}
+      </button>
+
+      {wynik && (
+        <div>
+          {/* Statystyki */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 14 }}>
+            <div style={{ textAlign: "center", background: "rgba(168,85,247,0.08)", border: "1px solid #a855f733", borderRadius: 8, padding: 8 }}>
+              <div style={{ fontSize: 18, fontWeight: "bold", color: "#c084fc" }}>{wynik.planoweWymiany.length}</div>
+              <div style={{ fontSize: 9, color: "#666" }}>wymian</div>
+            </div>
+            <div style={{ textAlign: "center", background: "rgba(0,200,100,0.08)", border: "1px solid #0c633", borderRadius: 8, padding: 8 }}>
+              <div style={{ fontSize: 18, fontWeight: "bold", color: "#0c6" }}>{wynik.lancuchy.length}</div>
+              <div style={{ fontSize: 9, color: "#666" }}>łańcuchów 🔗</div>
+            </div>
+            <div style={{ textAlign: "center", background: "rgba(255,50,50,0.06)", border: "1px solid #f5544433", borderRadius: 8, padding: 8 }}>
+              <div style={{ fontSize: 18, fontWeight: "bold", color: "#f55" }}>{wynik.nieobsluzone.length}</div>
+              <div style={{ fontSize: 9, color: "#666" }}>bez wymiany</div>
+            </div>
+          </div>
+
+          {/* Łańcuchy wyróżnione */}
+          {wynik.lancuchy.length > 0 && (
+            <div style={{ marginBottom: 14, background: "rgba(0,200,100,0.06)", border: "1px solid #0c633", borderRadius: 8, padding: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: "bold", color: "#0c6", marginBottom: 6 }}>🔗 Znalezione łańcuchy 3-osobowe</div>
+              {wynik.lancuchy.map((l, i) => (
+                <div key={i} style={{ fontSize: 11, color: "#aaa", marginBottom: 2 }}>{l[0]} → {l[1]} → {l[2]} → {l[0]}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Lista wymian */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: "bold", color: "var(--accent)", marginBottom: 8 }}>📋 Planowane wymiany</div>
+            {wynik.planoweWymiany.map((w, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", marginBottom: 4, borderRadius: 7,
+                background: w.lancuch ? "rgba(0,200,100,0.06)" : "rgba(255,255,255,0.03)",
+                border: w.lancuch ? "1px solid #0c633" : "1px solid #1e1e3a", fontSize: 11,
+              }}>
+                <span style={{ color: "var(--accent)", fontWeight: "bold" }}>{w.od}</span>
+                <span style={{ color: "#555" }}>➜</span>
+                <span style={{ color: "#0af" }}>{w.do}</span>
+                <span style={{ flex: 1, textAlign: "right", color: "#aaa" }}>{w.karta} <span style={{ color: "#555" }}>[{w.talia}]</span></span>
+                {w.wartoscKarty > 1 && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(168,85,247,0.12)", color: "#c084fc" }}>×{w.wartoscKarty} potrz.</span>}
+                {w.progWaga > 0 && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(255,165,0,0.1)", color: "#fa0" }}>🎯</span>}
+                {w.lancuch && <span style={{ fontSize: 9 }}>🔗</span>}
+              </div>
+            ))}
+          </div>
+
+          {wynik.nieobsluzone.length > 0 && (
+            <div style={{ marginBottom: 14, fontSize: 11, color: "#f55" }}>
+              ⚠️ Bez wymiany: {wynik.nieobsluzone.join(", ")}
+            </div>
+          )}
+
+          {/* Akcje */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={kopiuj} style={{
+              flex: 1, minWidth: 120, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: "bold", cursor: "pointer",
+              background: skopiowano ? "rgba(0,200,100,0.2)" : "rgba(168,85,247,0.12)",
+              border: `1px solid ${skopiowano ? "#0c6" : "#a855f755"}`, color: skopiowano ? "#0c6" : "#c084fc",
+            }}>{skopiowano ? "✓ Skopiowano!" : "📋 Kopiuj tekst"}</button>
+            <button onClick={ustawJakoAktywna} style={{
+              flex: 1, minWidth: 120, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: "bold", cursor: "pointer",
+              background: "rgba(0,200,100,0.12)", border: "1px solid #0c6", color: "#0c6",
+            }}>🚀 Ustaw jako aktywną</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function obliczFaze(brakT, brakO, typWymiany) {
