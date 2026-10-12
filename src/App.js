@@ -329,9 +329,9 @@ const CYTATY=[
   "Kickboxer zakręcił się, kopnął, przewrócił i... zapomniał wysłać kartę. Znowu.",
   "Kickboxer lubi Sonię. Sonia uciekła do AnyFam. Kickboxer kopie w powietrze z żalu.",
   // Kristoforo
-  "Kristoforo jest wiatrakiem z Holandii. Kręci się, kręci i jakoś zawsze wysyła karty.",
-  "Kristoforo robił turnieje po 10 osób i myślał że to hit. Było 3 chętnych. Zrozumiał.",
-  "Kristoforo i Artatuś — holenderskie tulipany w gangu. Jeden mówi, drugi milczy. Razem: jeden normalny.",
+  "Kristoforo chciał wylecieć z gangu całym sercem. Gang w końcu spełnił to marzenie. Oboje zadowoleni.",
+  "Kristoforo robił turnieje po 10 osób i myślał że to hit. Przyszło 3. Wyleciał zanim turniej się skończył.",
+  "Holenderski wiatrak przestał się kręcić w FAM. Kristoforo wyleciał na zbity pysk. Sam się o to prosił.",
   // Artatuś
   "Artatuś siedzi w Hadze i milczy. Mówi tylko: 'Wysłałem' i 'Napiję się'. W tej kolejności.",
   "Artatuś potwierdza wymianę cicho. Bez fanfar. Bez komentarza. Mistrz gatunku.",
@@ -371,26 +371,26 @@ const CYTATY=[
   "Krystek i Domcia siedzą w Anglii i wspominają jak pięknie było w FAM. Kart nie wysyłają. Przynajmniej jest o czym gadać.",
   "Domcia ma zawsze dobrą radę. Zazwyczaj w formie małej białej tabletki.",
   // Sonia i Bastek
-  "Sonia: siedzi w AnyFam z Devilem i Marysią. Kickboxer przestał kopić z tęsknoty. Zaczął z przyzwyczajenia.",
-  "Bastek wyszedł z AnyFam i wrócił do FAM. Devil i Marysia zostali. Każdy robi swoje.",
-  "Sonia siedzi w AnyFam. BUBU wrócił. Bastek wrócił. Dwie właściwe decyzje i jedna nie.",
+  "Sonia: siedzi w AnyFam sama. Devil, Marysia i Zielu wrócili do FAM. Kickboxer przestał kopić z tęsknoty. Zaczął z przyzwyczajenia.",
+  "Bastek wyszedł z AnyFam i wrócił do FAM pierwszy. Devil, Marysia i Zielu poszli w jego ślady. Koło się zatoczyło.",
+  "Sonia siedzi w AnyFam sama. BUBU wrócił. Bastek wrócił. Devil i Marysia wrócili. Jedna osoba zostaje przy swoim zdaniu.",
   // Kombinowane
-  "Holenderskie trio: Kristoforo, Artatuś, Młody. Jeden kręci, drugi milczy, trzeci szuka drogi do domu.",
+  "Holenderskie duo: Artatuś i Młody. Jeden milczy, drugi szuka drogi do domu. Wiatrak odleciał gdzie indziej.",
   "Sonny kocha Domcię. Domcia wzięła tabletkę i wyjechała do Anglii. Krystek tam już był. Siedzą i wspominają.",
   "Kickboxer, Sonny i Młody to trio które razem mogłoby nie trafić do własnych mieszkań.",
   "Ponton, KaY4k i gebelsy — historia rodziny która podcięła sobie razem.",
   "SaMaNtA z wiertłem, Bangmasta z aplikacją, Tatuś z analizą — gang ma narzędzia. Użyjcie ich.",
-  "BUBU wrócił. Bastek wrócił. Sonia, Devil i Marysia zostali w AnyFam. ™FAM™ nie dla każdego. Widać.",
+  "BUBU wrócił. Bastek wrócił. Devil i Marysia wrócili. Sonia sama w AnyFam. ™FAM™ widocznie ciągnie.",
   "Kasia obserwuje, Krime milczy, Bodek topi, Joker kasuje. ™FAM™ — różnorodność to nasza siła.",
   // Nowe po powrocie Bastka
   "Bastek wrócił. Gang nie pytał dlaczego. Zapytał tylko czy karty idą na czas. Idą.",
-  "Devil założył AnyFam bo się obraził. Marysia poszła z nim. Oboje siedzą i się obrażają. Gang gra dalej.",
-  "AnyFam: Devil, Marysia, Sonia. Założone z dumy. Utrzymywane z uporu. Bez kart do wymiany.",
-  "Bastek wrócił do korzeni. W AnyFam zostali tylko założyciele — Devil z Marysią. I tak lepiej.",
-  "Devil stworzył AnyFam z obrazy. ™FAM™ stworzyło Bastka z powrotem. Różne wyniki.",
+  "Devil założył AnyFam bo się obraził. Marysia poszła z nim. Oboje wrócili. Obraza minęła, karty znów lecą.",
+  "AnyFam: założone z dumy przez Devila i Marysię. Dziś zostaje tam już tylko Sonia i uparty opór.",
+  "Bastek wrócił do korzeni pierwszy. Devil i Marysia poszli w jego ślady. I tak lepiej.",
+  "Devil stworzył AnyFam z obrazy. ™FAM™ i tak go odzyskało — razem z Marysią i Zielu. Obraza nie trwa wiecznie.",
   "Krystek i Domcia w Anglii — ona odeszła, on odszedł, oboje wspominają. Gang gra dalej bez nostalgii.",
-  "Kristoforo zrobił turniej na 10 osób. Przyszły 3. Turniej odwołany. Wiatrak zakręcił się ze wstydu.",
-  "Marysia i Devil w AnyFam — para która się obraziła i postanowiła grać na własny rachunek. Rachunek pusty.",
+  "Kristoforo tak bardzo chciał wylecieć że w końcu mu się udało. Mission accomplished.",
+  "Marysia i Devil wrócili z AnyFam do FAM. Rachunek się zamknął, karty znów płyną.",
   "Krystek i Domcia w Anglii — siedzą, piją herbatę i wspominają jak FAM wygrywał. Gang nie potrzebuje wspomnień. Potrzebuje kart.",
   "Domcia założyła FAM, Krystek był wierny jak pies. Oboje odeszli. Bastek wrócił. Różne priorytety.",
   "Krystek i Domcia na gangowej emeryturze w Anglii. Mają czas. Kart nie mają.",
@@ -403,12 +403,30 @@ const CYTATY=[
   // Więcej o Młodym
   "Młody to nowy nabytek z Holandii. Świr ale swój. Tych dwóch przymiotników nie da się od siebie oddzielić.",
   "Młody pali, kręci się, gubi, ale wysyła karty. Gang docenia przynajmniej ten jeden talent.",
-  "Młody, Kristoforo i Artatuś — holenderska mafia. Jeden pali, drugi kręci wiatrakiem, trzeci milczy i pije.",
-  "Holenderskie trio: Kristoforo organizuje turnieje, Artatuś milczy, Młody szuka wyjścia z pokoju.",
+  "Młody i Artatuś — ostatni z holenderskiej mafii. Jeden pali i milczy, drugi tylko milczy. Organizator turniejów wyleciał.",
+  "Holenderskie duo: Artatuś milczy, Młody szuka wyjścia z pokoju. Organizatora turniejów już nie ma.",
   // Więcej o Bastku i Sonii
-  "Bastek wrócił do FAM. W AnyFam zostali tylko Devil i Marysia — założyciele którzy się obrazili. Widocznie tam kart nie wysyłają.",
-  "Sonia, Devil i Marysia w AnyFam. Kickboxer kopie w powietrze. Tatuś analizuje. Gang gra dalej.",
-  "Bastek wrócił! ™FAM™ pomnik przemianowało na: Sonia i Devil — wy jeszcze zostańcie.",
+  "Bastek wrócił do FAM pierwszy. Devil i Marysia wrócili zaraz po nim. AnyFam zostaje z samą Sonią.",
+  "Sonia sama w AnyFam. Devil i Marysia wrócili do FAM. Kickboxer kopie w powietrze. Gang gra dalej.",
+  "Bastek, Devil i Marysia wrócili! ™FAM™ pomnik przemianowało na: Sonia — ty jeszcze zostań.",
+  // Chupacabra
+  "Chupacabra dołączył do gangu. Samanta przedstawiła go osobiście. Teraz obaj mają dostęp do jej wiertła.",
+  "Chupacabra gra, gang obserwuje z zainteresowaniem. Nowy układ sił w gangowej parze.",
+  // SaMaNtA przerwa
+  "SaMaNtA zrobiła sobie przerwę. Wiertło odpoczywa. Gang czeka cierpliwie, bo wie że wróci.",
+  // Dawid Kluseczka
+  "Dawid Kluseczka wrócił do FAM. Online lubi się zabawić, w grze bije mocno. Priorytety jasne.",
+  "Kluseczka zniknął, Kluseczka wrócił. Gang przyjął bez pytań — bije za dobrze żeby pytać o resztę.",
+  // Czubak
+  "Czubak wyleciał za brak aktywności na ważnych walkach. Ścięty bez sentymentów. Taki los nieobecnych.",
+  // Trójkąt
+  "Pojawił się Trójkąt. Nikt nie wie skąd, kiedy ani kto to właściwie jest. Gang przyjął z otwartymi ramionami i samymi pytaniami.",
+  // Chmarsonn kapitan
+  "CHMARSONN został kapitanem gangu. Tomcio rządzi — czasem mu się odkleja wieczorem, ale to już chyba norma na tym stanowisku.",
+  // Sonny wieczorami
+  "Sonny rozkręca się na grupie wieczorami i mu się odkleja pod kopułą. Gang czyta, kiwa głową, czeka na kartę rano.",
+  // Podwójne karty
+  "Wszyscy pytają kiedy będą podwójne karty. Gang nie wie. Bangmasta nie wie. Nawet apka nie wie. Czekamy razem.",
   // Więcej o Szczawie
   "Szczawo i Artatuś — obaj mają słabość do trunku. Jeden mówi o tym głośno, drugi milczy i pije.",
   "Szczawo Szczawiński. Gorzała Gorzałowa. Dwie strony tego samego człowieka.",
@@ -438,7 +456,7 @@ const TEKSTY_ROZPISKI = [
   "Kickboxer skopał powietrze i potwierdził. Powietrze nic nie zrobiło. Ty coś zrób.",
   "BUBU wrócił po dezerterskiej przygodzie. Najmniej co może zrobić — to wysłać kartę.",
   "Tatuś przeanalizował wymianę 7 razy. Wynik każdej analizy: wyślij kartę.",
-  "Kristoforo kręci się jak wiatrak i jakoś wysyła. Weź przykład z tulipana.",
+  "Dawid Kluseczka pije online ale bije mocno i wysyła kartę. Weź przykład.",
   "Ponton pokazał wymiankę kotu. Kot mruknął: wyślij. Kot mądrzejszy od połowy gangu.",
   "Joker jest na kasie w Lidlu. Zdążył potwierdzić. Zastanów się nad swoim życiem.",
   "Szczawo wysłał między pierwszym a drugim. Chwila precyzji w morzu gorzały.",
@@ -448,7 +466,7 @@ const TEKSTY_ROZPISKI = [
   "Bodek wysłał zanim zaczął topić. Priorytety ustawione wzorowo.",
   "Sonia jest w AnyFam. Nie wróciła. Kickboxer kopie w powietrze i czeka.",
   "Krystian ma ripostę na każdą wymówkę. Nie testuj. Wyślij kartę.",
-  "Bastek wrócił i wysyła karty. Sonia w AnyFam z Devilem i Marysią. Kickboxer kopie już tylko za połowę.",
+  "Bastek, Devil i Marysia wrócili i wysyłają karty. Sonia sama w AnyFam. Kickboxer kopie już tylko za połowę.",
   "KaY4k nie dostaje pensji od Pontona, ale kartę wysyła. Charakter.",
   "CHMARSONN nie marnuje słów. Ani na pogaduszki, ani na wymówki. Wyślij kartę.",
   "Młody jest nowy. Jeszcze się uczy. Mimo to wysłał. Ty grasz dłużej — co masz do powiedzenia?",
@@ -456,7 +474,7 @@ const TEKSTY_ROZPISKI = [
   "Szczawo wysłał między kieliszkami. Trzeźwy czy nie — obowiązek obowiązuje.",
   "Krime wysłał bez słowa. Bez pytania. Bez wymówki. Weź przykład z człowieka-zagadki.",
   "Tatuś przeanalizował Twój brak akcji. Wyniki: nieoptymalne. Rozwiązanie: wyślij kartę.",
-  "Holenderskie trio wysłało. Kristoforo kręci, Artatuś milczy, Młody szuka przycisku. Ale wysłali.",
+  "Holenderskie duo wysłało. Artatuś milczy, Młody szuka przycisku. Ale wysłali.",
 ];
 
 const TIPY=[
