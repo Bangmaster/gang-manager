@@ -1106,18 +1106,13 @@ Wynik: ${w.wygrana === true ? "WYGRANA 🏆" : w.wygrana === false ? "PRZEGRANA 
 Uczestniczyło: ${w.gracze.filter(g => g.bylNaWalce).length}/${w.gracze.length} graczy
 ${top3.length > 0 ? `Top gracze: ${top3.map(g => `${g.nazwa} (${g.obrazenia || 0} pkt)`).join(", ")}` : ""}
 Napisz tylko komentarz, bez żadnego wstępu.`;
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/generate-announcement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 150,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        body: JSON.stringify({ prompt, adminKey: "family_admin_2024" }),
       });
       const data = await res.json();
-      const txt = data.content?.map(c => c.text || "").join("").trim();
-      if (txt) setAiKomentarze(p => ({ ...p, [w.id]: txt }));
+      if (data.success && data.tekst) setAiKomentarze(p => ({ ...p, [w.id]: data.tekst }));
     } catch (e) { /* cicho */ }
     setAiLadowanie(p => ({ ...p, [w.id]: false }));
   };
