@@ -272,13 +272,14 @@ async function analyzeBattleImages(files, onProgress) {
 }
 
 // Główny komponent
-export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, archiwumWalk=[] }) {
+export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, archiwumWalk=[], talie=[], posiadane={}, duplikaty={} }) {
   const [pliki, setPliki] = useState([]);
   const [podgladURL, setPodgladURL] = useState([]);
   const [analizujac, setAnalizujac] = useState(false);
   const [wyniki, setWyniki] = useState(null);
   const [nazwaWalki, setNazwaWalki] = useState("");
   const [wynikWalki, setWynikWalki] = useState(null); // null=nieokreślony, true=wygrana, false=przegrana
+  const [waznaWalka, setWaznaWalka] = useState(false);
   const [podglad, setPodglad] = useState("ranking");
   const [podsumowanieSezonu, setPodsumowanieSezonu] = useState(null);
   const [edytowanyGracz, setEdytowanyGracz] = useState(null);
@@ -376,6 +377,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
       data: wyniki.dataAnalizy,
       gracze: wyniki.gracze,
       wygrana: wynikWalki,
+      wazna: waznaWalka,
     }];
     await zapiszWalki(noweWalki);
     zapiszAutoBackup("zapis_walki");
@@ -383,6 +385,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
     setPliki([]);
     setNazwaWalki("");
     setWynikWalki(null);
+    setWaznaWalka(false);
     alert(`✓ Zapisano walkę "${nazwaWalki.trim()}"`);
   };
 
@@ -442,6 +445,12 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
                 }}>{opt.label}</button>
               ))}
             </div>
+            <button onClick={() => setWaznaWalka(v => !v)} style={{
+              width: "100%", padding: "7px 4px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: waznaWalka ? "bold" : "normal",
+              background: waznaWalka ? "rgba(255,165,0,0.15)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${waznaWalka ? "#fa0" : "#2a2a3a"}`,
+              color: waznaWalka ? "#fa0" : "#555", marginBottom: 8,
+            }}>{waznaWalka ? "⭐ Ważna walka" : "☆ Oznacz jako ważną"}</button>
             <input type="text" value={nazwaWalki} onChange={e => setNazwaWalki(e.target.value)}
               placeholder="Nazwa/data walki, np. Walka z 17.05.2026"
               style={{ width: "100%", padding: "8px 10px", background: "#12122a", border: "1px solid #333", borderRadius: 6, color: "#fff", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }} />
@@ -616,7 +625,8 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
       )}
 
       {podglad === "sezon" && (
-        <PodsumowanieSezonu podsumowanie={podsumowanieSezonu} zapiszWalki={zapiszWalki} walki={walki || []} />
+        <PodsumowanieSezonu podsumowanie={podsumowanieSezonu} zapiszWalki={zapiszWalki} walki={walki || []}
+          isAdmin={isAdmin} czlonkowie={czlonkowie || []} talie={talie} posiadane={posiadane} duplikaty={duplikaty} />
       )}
 
       {podglad === "liga" && (
@@ -1045,6 +1055,11 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
     setTrybEdycjiLvl(null);
   };
 
+  const toggleWazna = async (walkaId) => {
+    const noweWalki = walki.map(w => w.id === walkaId ? { ...w, wazna: !w.wazna } : w);
+    await zapiszWalki(noweWalki);
+  };
+
   const toggleObecnosc = async (walkaId, graczNazwa) => {
     const noweWalki = walki.map(w => {
       if (w.id !== walkaId) return w;
@@ -1155,10 +1170,17 @@ Napisz tylko komentarz, bez żadnego wstępu.`;
                   }}>
                     {isWygrana ? "🏆 WYGRANA" : isPrzegrana ? "💀 PRZEGRANA" : "⬜ WALKA"}
                   </span>
+                  {isAdmin ? (
+                    <button onClick={() => toggleWazna(w.id)} title={w.wazna ? "Odznacz jako ważną" : "Oznacz jako ważną walkę"} style={{
+                      background: "none", border: "none", cursor: "pointer", fontSize: 15, padding: 0,
+                      color: w.wazna ? "#fa0" : "#333", lineHeight: 1,
+                    }}>{w.wazna ? "⭐" : "☆"}</button>
+                  ) : (w.wazna && <span style={{ fontSize: 15, color: "#fa0" }}>⭐</span>)}
                 </div>
                 <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>
                   {new Date(w.data).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" })}
                   {w.nazwa && <span style={{ color: "#666", marginLeft: 6 }}>• {w.nazwa}</span>}
+                  {w.wazna && <span style={{ color: "#fa0", marginLeft: 6 }}>• ważna walka</span>}
                 </div>
               </div>
               {/* Wynik numeryczny jeśli dostępny */}
@@ -1317,6 +1339,7 @@ Napisz tylko komentarz, bez żadnego wstępu.`;
                 <RankingTabela gracze={w.gracze} edytowalne={false} />
               </div>
             )}
+            </div>
           </div>
         );
       })}
@@ -2158,9 +2181,41 @@ function generujOsobistePodsuamowanie(g, wszyscy, lacznaWalka) {
   return linie;
 }
 
-function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }) {
+// Liczy zaangażowanie w karty (posiadane/duplikaty/zamknięte talie) dla każdego członka
+function obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty) {
+  if (!czlonkowie?.length || !talie?.length) return {};
+  const wynik = {};
+  czlonkowie.forEach(o => {
+    let posiada = 0, mozliwe = 0, dup = 0, talieZamkniete = 0;
+    talie.forEach(t => {
+      const karty = t.karty || [];
+      if (karty.length === 0) return;
+      mozliwe += karty.length;
+      let maWszystkie = true;
+      karty.forEach(k => {
+        const klucz = `${o.id}_${t.id}_${k.nazwa}`;
+        if (posiadane[klucz]) posiada++;
+        else maWszystkie = false;
+        if (duplikaty[klucz]) dup += duplikaty[klucz];
+      });
+      if (maWszystkie) talieZamkniete++;
+    });
+    wynik[o.nazwa || o.id] = {
+      posiada, mozliwe,
+      procent: mozliwe > 0 ? Math.round(posiada / mozliwe * 100) : 0,
+      duplikaty: dup,
+      talieZamkniete,
+      talieLacznie: talie.filter(t => (t.karty || []).length > 0).length,
+    };
+  });
+  return wynik;
+}
+
+function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false, isAdmin=false, czlonkowie=[], talie=[], posiadane={}, duplikaty={} }) {
   const [edycjaGracza, setEdycjaGracza] = useState(null);
   const [nowyNick, setNowyNick] = useState("");
+  const [analizaAI, setAnalizaAI] = useState("");
+  const [analizaLadowanie, setAnalizaLadowanie] = useState(false);
 
   if (!podsumowanie) {
     return (
@@ -2189,6 +2244,63 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
     await zapiszWalki(zaktualizowane);
     setEdycjaGracza(null);
     alert(`✓ Zmieniono "${staryNick}" → "${nowyNickVal.trim()}" we wszystkich walkach`);
+  };
+
+  const generujAnalizeAI = async () => {
+    if (analizaLadowanie) return;
+    setAnalizaLadowanie(true);
+    try {
+      const daneKartowe = obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty);
+      const waznaWalki = walki.filter(w => w.wazna);
+      const totalObr = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0);
+
+      const tabela = wszyscy.map(g => {
+        const obecnoscWazne = waznaWalki.length > 0
+          ? waznaWalki.filter(w => w.gracze.some(gr => gr.nazwa === g.nazwa && (gr.bylNaWalce === true || gr.bylNaWalce === "U"))).length
+          : null;
+        const nieobecnoscWazne = waznaWalki.length > 0
+          ? waznaWalki.filter(w => w.gracze.some(gr => gr.nazwa === g.nazwa && gr.bylNaWalce === false)).length
+          : null;
+        const procWklad = totalObr > 0 ? ((g.obrazeniaLacznie / totalObr) * 100).toFixed(1) : "0";
+        const karty = daneKartowe[g.nazwa];
+        const kartyTxt = karty
+          ? `karty ${karty.posiada}/${karty.mozliwe} (${karty.procent}%), duplikaty: ${karty.duplikaty}, talie zamknięte: ${karty.talieZamkniete}/${karty.talieLacznie}`
+          : "brak danych o kartach";
+        return `- ${g.nazwa}: uczestnictwo ${g.uczestnictwa}/${lacznaWalka} walk, śr. obrażenia ${Math.round(g.obrazeniaLacznie / g.uczestnictwa)}, łączne obrażenia ${g.obrazeniaLacznie} (${procWklad}% wkładu drużyny)${waznaWalki.length > 0 ? `, ważne walki: był na ${obecnoscWazne}/${waznaWalki.length}, nieobecny na ${nieobecnoscWazne}/${waznaWalki.length}` : ""}, ${kartyTxt}`;
+      }).join("\n");
+
+      const prompt = `Jesteś analitykiem gangu ™FAM™ w grze mobilnej The Gang. Masz pełne statystyki sezonu dla wszystkich członków gangu. Zrób dogłębną, rzeczową analizę po polsku.
+
+Sezon: ${lacznaWalka} walk łącznie, w tym ${waznaWalki.length} oznaczonych jako WAŻNE (liczą się dużo bardziej niż zwykłe — to na nich mierzymy zaangażowanie).
+
+Dane graczy:
+${tabela}
+
+Przeanalizuj i napisz zwięzły raport zawierający:
+1. **Kto najbardziej odstaje** — najsłabsze statystyki, szczególnie nieobecności na WAŻNYCH walkach (to priorytet numer jeden) i niski wkład w łączne obrażenia drużyny.
+2. **Kandydaci do wymiany** — konkretne nicki osób, które najbardziej odbiegają od reszty gangu i powinny zostać rozważone do wymiany/zastąpienia. Uzasadnij każdego krótko.
+3. **Gra dla drużyny czy pod siebie** — wskaż kto realnie wnosi wkład w wyniki drużyny (wysoki % łącznych obrażeń, obecność na ważnych walkach) a kto jest pasywny lub tylko "numerem" w gangu (siedzi, nie bije, nie bierze udziału w ważnych momentach).
+4. **Ogólna ocena drużyny** — krótkie podsumowanie kondycji gangu jako całości.
+
+Pisz konkretnie, z nickami, bez lania wody. Styl rzeczowy ale może być z lekkim humorem charakterystycznym dla gangu (jak w innych tekstach apki). Maksymalnie 300-350 słów.`;
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      const txt = data.content?.map(c => c.text || "").join("").trim();
+      if (txt) setAnalizaAI(txt);
+      else alert("⚠️ Nie udało się wygenerować analizy. Spróbuj ponownie.");
+    } catch (e) {
+      alert("⚠️ Błąd generowania analizy: " + e.message);
+    }
+    setAnalizaLadowanie(false);
   };
 
   return (
@@ -2373,6 +2485,34 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false }
           );
         })}
       </div>
+
+      {/* Głęboka analiza AI — tylko admin */}
+      {isAdmin && !readonly && (
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid #2a2a3a" }}>
+          <div style={{ fontSize: 13, fontWeight: "bold", color: "#c084fc", marginBottom: 6 }}>🔎 Głęboka analiza AI</div>
+          <div style={{ fontSize: 10, color: "#666", marginBottom: 10, lineHeight: 1.5 }}>
+            Analiza na podstawie statystyk walk (z naciskiem na ⭐ ważne walki), kart posiadanych/duplikatów i zamkniętych talii. Wytypuje osoby najbardziej odstające od reszty i oceni kto gra dla drużyny.
+          </div>
+
+          {!analizaAI ? (
+            <button onClick={generujAnalizeAI} disabled={analizaLadowanie} style={{
+              width: "100%", padding: 12, borderRadius: 8, cursor: analizaLadowanie ? "not-allowed" : "pointer",
+              background: analizaLadowanie ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg,#7c3aed,#c084fc)",
+              border: "none", color: analizaLadowanie ? "#666" : "#fff", fontSize: 13, fontWeight: "bold",
+            }}>
+              {analizaLadowanie ? "⏳ Analizuję sezon..." : "🔎 Wygeneruj głęboką analizę"}
+            </button>
+          ) : (
+            <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid #7c3aed44", borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 12, color: "#ddd", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{analizaAI}</div>
+              <button onClick={() => { setAnalizaAI(""); }} style={{
+                marginTop: 10, padding: "6px 12px", background: "rgba(192,132,252,0.1)",
+                border: "1px solid #c084fc44", borderRadius: 6, color: "#c084fc", cursor: "pointer", fontSize: 11,
+              }}>↺ Wygeneruj ponownie</button>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

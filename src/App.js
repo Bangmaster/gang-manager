@@ -1103,6 +1103,9 @@ function App() {
           zapiszWalki={(now)=>zapiszStrukture("walki",now)}
           archiwumWalk={archiwumWalk}
           isAdmin={isAdmin}
+          talie={dane.talie||[]}
+          posiadane={dane.posiadane||{}}
+          duplikaty={dane.duplikaty||{}}
         />}
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
         {zakładka==="wynik"&&isAdmin&&<WynikView
