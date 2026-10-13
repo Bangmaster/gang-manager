@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { zapiszAutoBackup } from "./firebase";
 
 // Klucze API — te same co w gemini.js
@@ -1097,14 +1097,14 @@ function HistoriaWalk({ walki, usunWalke, isAdmin, zapiszWalki }) {
     setAiLadowanie(p => ({ ...p, [w.id]: true }));
     try {
       const top3 = [...w.gracze]
-        .filter(g => g.bylNaWalce && (g.obr || 0) > 0)
-        .sort((a, b) => (b.obr || 0) - (a.obr || 0))
+        .filter(g => g.bylNaWalce && (g.obrazenia || 0) > 0)
+        .sort((a, b) => (b.obrazenia || 0) - (a.obrazenia || 0))
         .slice(0, 3);
-      const prompt = `Jesteś komentatorem gangu ™FAM™ w grze mobilnej. Napisz jeden krótki, dramatyczny komentarz (max 2 zdania) po polsku do tej walki. Styl: gangsterski, z humorem, emoji. 
+      const prompt = `Jesteś komentatorem gangu ™FAM™ w grze mobilnej. Napisz jeden krótki, dramatyczny komentarz (max 2 zdania) po polsku do tej walki. Styl: gangsterski, z humorem, emoji.
 Walka: ${w.nazwa || "Walka gangów"}
 Wynik: ${w.wygrana === true ? "WYGRANA 🏆" : w.wygrana === false ? "PRZEGRANA 💀" : "NIEZNANY"}
 Uczestniczyło: ${w.gracze.filter(g => g.bylNaWalce).length}/${w.gracze.length} graczy
-${top3.length > 0 ? `Top gracze: ${top3.map(g => `${g.nazwa} (${g.obr || 0} pkt)`).join(", ")}` : ""}
+${top3.length > 0 ? `Top gracze: ${top3.map(g => `${g.nazwa} (${g.obrazenia || 0} pkt)`).join(", ")}` : ""}
 Napisz tylko komentarz, bez żadnego wstępu.`;
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -1137,13 +1137,12 @@ Napisz tylko komentarz, bez żadnego wstępu.`;
 
         // Top 3 gracze wg obrażeń
         const top3 = [...w.gracze]
-          .filter(g => (g.obr || 0) > 0)
-          .sort((a, b) => (b.obr || 0) - (a.obr || 0))
+          .filter(g => (g.obrazenia || 0) > 0)
+          .sort((a, b) => (b.obrazenia || 0) - (a.obrazenia || 0))
           .slice(0, 3);
-        const maxObr = top3[0]?.obr || 0;
 
         // Pasek postępu — nasza suma vs suma top3 przeciwników (szacunek)
-        const naszeObr = w.gracze.reduce((s, g) => s + (g.obr || 0), 0);
+        const naszeObr = w.gracze.reduce((s, g) => s + (g.obrazenia || 0), 0);
 
         return (
           <div key={w.id} style={{
@@ -1235,7 +1234,7 @@ Napisz tylko komentarz, bez żadnego wstępu.`;
                         <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: "bold", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {g.nazwa.replace(/™FAM™|fAM™|FAM™/gi, "").trim()}
                         </div>
-                        <div style={{ fontSize: 10, color: "#666", marginTop: 1 }}>{(g.obr || 0).toLocaleString()}</div>
+                        <div style={{ fontSize: 10, color: "#666", marginTop: 1 }}>{(g.obrazenia || 0).toLocaleString()}</div>
                       </div>
                     ))}
                   </div>
@@ -1265,6 +1264,39 @@ Napisz tylko komentarz, bez żadnego wstępu.`;
                   </button>
                 )}
               </div>
+
+              {/* Akcje admina */}
+              {isAdmin && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  <button onClick={() => {
+                    const noweWalki = walki.map(nw => nw.id === w.id
+                      ? { ...nw, wygrana: nw.wygrana === true ? false : nw.wygrana === false ? null : true }
+                      : nw);
+                    zapiszWalki(noweWalki);
+                  }} style={{
+                    padding: "5px 10px", borderRadius: 6, fontSize: 10, cursor: "pointer",
+                    background: "rgba(255,255,255,0.04)", border: "1px solid #333", color: "#999",
+                  }}>🔄 Wynik</button>
+                  <button onClick={() => otworzyjedycjeLvl(w)} style={{
+                    padding: "5px 10px", borderRadius: 6, fontSize: 10, cursor: "pointer",
+                    background: trybEdycjiLvl === w.id ? "rgba(100,200,255,0.12)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${trybEdycjiLvl === w.id ? "#64c8ff44" : "#333"}`, color: trybEdycjiLvl === w.id ? "#64c8ff" : "#999",
+                  }}>⚡ Lvl</button>
+                  <button onClick={() => setTrybEdycji(trybEdycji === w.id ? null : w.id)} style={{
+                    padding: "5px 10px", borderRadius: 6, fontSize: 10, cursor: "pointer",
+                    background: trybEdycji === w.id ? "rgba(100,150,255,0.12)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${trybEdycji === w.id ? "#6496ff44" : "#333"}`, color: trybEdycji === w.id ? "#6496ff" : "#999",
+                  }}>👥 Obecność</button>
+                  <button onClick={() => setRozwiniete(rozwiniete === w.id ? null : w.id)} style={{
+                    padding: "5px 10px", borderRadius: 6, fontSize: 10, cursor: "pointer",
+                    background: "rgba(255,255,255,0.04)", border: "1px solid #333", color: "#999",
+                  }}>{rozwiniete === w.id ? "🔼 Zwiń" : "🔽 Pokaż szczegóły"}</button>
+                  <button onClick={() => usunWalke(w.id)} style={{
+                    padding: "5px 10px", borderRadius: 6, fontSize: 10, cursor: "pointer",
+                    background: "rgba(255,50,50,0.06)", border: "1px solid #f5544433", color: "#f55", marginLeft: "auto",
+                  }}>🗑</button>
+                </div>
+              )}
 
             {/* Edycja lvl */}
             {trybEdycjiLvl === w.id && (
