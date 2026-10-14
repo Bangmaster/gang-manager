@@ -1106,13 +1106,14 @@ Wynik: ${w.wygrana === true ? "WYGRANA 🏆" : w.wygrana === false ? "PRZEGRANA 
 Uczestniczyło: ${w.gracze.filter(g => g.bylNaWalce).length}/${w.gracze.length} graczy
 ${top3.length > 0 ? `Top gracze: ${top3.map(g => `${g.nazwa} (${g.obrazenia || 0} pkt)`).join(", ")}` : ""}
 Napisz tylko komentarz, bez żadnego wstępu.`;
-      const res = await fetch("/api/generate-announcement", {
+      const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, adminKey: "family_admin_2024" }),
+        body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
-      if (data.success && data.tekst) setAiKomentarze(p => ({ ...p, [w.id]: data.tekst }));
+      const txt = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      if (txt) setAiKomentarze(p => ({ ...p, [w.id]: txt }));
     } catch (e) { /* cicho */ }
     setAiLadowanie(p => ({ ...p, [w.id]: false }));
   };
@@ -2311,14 +2312,16 @@ Przeanalizuj i napisz zwięzły raport zawierający:
 
 Pisz konkretnie, z nickami, bez lania wody. Styl rzeczowy ale może być z lekkim humorem charakterystycznym dla gangu (jak w innych tekstach apki). Maksymalnie 300-350 słów.`;
 
-      const res = await fetch("/api/generate-announcement", {
+      const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, adminKey: "family_admin_2024" }),
+        body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
-      if (data.success && data.tekst) setAnalizaAI(data.tekst);
-      else alert("⚠️ Nie udało się wygenerować analizy: " + (data.error || "spróbuj ponownie"));
+      if (!res.ok) throw new Error(data.error || "Błąd serwera");
+      const txt = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      if (txt) setAnalizaAI(txt);
+      else alert("⚠️ Nie udało się wygenerować analizy. Spróbuj ponownie.");
     } catch (e) {
       alert("⚠️ Błąd generowania analizy: " + e.message);
     }
