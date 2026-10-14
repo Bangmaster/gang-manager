@@ -41,8 +41,8 @@ module.exports = async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1000,
+        model: "claude-haiku-5-5",
+        max_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -50,7 +50,9 @@ module.exports = async function handler(req, res) {
     if (!response.ok) {
       const err = await response.text();
       console.error("Anthropic API error:", err);
-      return res.status(500).json({ error: `Anthropic API error: ${response.status}` });
+      let detal = "";
+      try { detal = JSON.parse(err)?.error?.message || ""; } catch(e) {}
+      return res.status(500).json({ error: `Anthropic API error: ${response.status}${detal ? " — " + detal : ""}` });
     }
 
     const data = await response.json();
