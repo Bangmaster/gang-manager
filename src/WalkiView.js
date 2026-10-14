@@ -2311,19 +2311,14 @@ Przeanalizuj i napisz zwięzły raport zawierający:
 
 Pisz konkretnie, z nickami, bez lania wody. Styl rzeczowy ale może być z lekkim humorem charakterystycznym dla gangu (jak w innych tekstach apki). Maksymalnie 300-350 słów.`;
 
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/generate-announcement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        body: JSON.stringify({ prompt, adminKey: "family_admin_2024" }),
       });
       const data = await res.json();
-      const txt = data.content?.map(c => c.text || "").join("").trim();
-      if (txt) setAnalizaAI(txt);
-      else alert("⚠️ Nie udało się wygenerować analizy. Spróbuj ponownie.");
+      if (data.success && data.tekst) setAnalizaAI(data.tekst);
+      else alert("⚠️ Nie udało się wygenerować analizy: " + (data.error || "spróbuj ponownie"));
     } catch (e) {
       alert("⚠️ Błąd generowania analizy: " + e.message);
     }
