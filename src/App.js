@@ -4013,7 +4013,8 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
           if (d) {
             w.push(nowaWymiana(u, d));
             if (ocenaPlanu(w) >= bazowa) {
-              const przep = w.filter((e, i) => e.v3Przepiete && !plan[i]?.v3Przepiete).length;
+              const planPrzed = plan;
+              const przep = w.filter((e, i) => e.v3Przepiete && !planPrzed[i]?.v3Przepiete).length;
               plan = w; zmiana = true;
               v3Info.dodane++; v3Info.przepiete += przep;
               v3Info.log.push(`➕ ${d.nazwa} ➜ ${o.nazwa}: ${u.karta} [${t.nazwa}]${przep ? ` (przepięto ${przep} wymian)` : ""}`);
