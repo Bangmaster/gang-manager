@@ -60,6 +60,15 @@ async function scaleScreenyWalki(files) {
 }
 
 // Prompt dla screenów aktywności członków
+// Automatyczna poprawka nicków, które AI często ucina na zrzutach ekranu
+function poprawNick(nazwa) {
+  if (typeof nazwa !== "string") return nazwa;
+  const n = nazwa.trim();
+  if (/b4ste$/i.test(n)) return n + "k";
+  if (/chupacabr$/i.test(n)) return n + "a";
+  return nazwa;
+}
+
 function buildActivityPrompt(ileScreenow) {
   const wieloInfo = ileScreenow > 1
     ? `Masz ${ileScreenow} screeny złączone pionowo. Każdego gracza zwróć TYLKO RAZ.`
@@ -149,7 +158,7 @@ async function analyzeActivityImages(files, onProgress) {
         if (text.endsWith("```")) text = text.slice(0, -3);
         const parsed = JSON.parse(text.trim());
         nastepnyKlucz();
-        return { sukces: true, czlonkowie: parsed.czlonkowie || [] };
+        return { sukces: true, czlonkowie: (parsed.czlonkowie || []).map(c => ({ ...c, nazwa: poprawNick(c.nazwa) })) };
 
       } catch (e) {
         ostatniBladMsg = e.message;
@@ -251,7 +260,7 @@ async function analyzeBattleImages(files, onProgress) {
         else if (text.startsWith("```")) text = text.slice(3);
         if (text.endsWith("```")) text = text.slice(0, -3);
         const parsed = JSON.parse(text.trim());
-        const gracze = (parsed.gracze || []).sort((a, b) => b.obrazenia - a.obrazenia);
+        const gracze = (parsed.gracze || []).map(g => ({ ...g, nazwa: poprawNick(g.nazwa) })).sort((a, b) => b.obrazenia - a.obrazenia);
         nastepnyKlucz();
         return { sukces: true, gracze };
 
@@ -1662,8 +1671,9 @@ function obliczPodsumowanieSezonu(walki, czlonkowie) {
     }
   });
 
+  awansePoziomu.sort((a, b) => b.roznica - a.roznica);
   if (awansePoziomu.length > 0) {
-    const maxAwans = [...awansePoziomu].sort((a, b) => b.roznica - a.roznica)[0];
+    const maxAwans = awansePoziomu[0];
     ciekawostki.push({
       ikona: "⬆️",
       tytul: "Największy awans poziomów",
