@@ -688,6 +688,8 @@ function App() {
   }, []);
   const [wynik, setWynik] = useState(null);
   const [trybWymiany, setTrybWymiany] = useState("priorytet");
+  const [wynikV3, setWynikV3] = useState(null);
+  const [trybV3, setTrybV3] = useState("priorytet");
   const [paczkiDiament, setPaczkiDiament] = useState({}); // {osobaId: liczba paczek nowych diamentowych}
   const [statusZapisu, setStatusZapisu] = useState("");
 
@@ -905,7 +907,6 @@ function App() {
     {id:"chat",label:"💬 Chat"},
     ...(isAdmin?[
       {id:"wynik",label:"⚡ Generuj"},
-      {id:"wynikV2",label:"🧬 Generuj V2"},
       {id:"wynikV3",label:"🧠 Generuj V3"},
       {id:"ocr",label:"📸 OCR talii"},
       {id:"edycja",label:"⚙️ Talie"},
@@ -1022,6 +1023,7 @@ function App() {
           <button onClick={()=>setTypWymiany(t=>{
             const nowy = t==="złote"?"diamentowe":t==="diamentowe"?"event":"złote";
             if(nowy==="event" && trybWymiany==="progi") setTrybWymiany("priorytet");
+            if(nowy==="event" && trybV3==="progi") setTrybV3("priorytet");
             return nowy;
           })} style={{
             padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:"bold",cursor:"pointer",border:"none",
@@ -1121,23 +1123,18 @@ function App() {
           historiaWymian={historiaWymian}
           paczkiDiament={paczkiDiament} setPaczkiDiament={setPaczkiDiament}
         />}
-        {zakładka==="wynikV2"&&isAdmin&&<WynikViewV2
+        {zakładka==="wynikV3"&&isAdmin&&<WynikView
+          wersja="v3"
           talie={typWymiany==="event" ? talieEventSorted : talieSorted}
           czlonkowie={dane.czlonkowie}
           posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
           duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
-          typWymiany={typWymiany}
+          typWymiany={typWymiany} wynik={wynikV3} setWynik={setWynikV3}
+          trybWymiany={trybV3} setTrybWymiany={setTrybV3}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
           przejdzDoAktywnej={()=>setZakładka("aktywna")}
-        />}
-        {zakładka==="wynikV3"&&isAdmin&&<WynikViewV3
-          talie={typWymiany==="event" ? talieEventSorted : talieSorted}
-          czlonkowie={dane.czlonkowie}
-          posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
-          duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
-          typWymiany={typWymiany}
-          zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
-          przejdzDoAktywnej={()=>setZakładka("aktywna")}
+          historiaWymian={historiaWymian}
+          paczkiDiament={paczkiDiament} setPaczkiDiament={setPaczkiDiament}
         />}
         {zakładka==="edycja"&&isAdmin&&<EdycjaTalii
           talie={dane.talie} zapisz={(noweTalie)=>zapiszStrukture("talie",noweTalie)}
@@ -2820,168 +2817,7 @@ function generujAlgorytm({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty
   return {planoweWymiany,nieobsluzone,zamknieciaInfo};
 }
 
-// ════════════════════════════════════════════════════════════════
-// GENERUJ V2 — algorytm eksperymentalny, CAŁKOWICIE NIEZALEŻNY od V1
-// Implementuje 3 ulepszenia:
-//   1. Waga duplikatu = ile osób w gangu wciąż potrzebuje tej karty
-//   2. Łańcuchy 3-osobowe (A→B→C→A) gdy nie ma bezpośredniego 1-do-1
-//   3. Dynamiczna waga progu = nagroda / liczba brakujących kart do progu
-// Nie modyfikuje, nie wywołuje i nie współdzieli stanu z generujAlgorytm (V1).
-// ════════════════════════════════════════════════════════════════
-function generujAlgorytmV2({talie, czlonkowie, posiadane, duplikaty, typWymiany}) {
-  const isEvent = typWymiany === "event";
-  const typ = typWymiany === "złote" ? "złota" : "diamentowa";
-  const oppTyp = typWymiany === "złote" ? "diamentowa" : isEvent ? null : "złota";
-  const obliczProgFn = isEvent ? obliczProgEvent : obliczProg;
-
-  // Progi per osoba (stan PRZED wymianą)
-  const progiOsob = {};
-  czlonkowie.forEach(o => {
-    progiOsob[o.id] = obliczProgFn(liczKartyOsoby(o.id, talie, posiadane));
-  });
-
-  // ULEPSZENIE 1 — globalna "wartość" karty = ilu odbiorców jej wciąż brakuje
-  const potrzebaKarty = {};
-  talie.forEach(talia => {
-    talia.karty.filter(k => k.typ === typ).forEach(karta => {
-      let cnt = 0;
-      czlonkowie.forEach(o => { if (!posiadane[`${o.id}_${talia.id}_${karta.nazwa}`]) cnt++; });
-      potrzebaKarty[`${talia.id}_${karta.nazwa}`] = cnt;
-    });
-  });
-
-  // Zbuduj listę wszystkich możliwych par dawca→odbiorca→karta
-  const kandydaci = [];
-  czlonkowie.forEach(dawca => {
-    talie.forEach(talia => {
-      talia.karty.filter(k => k.typ === typ).forEach(karta => {
-        const dKey = `${dawca.id}_${talia.id}_${karta.nazwa}`;
-        if (!duplikaty[dKey]) return;
-        czlonkowie.forEach(odbiorca => {
-          if (odbiorca.id === dawca.id) return;
-          const oKey = `${odbiorca.id}_${talia.id}_${karta.nazwa}`;
-          if (posiadane[oKey]) return;
-
-          const brakT = talia.karty.filter(k => k.typ === typ && !posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]).length;
-          const brakO = oppTyp ? talia.karty.filter(k => k.typ === oppTyp && !posiadane[`${odbiorca.id}_${talia.id}_${k.nazwa}`]).length : 0;
-          const nagroda = pobierzNagrode(talia, odbiorca.krag || 1);
-          const wartoscKarty = potrzebaKarty[`${talia.id}_${karta.nazwa}`] || 1;
-
-          // ULEPSZENIE 3 — im bliżej progu i im większa nagroda, tym wyższa waga
-          const prog = progiOsob[odbiorca.id];
-          let progWaga = 0;
-          if (prog.nastepnyProg) {
-            progWaga = prog.brakujeDoProg <= 1 ? prog.ammoProg : prog.ammoProg / prog.brakujeDoProg;
-          }
-
-          const priorytet = wartoscKarty * 60 + progWaga * 0.4 + nagroda * 0.01 + (brakT <= 2 ? 150 : 0) - brakT * 8;
-
-          kandydaci.push({ dawca, odbiorca, karta, talia, brakT, brakO, nagroda, wartoscKarty, progWaga, priorytet });
-        });
-      });
-    });
-  });
-
-  kandydaci.sort((a, b) => b.priorytet - a.priorytet);
-
-  // Przydział zachłanny — każdy dawca wysyła max 1 kartę
-  const wyslane = new Set();
-  const otrzymaneKlucz = new Set();
-  const planoweWymiany = [];
-
-  kandydaci.forEach(k => {
-    if (wyslane.has(k.dawca.id)) return;
-    const otrzKey = `${k.odbiorca.id}_${k.talia.id}_${k.karta.nazwa}`;
-    if (otrzymaneKlucz.has(otrzKey)) return;
-    wyslane.add(k.dawca.id);
-    otrzymaneKlucz.add(otrzKey);
-    planoweWymiany.push({
-      od: k.dawca.nazwa, do: k.odbiorca.nazwa,
-      karta: k.karta.nazwa, talia: k.talia.nazwa,
-      nagroda: k.nagroda, wartoscKarty: k.wartoscKarty,
-      progWaga: Math.round(k.progWaga), brakTCount: k.brakT, brakOCount: k.brakO,
-      lancuch: false,
-    });
-  });
-
-  // ULEPSZENIE 2 — łańcuchy 3-osobowe A→B→C→A dla dawców bez bezpośredniego matcha
-  const znajdzMatch = (dawcaId, odbiorcaId) => {
-    for (const talia of talie) {
-      for (const karta of talia.karty.filter(k => k.typ === typ)) {
-        const dKey = `${dawcaId}_${talia.id}_${karta.nazwa}`;
-        const oKey = `${odbiorcaId}_${talia.id}_${karta.nazwa}`;
-        if (duplikaty[dKey] && !posiadane[oKey]) return { karta, talia };
-      }
-    }
-    return null;
-  };
-
-  const lancuchy = [];
-  const niewyslani = czlonkowie.filter(c => !wyslane.has(c.id));
-  for (let i = 0; i < niewyslani.length; i++) {
-    const a = niewyslani[i];
-    if (wyslane.has(a.id)) continue;
-    for (let j = 0; j < niewyslani.length; j++) {
-      if (j === i || wyslane.has(niewyslani[j].id)) continue;
-      const b = niewyslani[j];
-      const abMatch = znajdzMatch(a.id, b.id);
-      if (!abMatch) continue;
-      for (let m = 0; m < niewyslani.length; m++) {
-        if (m === i || m === j || wyslane.has(niewyslani[m].id)) continue;
-        const c = niewyslani[m];
-        const bcMatch = znajdzMatch(b.id, c.id);
-        if (!bcMatch) continue;
-        const caMatch = znajdzMatch(c.id, a.id);
-        if (!caMatch) continue;
-        wyslane.add(a.id); wyslane.add(b.id); wyslane.add(c.id);
-        [[a, b, abMatch], [b, c, bcMatch], [c, a, caMatch]].forEach(([dawca, odbiorca, match]) => {
-          planoweWymiany.push({
-            od: dawca.nazwa, do: odbiorca.nazwa,
-            karta: match.karta.nazwa, talia: match.talia.nazwa,
-            nagroda: pobierzNagrode(match.talia, odbiorca.krag || 1),
-            wartoscKarty: potrzebaKarty[`${match.talia.id}_${match.karta.nazwa}`] || 1,
-            progWaga: 0, brakTCount: 0, brakOCount: 0,
-            lancuch: true,
-          });
-        });
-        lancuchy.push([a.nazwa, b.nazwa, c.nazwa]);
-        break;
-      }
-      if (wyslane.has(a.id)) break;
-    }
-  }
-
-  const nieobsluzone = czlonkowie.filter(c => !wyslane.has(c.id)).map(c => c.nazwa);
-
-  // Zamknięcia talii — identyczna logika co w V1, dla porównywalności wyników
-  const symPos = { ...posiadane };
-  planoweWymiany.forEach(w => {
-    const o = czlonkowie.find(c => c.nazwa === w.do);
-    const t = talie.find(t2 => t2.nazwa === w.talia);
-    if (o && t) symPos[`${o.id}_${t.id}_${w.karta}`] = true;
-  });
-  const zamknieciaInfo = [];
-  czlonkowie.forEach(osoba => {
-    talie.forEach(talia => {
-      const kPrzed = talia.karty.every(k => posiadane[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-      const kPo = talia.karty.every(k => symPos[`${osoba.id}_${talia.id}_${k.nazwa}`]);
-      if (!kPrzed && kPo) {
-        const liczbaPoWymianie = liczKartyOsoby(osoba.id, talie, symPos);
-        const progPrzed = obliczProgFn(liczKartyOsoby(osoba.id, talie, posiadane));
-        const progPo = obliczProgFn(liczbaPoWymianie);
-        const nowyProg = progPo.ostatniProg?.prog > (progPrzed.ostatniProg?.prog || 0);
-        zamknieciaInfo.push({
-          osoba: osoba.nazwa, talia: talia.nazwa, nagroda: pobierzNagrode(talia, osoba.krag),
-          nowyProg: nowyProg ? progPo.ostatniProg : null,
-        });
-      }
-    });
-  });
-
-  return { planoweWymiany, lancuchy, nieobsluzone, kandydaciCount: kandydaci.length, zamknieciaInfo };
-}
-
-// ═══ GENERUJ V3 — kopia V1 + optymalizator ścieżek naprzemiennych (V1 i V2 bez zmian) ═══
+// ═══ GENERUJ V3 — kopia V1 + optymalizator ścieżek naprzemiennych (V1 bez zmian) ═══
 function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplikaty,typWymiany,tryb,vipKolejka=[],celowaKolejka={},ignorujTrudne=false,historiaWymian=[],sprawiedliwe=false,maxKartNaOsobe=0,limitKartOsoby={},paczkiDiament={}}) {
   // czlonkowie = odbiorcy (aktywni), wszyscyCzlonkowie = dawcy (wszyscy łącznie z wyłączonymi)
   const dawcy = wszyscyCzlonkowie || czlonkowie;
@@ -3984,6 +3820,7 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
       };
     };
 
+    const T0 = Date.now();
     let plan = klonuj(planoweWymiany);
     // kolejka pominiętych (bez duplikatów)
     let kolejka = [];
@@ -4001,6 +3838,7 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
       let zmiana = false;
       const pozostale = [];
       for (const u of kolejka) {
+        if (Date.now() - T0 > 1200) { pozostale.push(u); continue; }
         const o = u.osoba; const t = u.talia;
         if (posiadane[`${o.id}_${t.id}_${u.karta}`]) continue;
         if (plan.some(e => e.do === o.nazwa && e.talia === t.nazwa && e.karta === u.karta)) continue;
@@ -4048,6 +3886,156 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
       if (!zmiana) break;
     }
 
+    // ── PEŁNA ANALIZA: dokładne przeszukanie zamknięć talii (z limitem czasu) ──
+    // Wybiera zbiór talii do zamknięcia tak, by suma 💰 (talie + progi) była największa,
+    // z gwarancją że każdy dawca wysyła max 1 kartę (dopasowanie). Resztę wymian dokłada jak wyżej.
+    const odbPoId = {}; czlonkowie.forEach(c => { odbPoId[c.id] = c; });
+    const taliaPoId = {}; talie.forEach(t => { taliaPoId[t.id] = t; });
+    const dawcaPoId = {}; dawcy.forEach(d => { dawcaPoId[d.id] = d; });
+
+    const dopasujDawcow = (pozycje) => {
+      const wlasciciel = {};
+      const wynikD = new Array(pozycje.length).fill(null);
+      const probuj = (i, odw) => {
+        for (const d of pozycje[i].dawcy) {
+          if (odw.has(d)) continue;
+          odw.add(d);
+          if (wlasciciel[d] === undefined || probuj(wlasciciel[d], odw)) {
+            wlasciciel[d] = i; wynikD[i] = d; return true;
+          }
+        }
+        return false;
+      };
+      for (let i = 0; i < pozycje.length; i++) {
+        if (!probuj(i, new Set())) return null;
+      }
+      return wynikD;
+    };
+
+    const zbudujPlanZPozycji = (pozycje, przyp, planWej, kolejkaWej, pelny) => {
+      const w = [];
+      const uzyteDawcy = new Set();
+      const klucze = new Set();
+      for (let i = 0; i < pozycje.length; i++) {
+        const p = pozycje[i];
+        const d = dawcaPoId[przyp[i]];
+        const o = odbPoId[p.odbId]; const t = taliaPoId[p.taliaId];
+        const klucz = `${o.nazwa}|${t.nazwa}|${p.karta}`;
+        const istn = planWej.find(e => `${e.do}|${e.talia}|${e.karta}` === klucz);
+        w.push(istn ? { ...istn, od: d.nazwa } : nowaWymiana({ osoba: o, talia: t, karta: p.karta, brakTCount: p.brakTCount }, d));
+        uzyteDawcy.add(d.id); klucze.add(klucz);
+      }
+      const doObsluzenia = [];
+      for (const e of planWej) {
+        const klucz = `${e.do}|${e.talia}|${e.karta}`;
+        if (klucze.has(klucz)) continue;
+        const d = dawcaPoNazwie[e.od];
+        const o = odbPoNazwie[e.do]; const t = taliaPoNazwie[e.talia];
+        if (!d || !o || !t) continue;
+        if (uzyteDawcy.has(d.id) || !mozeV3(o.id, ileOdbiera(w, o.nazwa))) {
+          doObsluzenia.push({ osoba: o, talia: t, karta: e.karta, brakTCount: e.brakTCount || 3 });
+          continue;
+        }
+        w.push({ ...e }); uzyteDawcy.add(d.id); klucze.add(klucz);
+      }
+      if (!pelny) return { plan: w, niezalatwione: [] };
+      kolejkaWej.forEach(u => doObsluzenia.push(u));
+      const niezalatwione = [];
+      for (const u of doObsluzenia) {
+        const o = u.osoba; const t = u.talia;
+        const klucz = `${o.nazwa}|${t.nazwa}|${u.karta}`;
+        if (klucze.has(klucz) || posiadane[`${o.id}_${t.id}_${u.karta}`]) continue;
+        if (!mozeV3(o.id, ileOdbiera(w, o.nazwa))) { niezalatwione.push(u); continue; }
+        const dd = szukajDawcy({ odbId: o.id, taliaId: t.id, karta: u.karta }, w, new Set(), 0);
+        if (dd) { w.push(nowaWymiana(u, dd)); klucze.add(klucz); }
+        else niezalatwione.push(u);
+      }
+      return { plan: w, niezalatwione };
+    };
+
+    const dokladnaAnaliza = (planWej, kolejkaWej) => {
+      const start = Date.now();
+      const LIMIT_WEZLOW = 120000;
+      const LIMIT_MS = Math.min(2000, Math.max(500, 3500 - (Date.now() - T0)));
+      const stan = { wezly: 0, przerwano: false };
+      const kand = [];
+      czlonkowie.forEach(o => {
+        talie.forEach(t => {
+          if (!t.karty.length) return;
+          const braki = t.karty.filter(k => !posiadane[`${o.id}_${t.id}_${k.nazwa}`]);
+          if (braki.length === 0 || braki.length > 4) return;
+          if (braki.some(k => k.typ !== typ)) return;
+          const pozycje = [];
+          for (const k of braki) {
+            const dd = dawcy.filter(d => d.id !== o.id && duplikaty[`${d.id}_${t.id}_${k.nazwa}`]).map(d => d.id);
+            if (!dd.length) return;
+            pozycje.push({ odbId: o.id, taliaId: t.id, karta: k.nazwa, dawcy: dd, brakTCount: braki.length });
+          }
+          kand.push({ o, t, pozycje, nagroda: pobierzNagrode(t, o.krag) || 0 });
+        });
+      });
+      if (!kand.length) return { wezly: 0, ms: 0, przerwano: false, kandydatow: 0, wynik: null };
+      kand.sort((a, b) => b.nagroda - a.nagroda);
+      // górne ograniczenie premii za progi (każda osoba max raz)
+      let zapasProgi = 0;
+      const osobyKand = new Set(kand.map(c => c.o.id));
+      osobyKand.forEach(id => {
+        const sp = { ...posiadane };
+        kand.filter(c => c.o.id === id).forEach(c => c.pozycje.forEach(p => { sp[`${id}_${p.taliaId}_${p.karta}`] = true; }));
+        const pr = progFnV3(liczKartyOsoby(id, talie, posiadane));
+        const pp = progFnV3(liczKartyOsoby(id, talie, sp));
+        if ((pp.ostatniProg?.prog || 0) > (pr.ostatniProg?.prog || 0)) zapasProgi += pp.ostatniProg.ammo || 0;
+      });
+      const sumaPozostalo = new Array(kand.length + 1).fill(0);
+      for (let i = kand.length - 1; i >= 0; i--) sumaPozostalo[i] = sumaPozostalo[i + 1] + kand[i].nagroda;
+
+      let najlepszaOcena = ocenaPlanu(planWej);
+      const ocenaStartowa = najlepszaOcena;
+      let najlepszyWynik = null;
+      let najlepszeWybory = null;
+      const wybrane = [];
+
+      const rec = (idx, suma, pozycje, przyp) => {
+        if (stan.przerwano) return;
+        stan.wezly++;
+        if (stan.wezly > LIMIT_WEZLOW || ((stan.wezly & 31) === 0 && Date.now() - start > LIMIT_MS)) { stan.przerwano = true; return; }
+        if (wybrane.length) {
+          const zb = zbudujPlanZPozycji(pozycje, przyp, planWej, kolejkaWej, false);
+          const oc = ocenaPlanu(zb.plan);
+          if (oc > najlepszaOcena + 1e-9) { najlepszaOcena = oc; najlepszeWybory = { pozycje, przyp }; }
+        }
+        if (idx >= kand.length) return;
+        if ((suma + sumaPozostalo[idx] + zapasProgi) * 1000 + 1000 <= najlepszaOcena) return;
+        const c = kand[idx];
+        const nowe = pozycje.concat(c.pozycje);
+        const przypNowe = dopasujDawcow(nowe);
+        const ileOdb = nowe.filter(p => p.odbId === c.o.id).length;
+        if (przypNowe && mozeV3(c.o.id, ileOdb - 1)) {
+          wybrane.push(idx);
+          rec(idx + 1, suma + c.nagroda, nowe, przypNowe);
+          wybrane.pop();
+        }
+        rec(idx + 1, suma, pozycje, przyp);
+      };
+      rec(0, 0, [], []);
+      let poprawaFinal = 0;
+      if (najlepszeWybory) {
+        const pelnyPlan = zbudujPlanZPozycji(najlepszeWybory.pozycje, najlepszeWybory.przyp, planWej, kolejkaWej, true);
+        const ocPelna = ocenaPlanu(pelnyPlan.plan);
+        if (ocPelna > ocenaStartowa + 1e-9) { najlepszyWynik = pelnyPlan; poprawaFinal = ocPelna - ocenaStartowa; }
+      }
+      return { wezly: stan.wezly, ms: Date.now() - start, przerwano: stan.przerwano, kandydatow: kand.length, wynik: najlepszyWynik, poprawa: poprawaFinal };
+    };
+
+    const dok = tryb === "progi" ? { wezly: 0, ms: 0, przerwano: false, kandydatow: 0, wynik: null } : dokladnaAnaliza(plan, kolejka);
+    v3Info.pelna = { wezly: dok.wezly, ms: dok.ms, przerwano: dok.przerwano, kandydatow: dok.kandydatow, poprawiono: false };
+    if (dok.wynik) {
+      plan = dok.wynik.plan;
+      kolejka = dok.wynik.niezalatwione;
+      v3Info.pelna.poprawiono = true;
+      v3Info.log.push(`🧮 Pełna analiza znalazła lepszy układ zamknięć (+${Math.round(dok.poprawa / 1000).toLocaleString()} 💰)`);
+    }
+
     planoweWymiany.length = 0;
     plan.forEach(e => planoweWymiany.push(e));
     nieobsluzone.length = 0;
@@ -4085,549 +4073,6 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
   return {planoweWymiany,nieobsluzone,zamknieciaInfo,v3Info};
 }
 
-
-function WynikViewV3({ talie, czlonkowie, posiadane, duplikaty, typWymiany, zapiszAktywna, przejdzDoAktywnej }) {
-  const [wynik, setWynik] = useState(null);
-  const [generujac, setGenerujac] = useState(false);
-  const [skopiowano, setSkopiowano] = useState(false);
-
-  const generuj = () => {
-    setGenerujac(true);
-    setTimeout(() => {
-      const r = generujAlgorytmV3({ talie, czlonkowie, wszyscyCzlonkowie: czlonkowie, posiadane, duplikaty, typWymiany, tryb: "priorytet" });
-      setWynik(r);
-      setGenerujac(false);
-    }, 50);
-  };
-
-  const tekstMessenger = () => {
-    if (!wynik) return "";
-    const linie = wynik.planoweWymiany.map(w => `${w.od} ➜ ${w.do}: ${w.karta} [${w.talia}]`);
-    return `🧬 WYMIANA V3\n\n${linie.join("\n")}`;
-  };
-
-  const kopiuj = () => {
-    navigator.clipboard.writeText(tekstMessenger()).then(() => {
-      setSkopiowano(true);
-      setTimeout(() => setSkopiowano(false), 2000);
-    });
-  };
-
-  const ustawJakoAktywna = () => {
-    if (!wynik) return;
-    zapiszAktywna({
-      data: new Date().toISOString(),
-      typWymiany,
-      wymiany: wynik.planoweWymiany,
-      potwierdzone: {},
-      wersja: "v3",
-    });
-    przejdzDoAktywnej();
-  };
-
-  return (
-    <div style={{ padding: 14 }}>
-      <div style={{
-        background: "linear-gradient(135deg,rgba(20,200,180,0.1),rgba(10,120,110,0.06))",
-        border: "1px solid #14b8a655", borderRadius: 10, padding: 12, marginBottom: 14,
-      }}>
-        <div style={{ fontWeight: "bold", color: "#5eead4", fontSize: 14, marginBottom: 4 }}>🧠 Generuj V3 — algorytm z optymalizatorem</div>
-        <div style={{ fontSize: 11, color: "#999", lineHeight: 1.5 }}>
-          Kopia zwykłego "Generuj" (tryb priorytet) + optymalizator końcowy:<br/>
-          <strong style={{ color: "#5eead4" }}>1)</strong> gdy jedyny dawca karty jest zajęty — jego wymiana jest przepinana na innego dawcę (łańcuchy do 6 kroków)<br/>
-          <strong style={{ color: "#5eead4" }}>2)</strong> gdy nie ma przepięcia, wymiana zamykająca talię / dająca próg wypiera mniej wartościową<br/>
-          <strong style={{ color: "#5eead4" }}>3)</strong> każda zmiana musi poprawić wynik — plan nigdy nie jest gorszy niż w V1
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 12, fontSize: 12, color: "#888" }}>
-        Tryb: <strong style={{ color: typWymiany === "złote" ? "#ffd700" : typWymiany === "event" ? "#00e676" : "#87CEEB" }}>
-          {typWymiany === "złote" ? "⭐ ZŁOTE" : typWymiany === "event" ? "🎉 EVENT" : "💎 DIAMENTOWE"}
-        </strong> (zmień przełącznikiem na górze ekranu)
-      </div>
-
-      <button onClick={generuj} disabled={generujac} style={{
-        width: "100%", padding: 12, borderRadius: 10, fontWeight: "bold", fontSize: 14, cursor: "pointer",
-        background: "linear-gradient(135deg,#14b8a6,#0f766e)", border: "none", color: "#fff", marginBottom: 16,
-      }}>
-        {generujac ? "⏳ Generuję..." : "🧠 Generuj wymianę V3"}
-      </button>
-
-      {wynik && (
-        <div>
-          {/* Statystyki */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 14 }}>
-            <div style={{ textAlign: "center", background: "rgba(20,184,166,0.08)", border: "1px solid #14b8a633", borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#5eead4" }}>{wynik.planoweWymiany.length}</div>
-              <div style={{ fontSize: 9, color: "#666" }}>wymian</div>
-            </div>
-            <div style={{ textAlign: "center", background: "rgba(0,200,100,0.08)", border: "1px solid #0c633", borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#0c6" }}>{(wynik.v3Info?.dodane)||0}</div>
-              <div style={{ fontSize: 9, color: "#666" }}>ulepszeń V3 🧠</div>
-            </div>
-            <div style={{ textAlign: "center", background: "rgba(255,50,50,0.06)", border: "1px solid #f5544433", borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#f55" }}>{wynik.nieobsluzone.length}</div>
-              <div style={{ fontSize: 9, color: "#666" }}>bez wymiany</div>
-            </div>
-          </div>
-
-          {/* Zamknięcia talii — identyczne dane jak w V1, fioletowy motyw */}
-          {wynik.zamknieciaInfo.length>0&&(
-            <div style={{background:"rgba(20,184,166,0.08)",border:"1px solid #14b8a655",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
-              <div style={{fontWeight:"bold",color:"#5eead4",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
-              {wynik.zamknieciaInfo.map((z,i)=>(
-                <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #0f2a2a"}}>
-                  🎉 <strong style={{color:"#5eead4"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
-                  <span style={{color:"#0c6",marginLeft:6}}>+{z.nagroda?.toLocaleString()} 💰</span>
-                  {z.nowyProg&&(
-                    <span style={{marginLeft:8,background:"rgba(255,165,0,0.2)",border:"1px solid #fa0",borderRadius:6,padding:"1px 6px",fontSize:11,color:"#fa0"}}>
-                      🎯 PRÓG {z.nowyProg.prog} kart! +{z.nowyProg.ammo.toLocaleString()} 💰
-                    </span>
-                  )}
-                </div>
-              ))}
-              <div style={{marginTop:8,fontWeight:"bold",color:"#5eead4",fontSize:13}}>
-                Łącznie z talii: +{wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0).toLocaleString()} 💰
-                {wynik.zamknieciaInfo.some(z=>z.nowyProg)&&(
-                  <span style={{color:"#fa0",marginLeft:8}}>
-                    + progi: +{(()=>{
-                      const zaliczone=new Set();
-                      return wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>{
-                        const key=`${z.osoba}_${z.nowyProg.prog}`;
-                        if(zaliczone.has(key)) return s;
-                        zaliczone.add(key);
-                        return s+z.nowyProg.ammo;
-                      },0);
-                    })().toLocaleString()} 💰
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Podsumowanie odbiorców — identyczne dane jak w V1, fioletowy motyw */}
-          {(()=>{
-            const perOdbiorca = {};
-            wynik.planoweWymiany.forEach(w=>{
-              if(!perOdbiorca[w.do]) perOdbiorca[w.do]=[];
-              perOdbiorca[w.do].push(w);
-            });
-
-            const symPos={...posiadane};
-            wynik.planoweWymiany.forEach(w=>{
-              const o=czlonkowie.find(c=>c.nazwa===w.do);
-              const t=talie.find(t2=>t2.nazwa===w.talia);
-              if(o&&t){
-                const k=t.karty.find(k2=>k2.nazwa===w.karta);
-                if(k) symPos[`${o.id}_${t.id}_${k.nazwa}`]=true;
-              }
-            });
-
-            const typ    = typWymiany==="złote" ? "złota"     : "diamentowa";
-            const oppTyp = typWymiany==="złote" ? "diamentowa": "złota";
-            const ikonaT = typWymiany==="złote" ? "⭐" : "💎";
-            const ikonaO = typWymiany==="złote" ? "💎" : "⭐";
-            const obliczProgFnLokalny = typWymiany==="event" ? obliczProgEvent : obliczProg;
-
-            return Object.keys(perOdbiorca).length>0 ? (
-              <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #0f2a2a",borderRadius:10,padding:14,marginBottom:14}}>
-                <div style={{fontWeight:"bold",color:"#5eead4",fontSize:13,marginBottom:10}}>
-                  👥 Podsumowanie odbiorców
-                </div>
-                {Object.entries(perOdbiorca).map(([nazwa, wymianyOsoby])=>{
-                  const osoba=czlonkowie.find(c=>c.nazwa===nazwa);
-                  const oId=osoba?.id;
-
-                  const kartyPrzed=osoba?liczKartyOsoby(oId,talie,posiadane):0;
-                  const kartyPo   =osoba?liczKartyOsoby(oId,talie,symPos)   :0;
-                  const progPrzed =obliczProgFnLokalny(kartyPrzed);
-                  const progPo    =obliczProgFnLokalny(kartyPo);
-                  const nowyProg  =progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
-
-                  return (
-                    <div key={nazwa} style={{padding:"8px 0",borderBottom:"1px solid #0a1f1f"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-                        <span style={{fontWeight:"bold",color:"#5eead4",fontSize:13}}>{nazwa}</span>
-                        <span style={{fontSize:11,color:"#777"}}>
-                          dostaje <strong style={{color:"#fff"}}>{wymianyOsoby.length}</strong> {wymianyOsoby.length===1?"kartę":wymianyOsoby.length<5?"karty":"kart"}
-                        </span>
-                        {nowyProg&&(
-                          <span style={{fontSize:11,color:"#fa0",background:"rgba(255,165,0,0.12)",padding:"2px 8px",borderRadius:10,border:"1px solid #fa033",fontWeight:"bold"}}>
-                            🎯 PRÓG {progPo.ostatniProg.prog}! +{progPo.ostatniProg.ammo.toLocaleString()} 💰
-                          </span>
-                        )}
-                      </div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginLeft:8}}>
-                        {wymianyOsoby.map((w,i)=>{
-                          const t=talie.find(t2=>t2.nazwa===w.talia);
-                          const kartyT=t?t.karty.filter(k=>k.typ===typ):[];
-                          const kartyO=t?t.karty.filter(k=>k.typ===oppTyp):[];
-                          const brakTPrzed=t?kartyT.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-                          const brakOPrzed=t?kartyO.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-                          const brakTPo=t?kartyT.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-                          const brakOPo=t?kartyO.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-
-                          const zamknieTalie=brakTPo===0&&brakOPo===0;
-                          const tylkoOppBrakuje=brakTPo===0&&brakOPo>0;
-
-                          const kolorBadge=zamknieTalie?"#0c6":brakTPrzed===1&&brakOPrzed===0?"#f55":brakTPrzed<=2?"#fa0":"#14b8a6";
-                          const bgBadge=zamknieTalie?"rgba(0,200,100,0.12)":brakTPrzed===1&&brakOPrzed===0?"rgba(255,50,50,0.1)":brakTPrzed<=2?"rgba(255,165,0,0.08)":"rgba(20,184,166,0.08)";
-
-                          return (
-                            <div key={i} style={{
-                              fontSize:11,padding:"4px 9px",borderRadius:6,
-                              background:bgBadge,
-                              border:`1px solid ${kolorBadge}55`,
-                              color:"var(--text)",
-                            }}>
-                              <span style={{fontWeight:"bold"}}>{w.karta}</span>
-                              <span style={{color:"#555",marginLeft:4}}>[{w.talia}]</span>
-                              <span style={{marginLeft:6,color:kolorBadge,fontWeight:"bold"}}>
-                                {zamknieTalie
-                                  ? "🏆 KOMPLET!"
-                                  : tylkoOppBrakuje
-                                    ? `brak ${brakOPo}${ikonaO}`
-                                    : brakTPo===0
-                                      ? `komplet ${ikonaT}`
-                                      : `po wymianie: −${brakTPo}${ikonaT}${brakOPo>0?` −${brakOPo}${ikonaO}`:` komplet${ikonaO}`}`
-                                }
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null;
-          })()}
-
-          {/* Zmiany optymalizatora V3 */}
-          {wynik.v3Info?.log?.length > 0 && (
-            <div style={{ marginBottom: 14, background: "rgba(20,184,166,0.06)", border: "1px solid #14b8a655", borderRadius: 8, padding: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: "bold", color: "#5eead4", marginBottom: 6 }}>🧠 Co poprawił V3 względem V1</div>
-              {wynik.v3Info.log.map((l, i) => (
-                <div key={i} style={{ fontSize: 11, color: "#aaa", marginBottom: 2 }}>{l}</div>
-              ))}
-            </div>
-          )}
-
-          {/* Lista wymian */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: "bold", color: "var(--accent)", marginBottom: 8 }}>📋 Planowane wymiany</div>
-            {wynik.planoweWymiany.map((w, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", marginBottom: 4, borderRadius: 7,
-                background: (w.v3Dodana||w.v3Przepiete) ? "rgba(20,184,166,0.07)" : "rgba(255,255,255,0.03)",
-                border: (w.v3Dodana||w.v3Przepiete) ? "1px solid #14b8a644" : "1px solid #1e1e3a", fontSize: 11,
-              }}>
-                <span style={{ color: "var(--accent)", fontWeight: "bold" }}>{w.od}</span>
-                <span style={{ color: "#555" }}>➜</span>
-                <span style={{ color: "#0af" }}>{w.do}</span>
-                <span style={{ flex: 1, textAlign: "right", color: "#aaa" }}>{w.karta} <span style={{ color: "#555" }}>[{w.talia}]</span></span>
-                {w.wartoscKarty > 1 && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(20,184,166,0.12)", color: "#5eead4" }}>×{w.wartoscKarty} potrz.</span>}
-                {w.progWaga > 0 && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(255,165,0,0.1)", color: "#fa0" }}>🎯</span>}
-                {w.v3Dodana && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(20,184,166,0.15)", color: "#5eead4" }}>🧠 nowa</span>}
-                {w.v3Przepiete && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(20,184,166,0.15)", color: "#5eead4" }}>🔀 przepięta</span>}
-              </div>
-            ))}
-          </div>
-
-          {wynik.nieobsluzone.length > 0 && (
-            <div style={{ marginBottom: 14, fontSize: 11, color: "#f55" }}>
-              ⚠️ Bez wymiany: {wynik.nieobsluzone.map(u=>`${u.osoba?.nazwa||u.osoba}: ${u.karta}`).join(", ")}
-            </div>
-          )}
-
-          {/* Akcje */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={kopiuj} style={{
-              flex: 1, minWidth: 120, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: "bold", cursor: "pointer",
-              background: skopiowano ? "rgba(0,200,100,0.2)" : "rgba(20,184,166,0.12)",
-              border: `1px solid ${skopiowano ? "#0c6" : "#14b8a655"}`, color: skopiowano ? "#0c6" : "#5eead4",
-            }}>{skopiowano ? "✓ Skopiowano!" : "📋 Kopiuj tekst"}</button>
-            <button onClick={ustawJakoAktywna} style={{
-              flex: 1, minWidth: 120, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: "bold", cursor: "pointer",
-              background: "rgba(0,200,100,0.12)", border: "1px solid #0c6", color: "#0c6",
-            }}>🚀 Ustaw jako aktywną</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WynikViewV2({ talie, czlonkowie, posiadane, duplikaty, typWymiany, zapiszAktywna, przejdzDoAktywnej }) {
-  const [wynik, setWynik] = useState(null);
-  const [generujac, setGenerujac] = useState(false);
-  const [skopiowano, setSkopiowano] = useState(false);
-
-  const generuj = () => {
-    setGenerujac(true);
-    setTimeout(() => {
-      const r = generujAlgorytmV2({ talie, czlonkowie, posiadane, duplikaty, typWymiany });
-      setWynik(r);
-      setGenerujac(false);
-    }, 50);
-  };
-
-  const tekstMessenger = () => {
-    if (!wynik) return "";
-    const linie = wynik.planoweWymiany.map(w => `${w.od} ➜ ${w.do}: ${w.karta} [${w.talia}]${w.lancuch ? " 🔗" : ""}`);
-    return `🧬 WYMIANA V2 (test)\n\n${linie.join("\n")}`;
-  };
-
-  const kopiuj = () => {
-    navigator.clipboard.writeText(tekstMessenger()).then(() => {
-      setSkopiowano(true);
-      setTimeout(() => setSkopiowano(false), 2000);
-    });
-  };
-
-  const ustawJakoAktywna = () => {
-    if (!wynik) return;
-    zapiszAktywna({
-      data: new Date().toISOString(),
-      typWymiany,
-      wymiany: wynik.planoweWymiany,
-      potwierdzone: {},
-      wersja: "v2",
-    });
-    przejdzDoAktywnej();
-  };
-
-  return (
-    <div style={{ padding: 14 }}>
-      <div style={{
-        background: "linear-gradient(135deg,rgba(180,80,255,0.1),rgba(100,40,200,0.06))",
-        border: "1px solid #a855f755", borderRadius: 10, padding: 12, marginBottom: 14,
-      }}>
-        <div style={{ fontWeight: "bold", color: "#c084fc", fontSize: 14, marginBottom: 4 }}>🧬 Generuj V2 — algorytm eksperymentalny</div>
-        <div style={{ fontSize: 11, color: "#999", lineHeight: 1.5 }}>
-          Osobny algorytm, niezależny od zwykłego "Generuj". Testuje 3 usprawnienia:<br/>
-          <strong style={{ color: "#c084fc" }}>1)</strong> priorytet kart których brakuje wielu osobom<br/>
-          <strong style={{ color: "#c084fc" }}>2)</strong> łańcuchy wymian 3-osobowe (A→B→C→A) gdy nie ma bezpośredniego dopasowania<br/>
-          <strong style={{ color: "#c084fc" }}>3)</strong> priorytet dla osób blisko progu ammo (waga = nagroda / brakujące karty)
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 12, fontSize: 12, color: "#888" }}>
-        Tryb: <strong style={{ color: typWymiany === "złote" ? "#ffd700" : typWymiany === "event" ? "#00e676" : "#87CEEB" }}>
-          {typWymiany === "złote" ? "⭐ ZŁOTE" : typWymiany === "event" ? "🎉 EVENT" : "💎 DIAMENTOWE"}
-        </strong> (zmień przełącznikiem na górze ekranu)
-      </div>
-
-      <button onClick={generuj} disabled={generujac} style={{
-        width: "100%", padding: 12, borderRadius: 10, fontWeight: "bold", fontSize: 14, cursor: "pointer",
-        background: "linear-gradient(135deg,#a855f7,#7c3aed)", border: "none", color: "#fff", marginBottom: 16,
-      }}>
-        {generujac ? "⏳ Generuję..." : "🧬 Generuj wymianę V2"}
-      </button>
-
-      {wynik && (
-        <div>
-          {/* Statystyki */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 14 }}>
-            <div style={{ textAlign: "center", background: "rgba(168,85,247,0.08)", border: "1px solid #a855f733", borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#c084fc" }}>{wynik.planoweWymiany.length}</div>
-              <div style={{ fontSize: 9, color: "#666" }}>wymian</div>
-            </div>
-            <div style={{ textAlign: "center", background: "rgba(0,200,100,0.08)", border: "1px solid #0c633", borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#0c6" }}>{wynik.lancuchy.length}</div>
-              <div style={{ fontSize: 9, color: "#666" }}>łańcuchów 🔗</div>
-            </div>
-            <div style={{ textAlign: "center", background: "rgba(255,50,50,0.06)", border: "1px solid #f5544433", borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#f55" }}>{wynik.nieobsluzone.length}</div>
-              <div style={{ fontSize: 9, color: "#666" }}>bez wymiany</div>
-            </div>
-          </div>
-
-          {/* Zamknięcia talii — identyczne dane jak w V1, fioletowy motyw */}
-          {wynik.zamknieciaInfo.length>0&&(
-            <div style={{background:"rgba(168,85,247,0.08)",border:"1px solid #a855f755",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
-              <div style={{fontWeight:"bold",color:"#c084fc",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
-              {wynik.zamknieciaInfo.map((z,i)=>(
-                <div key={i} style={{fontSize:13,padding:"4px 0",color:"#ccc",borderBottom:"1px solid #2a1a3a"}}>
-                  🎉 <strong style={{color:"#c084fc"}}>{z.osoba}</strong> zamknie <strong>{z.talia}</strong>
-                  <span style={{color:"#0c6",marginLeft:6}}>+{z.nagroda?.toLocaleString()} 💰</span>
-                  {z.nowyProg&&(
-                    <span style={{marginLeft:8,background:"rgba(255,165,0,0.2)",border:"1px solid #fa0",borderRadius:6,padding:"1px 6px",fontSize:11,color:"#fa0"}}>
-                      🎯 PRÓG {z.nowyProg.prog} kart! +{z.nowyProg.ammo.toLocaleString()} 💰
-                    </span>
-                  )}
-                </div>
-              ))}
-              <div style={{marginTop:8,fontWeight:"bold",color:"#c084fc",fontSize:13}}>
-                Łącznie z talii: +{wynik.zamknieciaInfo.reduce((s,z)=>s+(z.nagroda||0),0).toLocaleString()} 💰
-                {wynik.zamknieciaInfo.some(z=>z.nowyProg)&&(
-                  <span style={{color:"#fa0",marginLeft:8}}>
-                    + progi: +{(()=>{
-                      const zaliczone=new Set();
-                      return wynik.zamknieciaInfo.filter(z=>z.nowyProg).reduce((s,z)=>{
-                        const key=`${z.osoba}_${z.nowyProg.prog}`;
-                        if(zaliczone.has(key)) return s;
-                        zaliczone.add(key);
-                        return s+z.nowyProg.ammo;
-                      },0);
-                    })().toLocaleString()} 💰
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Podsumowanie odbiorców — identyczne dane jak w V1, fioletowy motyw */}
-          {(()=>{
-            const perOdbiorca = {};
-            wynik.planoweWymiany.forEach(w=>{
-              if(!perOdbiorca[w.do]) perOdbiorca[w.do]=[];
-              perOdbiorca[w.do].push(w);
-            });
-
-            const symPos={...posiadane};
-            wynik.planoweWymiany.forEach(w=>{
-              const o=czlonkowie.find(c=>c.nazwa===w.do);
-              const t=talie.find(t2=>t2.nazwa===w.talia);
-              if(o&&t){
-                const k=t.karty.find(k2=>k2.nazwa===w.karta);
-                if(k) symPos[`${o.id}_${t.id}_${k.nazwa}`]=true;
-              }
-            });
-
-            const typ    = typWymiany==="złote" ? "złota"     : "diamentowa";
-            const oppTyp = typWymiany==="złote" ? "diamentowa": "złota";
-            const ikonaT = typWymiany==="złote" ? "⭐" : "💎";
-            const ikonaO = typWymiany==="złote" ? "💎" : "⭐";
-            const obliczProgFnLokalny = typWymiany==="event" ? obliczProgEvent : obliczProg;
-
-            return Object.keys(perOdbiorca).length>0 ? (
-              <div style={{background:"rgba(0,0,0,0.25)",border:"1px solid #2a1a3a",borderRadius:10,padding:14,marginBottom:14}}>
-                <div style={{fontWeight:"bold",color:"#c084fc",fontSize:13,marginBottom:10}}>
-                  👥 Podsumowanie odbiorców
-                </div>
-                {Object.entries(perOdbiorca).map(([nazwa, wymianyOsoby])=>{
-                  const osoba=czlonkowie.find(c=>c.nazwa===nazwa);
-                  const oId=osoba?.id;
-
-                  const kartyPrzed=osoba?liczKartyOsoby(oId,talie,posiadane):0;
-                  const kartyPo   =osoba?liczKartyOsoby(oId,talie,symPos)   :0;
-                  const progPrzed =obliczProgFnLokalny(kartyPrzed);
-                  const progPo    =obliczProgFnLokalny(kartyPo);
-                  const nowyProg  =progPo.ostatniProg?.prog>(progPrzed.ostatniProg?.prog||0);
-
-                  return (
-                    <div key={nazwa} style={{padding:"8px 0",borderBottom:"1px solid #1a1030"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-                        <span style={{fontWeight:"bold",color:"#c084fc",fontSize:13}}>{nazwa}</span>
-                        <span style={{fontSize:11,color:"#777"}}>
-                          dostaje <strong style={{color:"#fff"}}>{wymianyOsoby.length}</strong> {wymianyOsoby.length===1?"kartę":wymianyOsoby.length<5?"karty":"kart"}
-                        </span>
-                        {nowyProg&&(
-                          <span style={{fontSize:11,color:"#fa0",background:"rgba(255,165,0,0.12)",padding:"2px 8px",borderRadius:10,border:"1px solid #fa033",fontWeight:"bold"}}>
-                            🎯 PRÓG {progPo.ostatniProg.prog}! +{progPo.ostatniProg.ammo.toLocaleString()} 💰
-                          </span>
-                        )}
-                      </div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginLeft:8}}>
-                        {wymianyOsoby.map((w,i)=>{
-                          const t=talie.find(t2=>t2.nazwa===w.talia);
-                          const kartyT=t?t.karty.filter(k=>k.typ===typ):[];
-                          const kartyO=t?t.karty.filter(k=>k.typ===oppTyp):[];
-                          const brakTPrzed=t?kartyT.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-                          const brakOPrzed=t?kartyO.filter(k=>!posiadane[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-                          const brakTPo=t?kartyT.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-                          const brakOPo=t?kartyO.filter(k=>!symPos[`${oId}_${t.id}_${k.nazwa}`]).length:null;
-
-                          const zamknieTalie=brakTPo===0&&brakOPo===0;
-                          const tylkoOppBrakuje=brakTPo===0&&brakOPo>0;
-
-                          const kolorBadge=zamknieTalie?"#0c6":brakTPrzed===1&&brakOPrzed===0?"#f55":brakTPrzed<=2?"#fa0":"#a855f7";
-                          const bgBadge=zamknieTalie?"rgba(0,200,100,0.12)":brakTPrzed===1&&brakOPrzed===0?"rgba(255,50,50,0.1)":brakTPrzed<=2?"rgba(255,165,0,0.08)":"rgba(168,85,247,0.08)";
-
-                          return (
-                            <div key={i} style={{
-                              fontSize:11,padding:"4px 9px",borderRadius:6,
-                              background:bgBadge,
-                              border:`1px solid ${kolorBadge}55`,
-                              color:"var(--text)",
-                            }}>
-                              <span style={{fontWeight:"bold"}}>{w.karta}</span>
-                              <span style={{color:"#555",marginLeft:4}}>[{w.talia}]</span>
-                              <span style={{marginLeft:6,color:kolorBadge,fontWeight:"bold"}}>
-                                {zamknieTalie
-                                  ? "🏆 KOMPLET!"
-                                  : tylkoOppBrakuje
-                                    ? `brak ${brakOPo}${ikonaO}`
-                                    : brakTPo===0
-                                      ? `komplet ${ikonaT}`
-                                      : `po wymianie: −${brakTPo}${ikonaT}${brakOPo>0?` −${brakOPo}${ikonaO}`:` komplet${ikonaO}`}`
-                                }
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null;
-          })()}
-
-          {/* Łańcuchy wyróżnione */}
-          {wynik.lancuchy.length > 0 && (
-            <div style={{ marginBottom: 14, background: "rgba(0,200,100,0.06)", border: "1px solid #0c633", borderRadius: 8, padding: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: "bold", color: "#0c6", marginBottom: 6 }}>🔗 Znalezione łańcuchy 3-osobowe</div>
-              {wynik.lancuchy.map((l, i) => (
-                <div key={i} style={{ fontSize: 11, color: "#aaa", marginBottom: 2 }}>{l[0]} → {l[1]} → {l[2]} → {l[0]}</div>
-              ))}
-            </div>
-          )}
-
-          {/* Lista wymian */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: "bold", color: "var(--accent)", marginBottom: 8 }}>📋 Planowane wymiany</div>
-            {wynik.planoweWymiany.map((w, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", marginBottom: 4, borderRadius: 7,
-                background: w.lancuch ? "rgba(0,200,100,0.06)" : "rgba(255,255,255,0.03)",
-                border: w.lancuch ? "1px solid #0c633" : "1px solid #1e1e3a", fontSize: 11,
-              }}>
-                <span style={{ color: "var(--accent)", fontWeight: "bold" }}>{w.od}</span>
-                <span style={{ color: "#555" }}>➜</span>
-                <span style={{ color: "#0af" }}>{w.do}</span>
-                <span style={{ flex: 1, textAlign: "right", color: "#aaa" }}>{w.karta} <span style={{ color: "#555" }}>[{w.talia}]</span></span>
-                {w.wartoscKarty > 1 && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(168,85,247,0.12)", color: "#c084fc" }}>×{w.wartoscKarty} potrz.</span>}
-                {w.progWaga > 0 && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, background: "rgba(255,165,0,0.1)", color: "#fa0" }}>🎯</span>}
-                {w.lancuch && <span style={{ fontSize: 9 }}>🔗</span>}
-              </div>
-            ))}
-          </div>
-
-          {wynik.nieobsluzone.length > 0 && (
-            <div style={{ marginBottom: 14, fontSize: 11, color: "#f55" }}>
-              ⚠️ Bez wymiany: {wynik.nieobsluzone.join(", ")}
-            </div>
-          )}
-
-          {/* Akcje */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={kopiuj} style={{
-              flex: 1, minWidth: 120, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: "bold", cursor: "pointer",
-              background: skopiowano ? "rgba(0,200,100,0.2)" : "rgba(168,85,247,0.12)",
-              border: `1px solid ${skopiowano ? "#0c6" : "#a855f755"}`, color: skopiowano ? "#0c6" : "#c084fc",
-            }}>{skopiowano ? "✓ Skopiowano!" : "📋 Kopiuj tekst"}</button>
-            <button onClick={ustawJakoAktywna} style={{
-              flex: 1, minWidth: 120, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: "bold", cursor: "pointer",
-              background: "rgba(0,200,100,0.12)", border: "1px solid #0c6", color: "#0c6",
-            }}>🚀 Ustaw jako aktywną</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function obliczFaze(brakT, brakO, typWymiany) {
   // Priorytet dynamiczny: im mniej brakuje łącznie tym wyższy priorytet
@@ -4678,7 +4123,79 @@ function opisFazy(faza, typWymiany) {
   };
 }
 
-function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej,historiaWymian=[],paczkiDiament={},setPaczkiDiament=()=>{}}) {
+// Porównanie wyniku V1 i V3 (te same ustawienia, te same dane)
+function metrykiWyniku(w) {
+  const zam = w.zamknieciaInfo || [];
+  const kasaTalie = zam.reduce((s, z) => s + (z.nagroda || 0), 0);
+  const zal = new Set();
+  let kasaProgi = 0;
+  zam.filter(z => z.nowyProg).forEach(z => {
+    const k = `${z.osoba}_${z.nowyProg.prog}`;
+    if (zal.has(k)) return;
+    zal.add(k); kasaProgi += z.nowyProg.ammo || 0;
+  });
+  return { wymian: w.planoweWymiany.length, zamkniec: zam.length, kasaTalie, kasaProgi, razem: kasaTalie + kasaProgi, bezDawcy: (w.nieobsluzone || []).length };
+}
+
+function PorownanieV1V3({ v1, v3 }) {
+  const m1 = metrykiWyniku(v1), m3 = metrykiWyniku(v3);
+  const wiersze = [
+    ["Wymian", m1.wymian, m3.wymian, true],
+    ["Zamkniętych talii", m1.zamkniec, m3.zamkniec, true],
+    ["💰 z talii", m1.kasaTalie, m3.kasaTalie, true],
+    ["💰 z progów", m1.kasaProgi, m3.kasaProgi, true],
+    ["💰 RAZEM", m1.razem, m3.razem, true],
+    ["Bez dawcy", m1.bezDawcy, m3.bezDawcy, false],
+  ];
+  const klucz = e => `${e.do}|${e.talia}|${e.karta}`;
+  const mapa1 = {}; v1.planoweWymiany.forEach(e => { mapa1[klucz(e)] = e; });
+  const mapa3 = {}; v3.planoweWymiany.forEach(e => { mapa3[klucz(e)] = e; });
+  const tylkoV3 = v3.planoweWymiany.filter(e => !mapa1[klucz(e)]);
+  const tylkoV1 = v1.planoweWymiany.filter(e => !mapa3[klucz(e)]);
+  const innyDawca = v3.planoweWymiany.filter(e => mapa1[klucz(e)] && mapa1[klucz(e)].od !== e.od);
+  const identyczne = tylkoV3.length === 0 && tylkoV1.length === 0 && innyDawca.length === 0;
+  const p = v3.v3Info?.pelna;
+  const delta = (a, b, wiecejLepiej) => {
+    const d = b - a;
+    if (d === 0) return <span style={{ color: "#777" }}>=</span>;
+    const dobrze = wiecejLepiej ? d > 0 : d < 0;
+    return <span style={{ color: dobrze ? "#0c6" : "#f55", fontWeight: "bold" }}>{d > 0 ? "+" : ""}{d.toLocaleString()}</span>;
+  };
+  return (
+    <div style={{ background: "rgba(20,184,166,0.07)", border: "1px solid #14b8a655", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+      <div style={{ fontWeight: "bold", color: "#5eead4", fontSize: 14, marginBottom: 8 }}>🧠 Pełne porównanie V1 ↔ V3</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr", gap: "4px 8px", fontSize: 12, alignItems: "center" }}>
+        <div style={{ color: "#777" }}></div><div style={{ color: "#aaa", textAlign: "right" }}>V1</div><div style={{ color: "#5eead4", textAlign: "right" }}>V3</div><div style={{ color: "#777", textAlign: "right" }}>różnica</div>
+        {wiersze.map(([n, a, b, wl]) => (
+          <React.Fragment key={n}>
+            <div style={{ color: "#ccc" }}>{n}</div>
+            <div style={{ textAlign: "right", color: "#aaa" }}>{a.toLocaleString()}</div>
+            <div style={{ textAlign: "right", color: "#fff", fontWeight: "bold" }}>{b.toLocaleString()}</div>
+            <div style={{ textAlign: "right" }}>{delta(a, b, wl)}</div>
+          </React.Fragment>
+        ))}
+      </div>
+      {identyczne ? (
+        <div style={{ marginTop: 8, fontSize: 11, color: "#888" }}>V3 nie znalazł nic do poprawy — oba plany są identyczne.</div>
+      ) : (
+        <div style={{ marginTop: 10, fontSize: 11, lineHeight: 1.6 }}>
+          {tylkoV3.map((e, i) => <div key={"n" + i} style={{ color: "#0c6" }}>➕ tylko V3: {e.od} ➜ {e.do}: {e.karta} [{e.talia}]</div>)}
+          {tylkoV1.map((e, i) => <div key={"s" + i} style={{ color: "#f77" }}>➖ tylko V1: {e.od} ➜ {e.do}: {e.karta} [{e.talia}]</div>)}
+          {innyDawca.map((e, i) => <div key={"d" + i} style={{ color: "#5eead4" }}>🔀 inny dawca: {e.do}: {e.karta} [{e.talia}] — V1: {mapa1[klucz(e)].od}, V3: {e.od}</div>)}
+        </div>
+      )}
+      {p && (
+        <div style={{ marginTop: 8, fontSize: 11, color: "#888" }}>
+          🧮 Pełna analiza: sprawdzono {p.wezly.toLocaleString()} układów ({p.kandydatow} talii do zamknięcia) w {p.ms} ms
+          {p.przerwano ? " — przerwano na limicie czasu, wynik może nie być idealny" : " — przeszukano wszystko"}
+          {p.poprawiono ? " — znalazła lepszy układ." : " — lepszego układu nie ma."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WynikView({wersja="v1",talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej,historiaWymian=[],paczkiDiament={},setPaczkiDiament=()=>{}}) {
   const [skopiowano,setSkopiowano]=useState(false);
   const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
@@ -4857,7 +4374,15 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
     }); // odbiorcy
     // Dawcami mogą być WSZYSCY (też wyłączeni z wymiany — mają duplikaty które inni mogą dostać)
     const aktywniDawcy=czlonkowie.filter(c=>!wylaczoneDawcy.has(c.id));
-    setWynik(generujAlgorytm({talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby,paczkiDiament:trybWymiany==="paczki_diament"?paczkiDiament:{}}));
+    const parametry={talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby,paczkiDiament:trybWymiany==="paczki_diament"?paczkiDiament:{}};
+    if(wersja==="v3"){
+      // V3: ten sam algorytm + optymalizator; V1 liczony obok dla pełnego porównania
+      const wynikV1=generujAlgorytm(parametry);
+      const wynikV3Nowy=generujAlgorytmV3(parametry);
+      setWynik({...wynikV3Nowy,v1:wynikV1});
+    } else {
+      setWynik(generujAlgorytm(parametry));
+    }
   };
 
   const tekstMessenger=wynik?wynik.planoweWymiany.map(w=>`${w.od} ➡️ ${w.do}: ${w.karta}`).join("\n"):"";
@@ -5340,9 +4865,10 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
         width:"100%",padding:14,background:"linear-gradient(135deg,#b8860b,#ffd700,#b8860b)",
         border:"none",borderRadius:10,color:"#000",fontSize:15,fontWeight:"bold",
         cursor:"pointer",letterSpacing:2,marginBottom:16,
-      }}>⚡ GENERUJ ({typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}) ⚡</button>
+      }}>{wersja==="v3"?"🧠 GENERUJ V3":"⚡ GENERUJ"} ({typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}) {wersja==="v3"?"🧠":"⚡"}</button>
 
       {wynik&&<>
+        {wersja==="v3"&&wynik.v1&&<PorownanieV1V3 v1={wynik.v1} v3={wynik} />}
         {wynik.zamknieciaInfo.length>0&&(
           <div style={{background:"rgba(0,200,100,0.1)",border:"1px solid #0c6",borderRadius:10,padding:"12px 16px",marginBottom:14,animation:"pulseGold 2s ease-in-out"}}>
             <div style={{fontWeight:"bold",color:"#0c6",marginBottom:8,fontSize:14}}>🏆 Po tej wymianie gang zamknie talie:</div>
