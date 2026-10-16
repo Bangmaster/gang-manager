@@ -5027,7 +5027,7 @@ function WynikView({talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWyn
                   borderRadius:6,
                 }}>
                   <span style={{flex:1,fontSize:12,color:zaznaczona?"var(--text)":"var(--muted)"}}>{c.nazwa}</span>
-                  {[0,1,2,3].map(n=>(
+                  {[0,1,2,3,4].map(n=>(
                     <button key={n} onClick={()=>setCelowaKolejka(prev=>({...prev,[c.id]:n}))} style={{
                       padding:"3px 10px",borderRadius:5,cursor:"pointer",fontSize:12,
                       background:ile===n
