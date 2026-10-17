@@ -3838,7 +3838,7 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
       let zmiana = false;
       const pozostale = [];
       for (const u of kolejka) {
-        if (Date.now() - T0 > 1200) { pozostale.push(u); continue; }
+        if (Date.now() - T0 > 3000) { pozostale.push(u); continue; }
         const o = u.osoba; const t = u.talia;
         if (posiadane[`${o.id}_${t.id}_${u.karta}`]) continue;
         if (plan.some(e => e.do === o.nazwa && e.talia === t.nazwa && e.karta === u.karta)) continue;
@@ -3955,8 +3955,8 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
 
     const dokladnaAnaliza = (planWej, kolejkaWej) => {
       const start = Date.now();
-      const LIMIT_WEZLOW = 120000;
-      const LIMIT_MS = Math.min(2000, Math.max(500, 3500 - (Date.now() - T0)));
+      const LIMIT_WEZLOW = 2000000;
+      const LIMIT_MS = Math.min(8000, Math.max(500, 11000 - (Date.now() - T0)));
       const stan = { wezly: 0, przerwano: false };
       const kand = [];
       czlonkowie.forEach(o => {
@@ -4197,6 +4197,7 @@ function PorownanieV1V3({ v1, v3 }) {
 
 function WynikView({wersja="v1",talie,czlonkowie,posiadane,duplikaty,typWymiany,wynik,setWynik,trybWymiany,setTrybWymiany,zapiszAktywna,przejdzDoAktywnej,historiaWymian=[],paczkiDiament={},setPaczkiDiament=()=>{}}) {
   const [skopiowano,setSkopiowano]=useState(false);
+  const [liczy,setLiczy]=useState(false);
   const [publikowanie,setPublikowanie]=useState(false);
   const [wylaczoneTalie,setWylaczoneTalie]=useState(new Set());
   const [wylaczoneOsoby,setWylaczoneOsoby]=useState(new Set());
@@ -4377,9 +4378,14 @@ function WynikView({wersja="v1",talie,czlonkowie,posiadane,duplikaty,typWymiany,
     const parametry={talie:aktywne,czlonkowie:aktywniCzlonkowie,wszyscyCzlonkowie:aktywniDawcy,posiadane,duplikaty,typWymiany,tryb:trybWymiany,vipKolejka:trybWymiany==="vip"?vipKolejka:[],celowaKolejka:trybWymiany==="celowany"?celowaKolejka:{},ignorujTrudne,historiaWymian,sprawiedliwe,maxKartNaOsobe,limitKartOsoby,paczkiDiament:trybWymiany==="paczki_diament"?paczkiDiament:{}};
     if(wersja==="v3"){
       // V3: ten sam algorytm + optymalizator; V1 liczony obok dla pełnego porównania
-      const wynikV1=generujAlgorytm(parametry);
-      const wynikV3Nowy=generujAlgorytmV3(parametry);
-      setWynik({...wynikV3Nowy,v1:wynikV1});
+      setLiczy(true);
+      setTimeout(()=>{
+        try{
+          const wynikV1=generujAlgorytm(parametry);
+          const wynikV3Nowy=generujAlgorytmV3(parametry);
+          setWynik({...wynikV3Nowy,v1:wynikV1});
+        } finally { setLiczy(false); }
+      },50);
     } else {
       setWynik(generujAlgorytm(parametry));
     }
@@ -4861,11 +4867,11 @@ function WynikView({wersja="v1",talie,czlonkowie,posiadane,duplikaty,typWymiany,
         )}
       </div>
 
-      <button onClick={generuj} style={{
+      <button onClick={generuj} disabled={liczy} style={{
         width:"100%",padding:14,background:"linear-gradient(135deg,#b8860b,#ffd700,#b8860b)",
         border:"none",borderRadius:10,color:"#000",fontSize:15,fontWeight:"bold",
         cursor:"pointer",letterSpacing:2,marginBottom:16,
-      }}>{wersja==="v3"?"🧠 GENERUJ V3":"⚡ GENERUJ"} ({typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}) {wersja==="v3"?"🧠":"⚡"}</button>
+      }}>{liczy?"⏳ Liczę (do ok. 10 s)...":wersja==="v3"?"🧠 GENERUJ V3":"⚡ GENERUJ"} ({typWymiany==="złote"?"⭐ ZŁOTE":"💎 DIAMENTOWE"}) {wersja==="v3"?"🧠":"⚡"}</button>
 
       {wynik&&<>
         {wersja==="v3"&&wynik.v1&&<PorownanieV1V3 v1={wynik.v1} v3={wynik} />}
