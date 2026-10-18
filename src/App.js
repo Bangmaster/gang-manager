@@ -118,14 +118,13 @@ function normalizuj(s) {
 
 const TRUDNE_NUMERY = [10, 11, 12, 14, 15];
 
-// Zwraca nagrodę amunicji uwzględniając krąg gracza
-// krag=1 → nagroda_amunicja, krag=2 → nagroda_amunicja_k2, krag>=3 → nagroda_amunicja_k3
+// Zwraca nagrodę amunicji uwzględniając krąg gracza (kręgi 1-5)
+// krag=1 → nagroda_amunicja, krag=N → nagroda_amunicja_kN; brak wartości → najbliższy niższy krąg
 function pobierzNagrode(talia, krag) {
-  if ((krag || 1) >= 3 && talia.nagroda_amunicja_k3 !== undefined) {
-    return talia.nagroda_amunicja_k3;
-  }
-  if ((krag || 1) >= 2 && talia.nagroda_amunicja_k2 !== undefined) {
-    return talia.nagroda_amunicja_k2;
+  const k = Math.min(Math.max(parseInt(krag) || 1, 1), 5);
+  for (let i = k; i >= 2; i--) {
+    const v = talia[`nagroda_amunicja_k${i}`];
+    if (v !== undefined && v !== null && v !== "") return v;
   }
   return talia.nagroda_amunicja || 0;
 }
@@ -874,6 +873,11 @@ function App() {
   const posiadaneMemo = useMemo(() => dane?.posiadane || {}, [dane]);
   const duplikatyMemo = useMemo(() => dane?.duplikaty || {}, [dane]);
   const czlonkowieMemo = useMemo(() => dane?.czlonkowie || [], [dane]);
+  // W evencie obowiązuje osobny krąg gracza (kragEvent) — nagrody talii liczone wg niego
+  const czlonkowieTyp = useMemo(
+    () => typWymiany === "event" ? (dane?.czlonkowie || []).map(c => ({ ...c, krag: c.kragEvent || 1 })) : (dane?.czlonkowie || []),
+    [dane, typWymiany]
+  );
 
   // Memoizuj dane eventowe
   const talieEventSorted = useMemo(
@@ -1090,7 +1094,7 @@ function App() {
         {zakładka==="aktywna"&&<AktywnaWymiana
           aktywnaWymiana={dane.aktywnaWymiana}
           zalogowany={zalogowany}
-          czlonkowie={dane.czlonkowie}
+          czlonkowie={czlonkowieTyp}
           talie={typWymiany==="event" ? talieEventSorted : talieSorted}
           posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
           duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
@@ -1113,7 +1117,7 @@ function App() {
         {zakładka==="wynik"&&!isAdmin&&<div style={{textAlign:"center",padding:60,color:"#555"}}><div style={{fontSize:36}}>🔒</div><div style={{marginTop:12}}>Tylko admin może generować wymianę.</div></div>}
         {zakładka==="wynik"&&isAdmin&&<WynikView
           talie={typWymiany==="event" ? talieEventSorted : talieSorted}
-          czlonkowie={dane.czlonkowie}
+          czlonkowie={czlonkowieTyp}
           posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
           duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
           typWymiany={typWymiany} wynik={wynik} setWynik={setWynik}
@@ -1126,7 +1130,7 @@ function App() {
         {zakładka==="wynikV3"&&isAdmin&&<WynikView
           wersja="v3"
           talie={typWymiany==="event" ? talieEventSorted : talieSorted}
-          czlonkowie={dane.czlonkowie}
+          czlonkowie={czlonkowieTyp}
           posiadane={typWymiany==="event" ? (daneEvent?.posiadaneEvent||{}) : (dane.posiadane||{})}
           duplikaty={typWymiany==="event" ? (daneEvent?.duplikatyEvent||{}) : (dane.duplikaty||{})}
           typWymiany={typWymiany} wynik={wynikV3} setWynik={setWynikV3}
@@ -1777,7 +1781,7 @@ function DaneView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zalogowany,z
                 {isAdmin && zapiszStrukture ? (
                   <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:6}}>
                     <span style={{fontSize:11,color:"#da70d6"}}>💜 Krąg:</span>
-                    {[1,2,3].map(k=>(
+                    {[1,2,3,4,5].map(k=>(
                       <button key={k} onClick={()=>{
                         const nowyList = czlonkowie.map(c=>c.id===os.id?{...c,krag:k}:c);
                         zapiszStrukture("czlonkowie", nowyList);
@@ -5254,11 +5258,17 @@ function EdycjaTalii({talie,zapisz,talieEvent=[],zapiszEvent=()=>{}}) {
     zapisz(talie.map(t=>t.id===talia.id?{...t,karty:t.karty.map(k=>k.nazwa===stara?{...k,nazwa:nowaNazwa}:k)}:t));
     setEdytujKarte(null);
   };
-  const zapiszPole=(pole,val)=>zapisz(talie.map(t=>t.id===talia.id?{...t,[pole]:pole==="numer"?parseInt(val)||t.numer:parseInt(val)||0}:t));
+  const zapiszPole=(pole,val)=>zapisz(talie.map(t=>{
+    if(t.id!==talia.id) return t;
+    if(pole.startsWith("nagroda_amunicja_k")&&(val===""||val===null||isNaN(parseInt(val)))){const kopia={...t};delete kopia[pole];return kopia;}
+    return {...t,[pole]:pole==="numer"?parseInt(val)||t.numer:parseInt(val)||0};
+  }));
   const dodajTalie=()=>{
     if(!nowaTalia.nazwa.trim()) return;
     const id=nowaTalia.nazwa.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now();
-    zapisz([...talie,{id,nazwa:nowaTalia.nazwa.trim(),numer:parseInt(nowaTalia.numer)||99,nagroda_amunicja:parseInt(nowaTalia.nagroda_amunicja)||0,karty:[]}]);
+    const nagrodyKregow={};
+    [2,3,4,5].forEach(n=>{const v=parseInt(nowaTalia[`nagroda_amunicja_k${n}`]);if(!isNaN(v))nagrodyKregow[`nagroda_amunicja_k${n}`]=v;});
+    zapisz([...talie,{id,nazwa:nowaTalia.nazwa.trim(),numer:parseInt(nowaTalia.numer)||99,nagroda_amunicja:parseInt(nowaTalia.nagroda_amunicja)||0,...nagrodyKregow,karty:[]}]);
     setNowaTalia({nazwa:"",numer:"",nagroda_amunicja:""});
     setNowyModal(false);
   };
@@ -5336,7 +5346,7 @@ function EdycjaTalii({talie,zapisz,talieEvent=[],zapiszEvent=()=>{}}) {
       {nowyModal&&(
         <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid #0c655",borderRadius:10,padding:16,marginBottom:14}}>
           <div style={{fontWeight:"bold",color:"#0c6",marginBottom:10}}>Nowa talia</div>
-          {[{p:"nazwa",l:"Nazwa"},{p:"numer",l:"Numer"},{p:"nagroda_amunicja",l:"Nagroda K1 (amunicja)"},{p:"nagroda_amunicja_k2",l:"Nagroda K2"},{p:"nagroda_amunicja_k3",l:"Nagroda K3"}].map(f=>(
+          {[{p:"nazwa",l:"Nazwa"},{p:"numer",l:"Numer"},{p:"nagroda_amunicja",l:"Nagroda K1 (amunicja)"},{p:"nagroda_amunicja_k2",l:"Nagroda K2"},{p:"nagroda_amunicja_k3",l:"Nagroda K3"},{p:"nagroda_amunicja_k4",l:"Nagroda K4"},{p:"nagroda_amunicja_k5",l:"Nagroda K5"}].map(f=>(
             <input key={f.p} value={nowaTalia[f.p]||""} onChange={e=>setNowaTalia(n=>({...n,[f.p]:e.target.value}))} placeholder={f.l}
               style={{display:"block",width:"100%",marginBottom:8,padding:"8px 10px",background:"var(--card-solid)",border:`1px solid ${f.p==="nagroda_amunicja_k2"?"#da70d655":"#333"}`,borderRadius:6,color:f.p==="nagroda_amunicja_k2"?"#da70d6":"#fff",fontSize:13,boxSizing:"border-box"}}/>
           ))}
@@ -5364,7 +5374,7 @@ function EdycjaTalii({talie,zapisz,talieEvent=[],zapiszEvent=()=>{}}) {
             <div style={{fontSize:15,fontWeight:"bold",color:"var(--accent)"}}>
               {talia.nazwa} <span style={{fontSize:12,color:"var(--muted)"}}>({talia.karty.length} kart)</span>
               <span style={{fontSize:11,color:"var(--accent)",marginLeft:8}}>K1: {(talia.nagroda_amunicja||0).toLocaleString()} 💰</span>
-              {talia.nagroda_amunicja_k2&&<span style={{fontSize:11,color:"#da70d6",marginLeft:6}}>K2: {talia.nagroda_amunicja_k2.toLocaleString()} 💜</span>}
+              {[2,3,4,5].map(n=>talia[`nagroda_amunicja_k${n}`]!==undefined&&<span key={n} style={{fontSize:11,color:"#da70d6",marginLeft:6}}>K{n}: {Number(talia[`nagroda_amunicja_k${n}`]).toLocaleString()} 💜</span>)}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
               <label style={{fontSize:11,color:"#aaa"}}>Nr: <input key={`nr-${talia.id}`} type="number" defaultValue={talia.numer} onBlur={e=>zapiszPole("numer",e.target.value)} style={{width:45,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #333",borderRadius:4,color:"#fff",fontSize:11}}/></label>
@@ -5373,6 +5383,15 @@ function EdycjaTalii({talie,zapisz,talieEvent=[],zapiszEvent=()=>{}}) {
               </label>
               <label style={{fontSize:11,color:"#aaa"}}>
                 K2 💜: <input key={`k2-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja_k2??""} placeholder="K2" onBlur={e=>zapiszPole("nagroda_amunicja_k2",e.target.value)} style={{width:65,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #da70d655",borderRadius:4,color:"#da70d6",fontSize:11}}/>
+              </label>
+              <label style={{fontSize:11,color:"#aaa"}}>
+                K3 💜: <input key={`k3-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja_k3??""} placeholder="K3" onBlur={e=>zapiszPole("nagroda_amunicja_k3",e.target.value)} style={{width:65,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #da70d655",borderRadius:4,color:"#da70d6",fontSize:11}}/>
+              </label>
+              <label style={{fontSize:11,color:"#aaa"}}>
+                K4 💜: <input key={`k4-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja_k4??""} placeholder="K4" onBlur={e=>zapiszPole("nagroda_amunicja_k4",e.target.value)} style={{width:65,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #da70d655",borderRadius:4,color:"#da70d6",fontSize:11}}/>
+              </label>
+              <label style={{fontSize:11,color:"#aaa"}}>
+                K5 💜: <input key={`k5-${talia.id}`} type="number" defaultValue={talia.nagroda_amunicja_k5??""} placeholder="K5" onBlur={e=>zapiszPole("nagroda_amunicja_k5",e.target.value)} style={{width:65,padding:"3px 5px",background:"var(--card-solid)",border:"1px solid #da70d655",borderRadius:4,color:"#da70d6",fontSize:11}}/>
               </label>
               <button onClick={()=>usunTalie(talia.id)} style={{padding:"4px 10px",background:"rgba(255,50,50,0.12)",border:"1px solid #f5544455",borderRadius:6,color:"#f55",cursor:"pointer",fontSize:11}}>🗑 Usuń</button>
             </div>
@@ -5427,6 +5446,7 @@ function EdycjaTalii({talie,zapisz,talieEvent=[],zapiszEvent=()=>{}}) {
 
 function EdycjaCzlonkow({czlonkowie,zapisz}) {
   const zapiszKrag = (id, krag) => zapisz(czlonkowie.map(c => c.id===id ? {...c, krag: parseInt(krag)||1} : c));
+  const zapiszKragEvent = (id, krag) => zapisz(czlonkowie.map(c => c.id===id ? {...c, kragEvent: parseInt(krag)||1} : c));
   const [nowyNick,setNowyNick]=useState("");
   const [edytujId,setEdytujId]=useState(null);
   const [tempNazwa,setTempNazwa]=useState("");
@@ -5499,6 +5519,15 @@ function EdycjaCzlonkow({czlonkowie,zapisz}) {
                   <option value={1}>K1</option>
                   <option value={2}>K2</option>
                   <option value={3}>K3</option>
+                  <option value={4}>K4</option>
+                  <option value={5}>K5</option>
+                </select>
+                {/* Krąg w evencie (osobny od zwykłych kart) */}
+                <select value={c.kragEvent||1} onChange={e=>zapiszKragEvent(c.id,e.target.value)} title="Krąg w evencie"
+                  style={{padding:"2px 4px",background:"var(--card-solid)",border:"1px solid #00e67655",borderRadius:4,color:"#00e676",fontSize:10,cursor:"pointer"}}>
+                  <option value={1}>🎉K1</option>
+                  <option value={2}>🎉K2</option>
+                  <option value={3}>🎉K3</option>
                 </select>
                 <button onClick={()=>{setEdytujId(c.id);setTempNazwa(c.nazwa);}} style={{padding:"3px 8px",background:"rgba(255,215,0,0.08)",border:"1px solid #b8860b33",borderRadius:5,color:"#b8860b",cursor:"pointer",fontSize:11}}>✏️</button>
                 <button onClick={()=>usun(c.id)} style={{padding:"3px 8px",background:"rgba(255,50,50,0.08)",border:"1px solid #f5544433",borderRadius:5,color:"#f5544488",cursor:"pointer",fontSize:11}}>🗑</button>
@@ -6760,7 +6789,7 @@ function PostepSezonu({talie,czlonkowie,posiadane}) {
       <div style={{marginBottom:14}}>
         <div style={{fontSize:13,fontWeight:"bold",color:"var(--accent)",marginBottom:8}}>🏆 Ranking postępu</div>
         {stats.map((s,i)=>{
-          const kragKolor = s.krag===3?"var(--accent)":s.krag===2?"#da70d6":"transparent";
+          const kragKolor = s.krag>=3?"var(--accent)":s.krag===2?"#da70d6":"transparent";
           const kragBorder = s.krag>1?`1px solid ${kragKolor}55`:"1px solid var(--border)";
           return (
           <div key={s.nazwa} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:4,background:s.krag>1?"rgba(138,43,226,0.06)":"rgba(0,0,0,0.2)",border:kragBorder,borderRadius:8}}>
@@ -7292,6 +7321,9 @@ function ResetSezonu({talie,czlonkowie,zapiszStrukture,walki=[]}) {
       nazwa: "",
       nagroda_amunicja: t.nagroda_amunicja || 0,
       nagroda_amunicja_k2: t.nagroda_amunicja_k2,
+      nagroda_amunicja_k3: t.nagroda_amunicja_k3,
+      nagroda_amunicja_k4: t.nagroda_amunicja_k4,
+      nagroda_amunicja_k5: t.nagroda_amunicja_k5,
       karty: [],
     }));
     await zapiszStrukture("talie", talieZachowaneNagrody);
@@ -10649,6 +10681,11 @@ function EdycjaTaliiEvent({ talieEvent, zapisz }) {
       id, nazwa: nowaTalia.nazwa.trim(),
       numer: parseInt(nowaTalia.numer) || 99,
       nagroda_amunicja: parseInt(nowaTalia.nagroda_amunicja) || 0,
+      ...[2, 3].reduce((acc, n) => {
+        const v = parseInt(nowaTalia[`nagroda_amunicja_k${n}`]);
+        if (!isNaN(v)) acc[`nagroda_amunicja_k${n}`] = v;
+        return acc;
+      }, {}),
       karty: [],
     }]);
     setNowaTalia({ nazwa: "", numer: "", nagroda_amunicja: "" });
@@ -10734,6 +10771,10 @@ function EdycjaTaliiEvent({ talieEvent, zapisz }) {
               placeholder="Nr" type="number" style={{ width: 60, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13 }} />
             <input value={nowaTalia.nagroda_amunicja} onChange={e => setNowaTalia(p => ({ ...p, nagroda_amunicja: e.target.value }))}
               placeholder="Nagroda ammo" type="number" style={{ width: 110, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13 }} />
+            <input value={nowaTalia.nagroda_amunicja_k2 || ""} onChange={e => setNowaTalia(p => ({ ...p, nagroda_amunicja_k2: e.target.value }))}
+              placeholder="Nagroda K2" type="number" style={{ width: 110, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid #da70d655", color: "#da70d6", fontSize: 13 }} />
+            <input value={nowaTalia.nagroda_amunicja_k3 || ""} onChange={e => setNowaTalia(p => ({ ...p, nagroda_amunicja_k3: e.target.value }))}
+              placeholder="Nagroda K3" type="number" style={{ width: 110, padding: "7px 10px", borderRadius: 7, background: "rgba(0,0,0,0.3)", border: "1px solid #da70d655", color: "#da70d6", fontSize: 13 }} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={dodajTalie} style={{ padding: "7px 16px", borderRadius: 7, background: "rgba(0,230,118,0.15)", border: "1px solid #00e676", color: "#00e676", cursor: "pointer", fontWeight: "bold" }}>✓ Dodaj</button>
@@ -10756,10 +10797,32 @@ function EdycjaTaliiEvent({ talieEvent, zapisz }) {
                   style={{ width: 45, padding: "2px 5px", background: "rgba(0,0,0,0.3)", border: "1px solid #333", borderRadius: 4, color: "#fff", fontSize: 11 }} />
               </label>
               <label style={{ fontSize: 11, color: "#fa0", display: "flex", alignItems: "center", gap: 4 }}>
-                💰 Nagroda:
+                💰 Nagroda K1:
                 <input type="number" defaultValue={talia.nagroda_amunicja || 0} key={`nagroda-${talia.id}`}
                   onBlur={e => zapisz(talieEvent.map(t => t.id === talia.id ? { ...t, nagroda_amunicja: parseInt(e.target.value) || 0 } : t))}
                   style={{ width: 80, padding: "2px 5px", background: "rgba(0,0,0,0.3)", border: "1px solid #fa055", borderRadius: 4, color: "#fa0", fontSize: 11 }} />
+              </label>
+              <label style={{ fontSize: 11, color: "#da70d6", display: "flex", alignItems: "center", gap: 4 }}>
+                K2 💜:
+                <input type="number" defaultValue={talia.nagroda_amunicja_k2 ?? ""} placeholder="K2" key={`nagroda-k2-${talia.id}`}
+                  onBlur={e => zapisz(talieEvent.map(t => {
+                    if (t.id !== talia.id) return t;
+                    const v = parseInt(e.target.value);
+                    if (isNaN(v)) { const kopia = { ...t }; delete kopia.nagroda_amunicja_k2; return kopia; }
+                    return { ...t, nagroda_amunicja_k2: v };
+                  }))}
+                  style={{ width: 80, padding: "2px 5px", background: "rgba(0,0,0,0.3)", border: "1px solid #da70d655", borderRadius: 4, color: "#da70d6", fontSize: 11 }} />
+              </label>
+              <label style={{ fontSize: 11, color: "#da70d6", display: "flex", alignItems: "center", gap: 4 }}>
+                K3 💜:
+                <input type="number" defaultValue={talia.nagroda_amunicja_k3 ?? ""} placeholder="K3" key={`nagroda-k3-${talia.id}`}
+                  onBlur={e => zapisz(talieEvent.map(t => {
+                    if (t.id !== talia.id) return t;
+                    const v = parseInt(e.target.value);
+                    if (isNaN(v)) { const kopia = { ...t }; delete kopia.nagroda_amunicja_k3; return kopia; }
+                    return { ...t, nagroda_amunicja_k3: v };
+                  }))}
+                  style={{ width: 80, padding: "2px 5px", background: "rgba(0,0,0,0.3)", border: "1px solid #da70d655", borderRadius: 4, color: "#da70d6", fontSize: 11 }} />
               </label>
             </div>
             <button onClick={() => usunTalie(talia.id)} style={{ padding: "4px 12px", borderRadius: 6, background: "rgba(255,50,50,0.1)", border: "1px solid #f5544455", color: "#f55", cursor: "pointer", fontSize: 11 }}>🗑️ Usuń talię</button>
