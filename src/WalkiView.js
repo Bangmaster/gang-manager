@@ -1,20 +1,25 @@
 import { useState, useEffect } from "react";
 import { zapiszAutoBackup } from "./firebase";
 
-// Klucze API — te same co w gemini.js
-const KLUCZE = [
-  process.env.REACT_APP_GEMINI_API_KEY || "",
-  process.env.REACT_APP_GEMINI_API_KEY_2 || "",
-  process.env.REACT_APP_GEMINI_API_KEY_3 || "",
-  process.env.REACT_APP_GEMINI_API_KEY_4 || "",
-  process.env.REACT_APP_GEMINI_API_KEY_5 || "",
-].filter(k => k.length > 0);
+// Wywołania Gemini idą przez serwer (/api/gemini) — klucze API NIE trafiają do przeglądarki
 let kluczIdx = 0;
-function pobierzURL() {
-  const k = KLUCZE[kluczIdx % Math.max(1, KLUCZE.length)];
-  return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${k}`;
+function nastepnyKlucz() { kluczIdx = (kluczIdx + 1) % 5; }
+
+// Wysyła prompt + obraz na serwer. Zwraca obiekt podobny do Response:
+// { ok, status, text(), json() } — przy błędzie text() zawiera JSON błędu Google (jeśli się da)
+async function wolajGeminiObraz(prompt, base64) {
+  const r = await fetch("/api/gemini", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, base64, mimeType: "image/jpeg", kluczIdx }),
+  });
+  if (r.ok) return r;
+  let surowy = "";
+  try { surowy = await r.text(); } catch {}
+  let wewn = surowy;
+  try { const o = JSON.parse(surowy); if (typeof o.error === "string") wewn = o.error; else if (o.error) wewn = JSON.stringify(o); } catch {}
+  return { ok: false, status: r.status, text: async () => wewn, json: async () => { try { return JSON.parse(wewn); } catch { return {}; } } };
 }
-function nastepnyKlucz() { kluczIdx = (kluczIdx + 1) % Math.max(1, KLUCZE.length); }
 
 // Skleja screeny walki pionowo (ranking jest pionowy więc lepiej niż siatka)
 async function scaleScreenyWalki(files) {
@@ -69,6 +74,84 @@ function poprawNick(nazwa) {
   return nazwa;
 }
 
+// Uproszczona forma nicku do porównań: bez polskich znaków, tagu FAM/™, spacji i znaków specjalnych
+function normNick(s) {
+  return String(s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/ł/gi, "l")
+    .toLowerCase()
+    .replace(/™/g, "")
+    .replace(/^fam/, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function odlegloscEdycyjna(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let poprz = Array.from({ length: n + 1 }, (_, k) => k);
+  for (let x = 1; x <= m; x++) {
+    const biez = [x];
+    for (let y = 1; y <= n; y++) {
+      biez[y] = Math.min(poprz[y] + 1, biez[y - 1] + 1, poprz[y - 1] + (a[x - 1] === b[y - 1] ? 0 : 1));
+    }
+    poprz = biez;
+  }
+  return poprz[n];
+}
+
+// Dopasowuje nick odczytany przez AI do listy członków gangu:
+// 1) ten sam nick po normalizacji, 2) nick ucięty (prefiks), 3) drobna literówka.
+// Dopasowanie musi być JEDNOZNACZNE — przy wątpliwościach zwracamy nick bez zmian.
+function dopasujNick(nazwa, czlonkowie) {
+  const wstepny = poprawNick(nazwa);
+  if (!Array.isArray(czlonkowie) || czlonkowie.length === 0) return wstepny;
+  const n = normNick(wstepny);
+  if (!n) return wstepny;
+  const kand = czlonkowie.map(c => ({ nazwa: c.nazwa, k: normNick(c.nazwa) })).filter(x => x.k);
+  const dokladne = kand.filter(x => x.k === n);
+  if (dokladne.length === 1) return dokladne[0].nazwa;
+  if (dokladne.length > 1) return wstepny;
+  if (n.length >= 4) {
+    const prefiks = kand.filter(x => (x.k.startsWith(n) && x.k.length - n.length <= 3) || (n.startsWith(x.k) && x.k.length >= 4 && n.length - x.k.length <= 2));
+    if (prefiks.length === 1) return prefiks[0].nazwa;
+    if (prefiks.length > 1) return wstepny;
+  }
+  if (n.length >= 5) {
+    const prog = n.length >= 9 ? 2 : 1;
+    const bliskie = kand.map(x => ({ ...x, d: odlegloscEdycyjna(n, x.k) })).filter(x => x.d <= prog).sort((a, b) => a.d - b.d);
+    if (bliskie.length === 1 || (bliskie.length > 1 && bliskie[0].d < bliskie[1].d)) return bliskie[0].nazwa;
+  }
+  return wstepny;
+}
+
+// Jeśli po poprawie nicków ten sam gracz występuje dwa razy — zostaje wpis z większymi obrażeniami
+function scalGraczy(gracze) {
+  const mapa = new Map();
+  (gracze || []).forEach(g => {
+    const klucz = g.nazwa;
+    const juz = mapa.get(klucz);
+    if (!juz || (g.obrazenia || 0) > (juz.obrazenia || 0)) mapa.set(klucz, g);
+  });
+  return Array.from(mapa.values());
+}
+
+function planNaprawyNickow(walki, czlonkowie) {
+  const zmiany = {};
+  (walki || []).forEach(w => (w.gracze || []).forEach(g => {
+    const n = dopasujNick(g.nazwa, czlonkowie);
+    if (n !== g.nazwa) zmiany[g.nazwa] = n;
+  }));
+  return zmiany;
+}
+
+function zastosujNaprawe(walki, zmiany) {
+  return (walki || []).map(w => ({
+    ...w,
+    gracze: scalGraczy((w.gracze || []).map(g => (zmiany[g.nazwa] ? { ...g, nazwa: zmiany[g.nazwa] } : g))),
+  }));
+}
+
 function buildActivityPrompt(ileScreenow) {
   const wieloInfo = ileScreenow > 1
     ? `Masz ${ileScreenow} screeny złączone pionowo. Każdego gracza zwróć TYLKO RAZ.`
@@ -99,10 +182,6 @@ Zwróć każdego gracza TYLKO RAZ. Ignoruj graczy bez czasu aktywności.`;
 
 // Analizuje screeny aktywności członków
 async function analyzeActivityImages(files, onProgress) {
-  if (KLUCZE.length === 0) {
-    return { sukces: false, blad: "🔑 Brak klucza API", czlonkowie: [] };
-  }
-
   try {
     onProgress?.(`📸 Scalanie ${files.length} screen${files.length === 1 ? "u" : "ów"} aktywności...`);
     const base64 = files.length === 1
@@ -119,18 +198,7 @@ async function analyzeActivityImages(files, onProgress) {
     let ostatniBladMsg = "";
     for (let proba = 0; proba < 3; proba++) {
       try {
-        const url = pobierzURL();
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [
-              { text: buildActivityPrompt(files.length) },
-              { inline_data: { mime_type: "image/jpeg", data: base64 } }
-            ]}],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
-          }),
-        });
+        const response = await wolajGeminiObraz(buildActivityPrompt(files.length), base64);
 
         if (!response.ok) {
           const errText = await response.text();
@@ -202,10 +270,6 @@ Zwróć każdego gracza TYLKO RAZ (bez duplikatów).`;
 
 // Analizuje screeny walki (scala je najpierw w jeden obraz)
 async function analyzeBattleImages(files, onProgress) {
-  if (KLUCZE.length === 0) {
-    return { sukces: false, blad: "🔑 Brak klucza API", gracze: [] };
-  }
-
   try {
     onProgress?.(`📸 Scalanie ${files.length} screen${files.length === 1 ? "u" : "ów"}...`);
     const base64 = files.length === 1
@@ -222,18 +286,7 @@ async function analyzeBattleImages(files, onProgress) {
     let ostatniBladMsg = "";
     for (let proba = 0; proba < 3; proba++) {
       try {
-        const url = pobierzURL();
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [
-              { text: buildBattlePrompt(files.length) },
-              { inline_data: { mime_type: "image/jpeg", data: base64 } }
-            ]}],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
-          }),
-        });
+        const response = await wolajGeminiObraz(buildBattlePrompt(files.length), base64);
 
         if (!response.ok) {
           const errText = await response.text();
@@ -284,6 +337,7 @@ async function analyzeBattleImages(files, onProgress) {
 export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, archiwumWalk=[], talie=[], posiadane={}, duplikaty={} }) {
   const [pliki, setPliki] = useState([]);
   const [podgladURL, setPodgladURL] = useState([]);
+  const [ostatnioUsunieta, setOstatnioUsunieta] = useState(null); // {walka, idx} — do cofnięcia
   const [analizujac, setAnalizujac] = useState(false);
   const [wyniki, setWyniki] = useState(null);
   const [nazwaWalki, setNazwaWalki] = useState("");
@@ -322,7 +376,8 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
     if (!wynik.sukces) {
       setWyniki({ gracze: [], bledy: [{ blad: wynik.blad }], dataAnalizy: new Date().toISOString() });
     } else {
-      setWyniki({ gracze: wynik.gracze, bledy: [], dataAnalizy: new Date().toISOString() });
+      const graczeDopasowani = scalGraczy(wynik.gracze.map(g => ({ ...g, nazwa: dopasujNick(g.nazwa, czlonkowie) }))).sort((a, b) => b.obrazenia - a.obrazenia);
+      setWyniki({ gracze: graczeDopasowani, bledy: [], dataAnalizy: new Date().toISOString() });
     }
     setAnalizujac(false);
   };
@@ -347,6 +402,7 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
         .filter(c => c.nazwa && c.nazwa.toLowerCase() !== "mob")
         .map(c => ({
           ...c,
+          nazwa: dopasujNick(c.nazwa, czlonkowie),
           bylNaWalce: c.minutTemu <= PROG,
           poziom: c.poziom || null,
         }));
@@ -400,7 +456,31 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
 
   const usunWalke = async (id) => {
     if (!window.confirm("Usunąć tę walkę?")) return;
-    await zapiszWalki((walki || []).filter(w => w.id !== id));
+    const lista = walki || [];
+    const idx = lista.findIndex(w => w.id === id);
+    const usunieta = idx >= 0 ? lista[idx] : null;
+    await zapiszWalki(lista.filter(w => w.id !== id));
+    if (usunieta) {
+      setOstatnioUsunieta({ walka: usunieta, idx });
+      setTimeout(() => setOstatnioUsunieta(cur => (cur && cur.walka.id === usunieta.id ? null : cur)), 30000);
+    }
+  };
+
+  const cofnijUsuniecie = async () => {
+    if (!ostatnioUsunieta) return;
+    const { walka, idx } = ostatnioUsunieta;
+    const lista = [...(walki || [])];
+    if (!lista.some(w => w.id === walka.id)) {
+      lista.splice(Math.min(idx, lista.length), 0, walka);
+      await zapiszWalki(lista);
+    }
+    setOstatnioUsunieta(null);
+  };
+
+  const zmianyNickow = isAdmin ? planNaprawyNickow(walki, czlonkowie) : {};
+  const liczbaZmianNickow = Object.keys(zmianyNickow).length;
+  const naprawNicki = async () => {
+    await zapiszWalki(zastosujNaprawe(walki, zmianyNickow));
   };
 
   const generujPodsumowanie = () => {
@@ -410,6 +490,21 @@ export default function WalkiView({ czlonkowie, walki, zapiszWalki, isAdmin, arc
 
   return (
     <div>
+      {/* Cofnięcie ostatnio usuniętej walki */}
+      {ostatnioUsunieta && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,165,0,0.12)", border: "1px solid #fa0", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: "#fa0" }}>
+          <span style={{ flex: 1 }}>🗑 Usunięto walkę „{ostatnioUsunieta.walka.nazwa || ostatnioUsunieta.walka.data || "bez nazwy"}"</span>
+          <button onClick={cofnijUsuniecie} style={{ padding: "5px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold", background: "rgba(255,165,0,0.25)", border: "1px solid #fa0", color: "#fa0" }}>↩️ Cofnij</button>
+          <button onClick={() => setOstatnioUsunieta(null)} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14 }}>✕</button>
+        </div>
+      )}
+      {/* Naprawa niedokładnych nicków w historii walk (admin) */}
+      {isAdmin && liczbaZmianNickow > 0 && (
+        <div style={{ background: "rgba(0,200,255,0.08)", border: "1px solid #0af", borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 12, color: "#9de" }}>
+          🔧 W historii walk jest {liczbaZmianNickow} niedokładnych nicków (np. {Object.entries(zmianyNickow).slice(0, 3).map(([a, b]) => `${a} → ${b}`).join(", ")}).
+          <button onClick={naprawNicki} style={{ marginLeft: 10, padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold", background: "rgba(0,170,255,0.2)", border: "1px solid #0af", color: "#0af" }}>Napraw i scal</button>
+        </div>
+      )}
       {/* Tabs — wgrywanie tylko dla admina */}
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {[
@@ -823,7 +918,6 @@ Nasz gang to "Family". Zwróć wszystkie gangi które widzisz.`;
 
 // OCR ligi
 async function analyzeLigaImages(files, onProgress) {
-  if (KLUCZE.length === 0) return { sukces: false, blad: "Brak klucza API", gangi: [] };
   try {
     onProgress?.(`📸 Scalanie ${files.length} screenu ligi...`);
     const base64 = files.length === 1
@@ -833,15 +927,7 @@ async function analyzeLigaImages(files, onProgress) {
     onProgress?.("🤖 Analizuję ranking ligi...");
     for (let proba = 0; proba < 3; proba++) {
       try {
-        const url = pobierzURL();
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: buildLigaPrompt(files.length) }, { inline_data: { mime_type: "image/jpeg", data: base64 } }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
-          }),
-        });
+        const response = await wolajGeminiObraz(buildLigaPrompt(files.length), base64);
         if (!response.ok) { nastepnyKlucz(); if (proba < 2) { await new Promise(r => setTimeout(r, 10000)); } continue; }
         const data = await response.json();
         let text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();

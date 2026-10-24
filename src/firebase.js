@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc, runTransaction } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -157,6 +157,42 @@ const ONLINE_DOC = doc(db, "gang", "online");
 const KALENDARZ_DOC = doc(db, "gang", "kalendarz"); // osobny dokument dla kalendarza
 const EVENT_DOC = doc(db, "gang", "event"); // osobny dokument dla danych eventowych
 
+// === OCHRONA PRZED NADPISANIEM (rewizje pól) ===
+// Każde pole zapisywane w całości (talie, członkowie, walki...) ma numer rewizji w polu `_rev`.
+// Zapis przechodzi tylko wtedy, gdy nikt inny nie zmienił tego pola od ostatniej synchronizacji
+// tej przeglądarki — w przeciwnym razie zwracamy "konflikt" zamiast po cichu nadpisać cudze zmiany.
+const znaneRewizje = {}; // "klucz_dokumentu/pole" -> ostatnia znana rewizja
+
+function zapamietajRewizje(prefix, dane) {
+  const rev = dane && dane._rev;
+  if (!rev) return;
+  Object.keys(rev).forEach(pole => {
+    const k = `${prefix}/${pole}`;
+    if ((rev[pole] || 0) > (znaneRewizje[k] || 0)) znaneRewizje[k] = rev[pole];
+  });
+}
+
+async function zapiszPoleZRewizja(docRef, prefix, pole, wartosc) {
+  const klucz = `${prefix}/${pole}`;
+  try {
+    const nowaRewizja = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(docRef);
+      const aktualna = (snap.exists() && snap.data()._rev && snap.data()._rev[pole]) || 0;
+      if (aktualna > (znaneRewizje[klucz] || 0)) throw new Error("KONFLIKT_REWIZJI");
+      tx.set(docRef, { [pole]: wartosc, _rev: { [pole]: aktualna + 1 } }, { merge: true });
+      return aktualna + 1;
+    });
+    znaneRewizje[klucz] = nowaRewizja;
+    return true;
+  } catch (e) {
+    if (e && e.message === "KONFLIKT_REWIZJI") return "konflikt";
+    // brak połączenia itp. — wracamy do zwykłego zapisu (Firestore dośle go po odzyskaniu sieci)
+    console.warn("Transakcja nieudana, zapis bez kontroli rewizji:", e);
+    await setDoc(docRef, { [pole]: wartosc }, { merge: true });
+    return true;
+  }
+}
+
 // === EVENT ===
 export async function loadEventData() {
   try {
@@ -196,8 +232,7 @@ export async function setEventCardField(typ, key, value) {
 
 export async function setEventStructure(pole, wartosc) {
   try {
-    await setDoc(EVENT_DOC, { [pole]: wartosc }, { merge: true });
-    return true;
+    return await zapiszPoleZRewizja(EVENT_DOC, "event", pole, wartosc);
   } catch(e) {
     console.error("Błąd zapisu struktury eventu:", e);
     return false;
@@ -206,6 +241,7 @@ export async function setEventStructure(pole, wartosc) {
 
 export function subscribeEventData(callback) {
   return onSnapshot(EVENT_DOC, (snap) => {
+    if (snap.exists()) zapamietajRewizje("event", snap.data());
     if (snap.exists()) callback(snap.data());
     else callback(null);
   }, (err) => console.error("Błąd subskrypcji eventu:", err));
@@ -429,8 +465,7 @@ export async function setStructure(pole, wartosc) {
         }
       }
     }
-    await setDoc(GANG_DOC, { [pole]: wartosc }, { merge: true });
-    return true;
+    return await zapiszPoleZRewizja(GANG_DOC, "gang", pole, wartosc);
   } catch (e) {
     console.error("Błąd zapisu struktury:", e);
     return false;
@@ -439,6 +474,7 @@ export async function setStructure(pole, wartosc) {
 
 export function subscribeGangData(callback) {
   return onSnapshot(GANG_DOC, (snap) => {
+    if (snap.exists()) zapamietajRewizje("gang", snap.data());
     if (snap.exists()) callback(snap.data());
   }, (err) => console.error("Błąd subskrypcji:", err));
 }
