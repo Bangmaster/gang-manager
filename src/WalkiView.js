@@ -2326,6 +2326,7 @@ function obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty) {
     });
     wynik[o.nazwa || o.id] = {
       posiada, mozliwe,
+      krag: o.krag || 1,
       procent: mozliwe > 0 ? Math.round(posiada / mozliwe * 100) : 0,
       duplikaty: dup,
       talieZamkniete,
@@ -2377,6 +2378,8 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false, 
       const daneKartowe = obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty);
       const waznaWalki = walki.filter(w => w.wazna);
       const totalObr = wszyscy.reduce((s, g) => s + g.obrazeniaLacznie, 0);
+      const obrWazne = (nazwa) => waznaWalki.reduce((s, w) => s + (w.gracze.find(gr => gr.nazwa === nazwa)?.obrazenia || 0), 0);
+      const totalObrWazne = wszyscy.reduce((s, g) => s + obrWazne(g.nazwa), 0);
 
       const tabela = wszyscy.map(g => {
         const obecnoscWazne = waznaWalki.length > 0
@@ -2388,9 +2391,13 @@ function PodsumowanieSezonu({ podsumowanie, zapiszWalki, walki, readonly=false, 
         const procWklad = totalObr > 0 ? ((g.obrazeniaLacznie / totalObr) * 100).toFixed(1) : "0";
         const karty = daneKartowe[g.nazwa];
         const kartyTxt = karty
-          ? `karty ${karty.posiada}/${karty.mozliwe} (${karty.procent}%), duplikaty: ${karty.duplikaty}, talie zamknięte: ${karty.talieZamkniete}/${karty.talieLacznie}`
+          ? `karty: zamknięte kręgi ${Math.max(0, karty.krag - 1)}, w obecnym kręgu (K${karty.krag}) ${karty.posiada}/${karty.mozliwe} (${karty.procent}%), duplikaty: ${karty.duplikaty}, talie zamknięte w tym kręgu: ${karty.talieZamkniete}/${karty.talieLacznie}`
           : "brak danych o kartach";
-        return `- ${g.nazwa}: uczestnictwo ${g.uczestnictwa}/${lacznaWalka} walk, śr. obrażenia ${Math.round(g.obrazeniaLacznie / g.uczestnictwa)}, łączne obrażenia ${g.obrazeniaLacznie} (${procWklad}% wkładu drużyny)${waznaWalki.length > 0 ? `, ważne walki: był na ${obecnoscWazne}/${waznaWalki.length}, nieobecny na ${nieobecnoscWazne}/${waznaWalki.length}` : ""}, ${kartyTxt}`;
+        const ow = obrWazne(g.nazwa);
+        const wazneObrTxt = waznaWalki.length > 0
+          ? `, obrażenia w ważnych walkach: ${ow} (${totalObrWazne > 0 ? ((ow / totalObrWazne) * 100).toFixed(1) : "0"}% wkładu drużyny w ważnych${obecnoscWazne > 0 ? `, śr. ${Math.round(ow / obecnoscWazne)} na walkę` : ""})`
+          : "";
+        return `- ${g.nazwa}: uczestnictwo ${g.uczestnictwa}/${lacznaWalka} walk, śr. obrażenia ${Math.round(g.obrazeniaLacznie / g.uczestnictwa)}, łączne obrażenia ${g.obrazeniaLacznie} (${procWklad}% wkładu drużyny)${waznaWalki.length > 0 ? `, ważne walki: był na ${obecnoscWazne}/${waznaWalki.length}, nieobecny na ${nieobecnoscWazne}/${waznaWalki.length}` : ""}${wazneObrTxt}, ${kartyTxt}`;
       }).join("\n");
 
       const prompt = `Jesteś analitykiem gangu ™FAM™ w grze mobilnej The Gang. Masz pełne statystyki sezonu dla wszystkich członków gangu. Zrób dogłębną, rzeczową analizę po polsku.
@@ -2399,6 +2406,10 @@ Sezon: ${lacznaWalka} walk łącznie, w tym ${waznaWalki.length} oznaczonych jak
 
 Dane graczy:
 ${tabela}
+
+WAŻNE zasady oceny:
+- Karty: po zamknięciu kręgu gracz zaczyna zbierać od nowa, więc niski postęp w obecnym kręgu u kogoś, kto ma zamknięte kręgi, NIE jest słabością. Oceniaj zaangażowanie w karty łącznie: zamknięte kręgi + postęp w obecnym.
+- Obrażenia zadane w ważnych walkach liczą się najbardziej (obok obecności). Ktoś obecny na ważnej walce, ale z bardzo niskimi obrażeniami tam, jest słaby mimo obecności.
 
 Przeanalizuj i napisz zwięzły raport zawierający:
 1. **Kto najbardziej odstaje** — najsłabsze statystyki, szczególnie nieobecności na WAŻNYCH walkach (to priorytet numer jeden) i niski wkład w łączne obrażenia drużyny.
