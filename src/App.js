@@ -1906,7 +1906,7 @@ function DaneView({talie,czlonkowie,czlonkowieOryg,typWymiany,posiadane,duplikat
 
 // ═══ Obliczanie wymian w Web Workerze (public/algorytmWorker.js + public/algorytmy.js) ═══
 // Algorytmy V1/V3 nie są już w tym pliku — liczą się w tle, więc ekran nie zamarza.
-const ALG_WERSJA = "20261020";
+const ALG_WERSJA = "20261027";
 let _algWorker = null;
 let _algKod = null;
 
@@ -2924,13 +2924,20 @@ function WynikView({wersja="v1",talie,czlonkowie,posiadane,duplikaty,typWymiany,
           {wynik.nieobsluzone.length>0&&<span style={{color:"#fa0",marginLeft:12}}>⚠️ {wynik.nieobsluzone.length} bez dawcy</span>}
           <button onClick={async()=>{
             setPublikowanie(true);
-            const aktywna={
+            // Firestore nie przyjmuje wartości undefined — czyścimy dane przed zapisem
+            const aktywna=JSON.parse(JSON.stringify({
               wymiany: wynik.planoweWymiany,
               typWymiany,
               data: new Date().toISOString(),
               potwierdzone: {},
-            };
-            await zapiszAktywna(aktywna);
+            }));
+            try {
+              await zapiszAktywna(aktywna);
+            } catch(e) {
+              setPublikowanie(false);
+              alert("❌ Nie udało się opublikować rozpiski: "+e.message);
+              return;
+            }
             zapiszAutoBackup("publikacja_wymiany");
             setPublikowanie(false);
             playSound("gold");

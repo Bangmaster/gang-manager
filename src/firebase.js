@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc, runTransaction } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -173,24 +173,10 @@ function zapamietajRewizje(prefix, dane) {
 }
 
 async function zapiszPoleZRewizja(docRef, prefix, pole, wartosc) {
-  const klucz = `${prefix}/${pole}`;
-  try {
-    const nowaRewizja = await runTransaction(db, async (tx) => {
-      const snap = await tx.get(docRef);
-      const aktualna = (snap.exists() && snap.data()._rev && snap.data()._rev[pole]) || 0;
-      if (aktualna > (znaneRewizje[klucz] || 0)) throw new Error("KONFLIKT_REWIZJI");
-      tx.set(docRef, { [pole]: wartosc, _rev: { [pole]: aktualna + 1 } }, { merge: true });
-      return aktualna + 1;
-    });
-    znaneRewizje[klucz] = nowaRewizja;
-    return true;
-  } catch (e) {
-    if (e && e.message === "KONFLIKT_REWIZJI") return "konflikt";
-    // brak połączenia itp. — wracamy do zwykłego zapisu (Firestore dośle go po odzyskaniu sieci)
-    console.warn("Transakcja nieudana, zapis bez kontroli rewizji:", e);
-    await setDoc(docRef, { [pole]: wartosc }, { merge: true });
-    return true;
-  }
+  // Szybki zapis bez transakcji i bez blokowania (jak w starszych wersjach).
+  // Zapisuje tylko zmienione pole — nic nie pobiera z serwera.
+  await setDoc(docRef, { [pole]: wartosc }, { merge: true });
+  return true;
 }
 
 // === EVENT ===
