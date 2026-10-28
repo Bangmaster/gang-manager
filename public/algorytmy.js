@@ -2033,7 +2033,7 @@ function generujAlgorytmV3({talie,czlonkowie,wszyscyCzlonkowie,posiadane,duplika
       return {
         od: dawca.nazwa, do: o.nazwa, karta: u.karta.nazwa || u.karta, talia: t.nazwa,
         nagroda: pobierzNagrode(t, o.krag) || 0, faza: 98,
-        brakTCount: u.brakTCount || 1, brakOCount: brakO, trudna: t.trudna, v3Dodana: true,
+        brakTCount: u.brakTCount || 1, brakOCount: brakO, trudna: TRUDNE_NUMERY.includes(t.numer), v3Dodana: true,
       };
     };
 

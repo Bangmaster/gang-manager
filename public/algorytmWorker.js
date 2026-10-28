@@ -1,6 +1,6 @@
 // Web Worker — liczy wymiany poza głównym wątkiem, żeby ekran nie zamarzał.
 // Wersję w adresie zmieniaj razem z algorytmy.js, żeby przeglądarka nie trzymała starej kopii.
-importScripts("/algorytmy.js?v=20261020");
+importScripts("/algorytmy.js?v=20261027");
 
 self.onmessage = function (e) {
   const { id, wersja, parametry } = e.data || {};
