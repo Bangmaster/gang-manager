@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc, deleteField, arrayUnion, collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, deleteDoc, FieldPath } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBFkrpSF7BX4VNbbNRPYg5I30T0OZmODbs",
@@ -728,4 +728,28 @@ export async function zapiszTaktyke(dane) {
     await setDoc(TAKTYKA_DOC, dane, { merge: true });
     return true;
   } catch(e) { console.error(e); return false; }
+}
+
+
+// === HURTOWY ZAPIS KART (import ze skanera) ===
+// zmiany: [{doc:"zwykla"|"event", pole:"posiadane"|"duplikaty"|"posiadaneEvent"|"duplikatyEvent", klucz, wart:true|null}]
+// Używa updateDoc + FieldPath, więc usuwa klucze naprawdę (setDoc+merge nie usuwa kluczy z mapy)
+// i działa też dla nazw kart zawierających kropki.
+export async function zapiszKartyHurtem(zmiany) {
+  try {
+    const grupy = [[GANG_DOC, zmiany.filter(z => z.doc !== "event")], [EVENT_DOC, zmiany.filter(z => z.doc === "event")]];
+    for (const [ref, lista] of grupy) {
+      for (let i = 0; i < lista.length; i += 300) {
+        const args = [];
+        lista.slice(i, i + 300).forEach(z => {
+          args.push(new FieldPath(z.pole, z.klucz), z.wart === null ? deleteField() : z.wart);
+        });
+        if (args.length) await updateDoc(ref, ...args);
+      }
+    }
+    return true;
+  } catch (e) {
+    console.error("Błąd hurtowego zapisu kart:", e);
+    return false;
+  }
 }

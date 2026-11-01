@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, startTransition } from "re
 
 import { createPortal } from "react-dom";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, loadEventData, setEventCardField, setEventStructure, subscribeEventData } from "./firebase"; // eslint-disable-line no-unused-vars
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, zapiszKartyHurtem, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, loadEventData, setEventCardField, setEventStructure, subscribeEventData } from "./firebase"; // eslint-disable-line no-unused-vars
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import { analyzeDeckStructure } from "./gemini";
@@ -1164,6 +1164,7 @@ function App() {
           czlonkowie={dane.czlonkowie} zapisz={(now)=>zapiszStrukture("czlonkowie",now)}
         />}
         {zakładka==="testy"&&isAdmin&&<TestyView
+          daneEvent={daneEvent}
           zalogowany={zalogowany}
           historiaWymian={historiaWymian}
           statusOnline={statusOnline}
@@ -3999,7 +4000,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 // ============================================================
 // TESTY — wszystkie eksperymenty
 // ============================================================
-function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={},historiaPush=[],archiwumWalk=[]}) {
+function TestyView({daneEvent=null,talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStrukture,aktywnaWymiana,walki,typWymiany,dane,isAdmin=false,zablokowane=[],onZablokuj,onOdblokuj,zalogowany={},historiaWymian=[],statusOnline={},historiaPush=[],archiwumWalk=[]}) {
   const [tryb,setTryb]=useState("szybkie");
   const [wybranaOsoba,setWybranaOsoba]=useState(0);
   const [wybranaTalia,setWybranaTalia]=useState(0);
@@ -4042,7 +4043,7 @@ function TestyView({talie,czlonkowie,posiadane,duplikaty,zapiszKarte,zapiszStruk
       {tryb==="postep"&&<PostepSezonu talie={talie} czlonkowie={czlonkowie} posiadane={posiadane}/>}
       {tryb==="historia"&&<HistoriaWymian zapiszStrukture={zapiszStrukture} aktywnaWymiana={aktywnaWymiana} czlonkowie={czlonkowie}/>}
       {tryb==="reset"&&<ResetSezonu talie={talie} czlonkowie={czlonkowie} zapiszStrukture={zapiszStrukture} walki={dane.walki||[]}/>}
-      {tryb==="backup"&&<BackupDanych dane={dane} zapiszStrukture={zapiszStrukture}/>}
+      {tryb==="backup"&&<><BackupDanych dane={dane} zapiszStrukture={zapiszStrukture}/><ImportSkanu dane={dane} daneEvent={daneEvent}/></>}
       {tryb==="push"&&<PowiadomieniaPush zalogowany={zalogowany} isAdmin={isAdmin} historiaPush={historiaPush}/>}
       {tryb==="duple"&&<DupleView czlonkowie={czlonkowie} talie={talie} duplikaty={duplikaty}/>}
       {tryb==="logi"&&<>
@@ -4613,6 +4614,174 @@ function AutoBackupPanel() {
               }}>Przywróć</button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// SKANER KART — eksport danych dla skanera i import wyniku z podglądem zmian
+// ============================================================
+function ImportSkanu({dane, daneEvent}) {
+  const [plan, setPlan] = useState(null);
+  const [wylaczone, setWylaczone] = useState({});
+  const [szczegoly, setSzczegoly] = useState(null);
+  const [stosuje, setStosuje] = useState(false);
+
+  const pobierzKatalog = () => {
+    const mapuj = (t) => ({ id: t.id, numer: t.numer, nazwa: t.nazwa, karty: (t.karty || []).map(c => ({ nazwa: c.nazwa, typ: c.typ })) });
+    const k = {
+      wersja: 1, data: new Date().toISOString(),
+      czlonkowie: (dane.czlonkowie || []).map(c => ({ id: c.id, nazwa: c.nazwa })),
+      talie: (dane.talie || []).map(mapuj),
+      talieEvent: (daneEvent?.talieEvent || []).map(mapuj),
+      posiadane: dane.posiadane || {}, duplikaty: dane.duplikaty || {},
+      posiadaneEvent: daneEvent?.posiadaneEvent || {}, duplikatyEvent: daneEvent?.duplikatyEvent || {},
+    };
+    const blob = new Blob([JSON.stringify(k)], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "katalog.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
+
+  const zbudujPlan = (skan) => {
+    const ostrzezenia = [];
+    const osoby = [];
+    Object.entries(skan.osoby || {}).forEach(([oid, o]) => {
+      const cz = (dane.czlonkowie || []).find(c => String(c.id) === String(oid));
+      if (!cz) { ostrzezenia.push(`Osoba „${o.nazwa}” z pliku nie istnieje już w aplikacji — pominięto.`); return; }
+      if (cz.nazwa !== o.nazwa) { ostrzezenia.push(`Nazwa osoby w pliku („${o.nazwa}”) różni się od nazwy w aplikacji („${cz.nazwa}”) — pominięto. Pobierz świeże dane dla skanera.`); return; }
+      const zm = [];
+      const detal = { nowe: [], usuniete: [], dupNowe: [], dupUsuniete: [] };
+      Object.values(o.talie || {}).forEach(r => {
+        const lista = r.typ === "event" ? (daneEvent?.talieEvent || []) : (dane.talie || []);
+        const def = lista.find(t => String(t.id) === String(r.talia_id));
+        if (!def) { ostrzezenia.push(`Talia „${r.nazwa}” nie istnieje już w aplikacji — pominięto (${cz.nazwa}).`); return; }
+        const nazwyDef = (def.karty || []).map(k => k.nazwa);
+        if (r.karty.length !== nazwyDef.length || r.karty.some(k => !nazwyDef.includes(k.nazwa))) {
+          ostrzezenia.push(`Talia „${r.nazwa}” ma w aplikacji inną listę kart niż w skanie — pominięto (${cz.nazwa}).`); return;
+        }
+        const ev = r.typ === "event";
+        const polaP = ev ? "posiadaneEvent" : "posiadane";
+        const polaD = ev ? "duplikatyEvent" : "duplikaty";
+        const stP = ev ? (daneEvent?.posiadaneEvent || {}) : (dane.posiadane || {});
+        const stD = ev ? (daneEvent?.duplikatyEvent || {}) : (dane.duplikaty || {});
+        r.karty.forEach(k => {
+          const klucz = `${cz.id}_${def.id}_${k.nazwa}`;
+          const mam = !!stP[klucz];
+          const dup = !!stD[klucz];
+          const opis = `${r.nazwa}: ${k.nazwa}`;
+          if (k.status === "posiada") {
+            if (!mam) { zm.push({doc: r.typ, pole: polaP, klucz, wart: true}); detal.nowe.push(opis); }
+            if (k.dup && !dup) { zm.push({doc: r.typ, pole: polaD, klucz, wart: true}); detal.dupNowe.push(opis); }
+            if (!k.dup && dup) { zm.push({doc: r.typ, pole: polaD, klucz, wart: null}); detal.dupUsuniete.push(opis); }
+          } else if (k.status === "brak") {
+            if (mam) { zm.push({doc: r.typ, pole: polaP, klucz, wart: null}); detal.usuniete.push(opis); }
+            if (dup) { zm.push({doc: r.typ, pole: polaD, klucz, wart: null}); detal.dupUsuniete.push(opis); }
+          }
+        });
+      });
+      osoby.push({ id: cz.id, nazwa: cz.nazwa, zm, detal, doSprawdzenia: o.do_sprawdzenia || [], brakuje: o.brakuje || [] });
+    });
+    return { osoby, ostrzezenia, niepotwierdzona: skan.niepotwierdzona_kolejnosc || [], data: skan.data };
+  };
+
+  const wczytaj = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const skan = JSON.parse(ev.target.result);
+        if (skan.program !== "skaner-kart") { alert("To nie jest plik wyniku ze skanera kart (wynik_skanu.json)."); return; }
+        setWylaczone({}); setSzczegoly(null);
+        setPlan(zbudujPlan(skan));
+      } catch { alert("Nie udało się odczytać pliku."); }
+    };
+    reader.readAsText(file);
+  };
+
+  const wybrane = plan ? plan.osoby.filter(o => !wylaczone[o.id]) : [];
+  const sumaZmian = wybrane.reduce((s, o) => s + o.zm.length, 0);
+  const sumaUsuniec = wybrane.reduce((s, o) => s + o.detal.usuniete.length, 0);
+
+  const zastosuj = async () => {
+    if (!plan || sumaZmian === 0) return;
+    if (!window.confirm(`Zapisać ${sumaZmian} zmian dla ${wybrane.length} osób?${sumaUsuniec ? `\n\nUWAGA: ${sumaUsuniec} kart zostanie USUNIĘTYCH (skan nie widzi ich u gracza).` : ""}\n\nPrzed zapisem zostanie zrobiony automatyczny backup.`)) return;
+    setStosuje(true);
+    try {
+      await zapiszAutoBackup("przed_importem_skanu");
+      const ok = await zapiszKartyHurtem(wybrane.flatMap(o => o.zm));
+      alert(ok ? `✅ Zapisano ${sumaZmian} zmian.` : "❌ Błąd zapisu. Sprawdź połączenie i spróbuj ponownie (dane mogły zapisać się częściowo — porównaj ponownie).");
+      if (ok) setPlan(null);
+    } catch (e) { alert("❌ Błąd: " + e.message); }
+    setStosuje(false);
+  };
+
+  const btn = (kolor) => ({padding:"9px 14px",background:`rgba(${kolor},0.14)`,border:`1px solid rgba(${kolor},0.6)`,borderRadius:8,color:`rgb(${kolor})`,fontWeight:"bold",cursor:"pointer",fontSize:13});
+
+  return (
+    <div style={{marginTop:18,padding:14,background:"rgba(0,150,255,0.05)",border:"1px solid rgba(0,150,255,0.25)",borderRadius:10}}>
+      <div style={{fontSize:14,fontWeight:"bold",color:"#4db8ff",marginBottom:4}}>🤖 Skaner kart (automatyczne wczytywanie z gry)</div>
+      <div style={{fontSize:11,color:"var(--muted)",lineHeight:1.6,marginBottom:10}}>
+        1) Pobierz dane dla skanera i zapisz jako <b>katalog.json</b> obok programu skanera.<br/>
+        2) Przejdź w grze po profilach i taliach — skaner zapisze <b>wynik_skanu.json</b>.<br/>
+        3) Wczytaj ten plik tutaj, sprawdź podgląd zmian i zatwierdź.
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+        <button onClick={pobierzKatalog} style={btn("77,184,255")}>⬇️ Pobierz dane dla skanera</button>
+        <label style={{...btn("0,200,100"),display:"inline-block"}}>⬆️ Wczytaj wynik skanu
+          <input type="file" accept=".json" onChange={wczytaj} style={{display:"none"}}/>
+        </label>
+      </div>
+      {plan && (
+        <div>
+          <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>Skan z: {plan.data ? new Date(plan.data).toLocaleString("pl-PL") : "?"}</div>
+          {plan.niepotwierdzona.length > 0 && (
+            <div style={{fontSize:11,color:"#fa0",background:"rgba(255,170,0,0.08)",border:"1px solid #fa04",borderRadius:6,padding:8,marginBottom:8}}>
+              ⚠️ Kolejność kart w {plan.niepotwierdzona.length} taliach nie została potwierdzona w skanerze (klawisz „v”). Zrób to przed pierwszym importem.
+            </div>
+          )}
+          {plan.ostrzezenia.map((t, i) => (
+            <div key={i} style={{fontSize:11,color:"#fa0",marginBottom:4}}>⚠️ {t}</div>
+          ))}
+          {plan.osoby.map(o => {
+            const d = o.detal;
+            const wyl = !!wylaczone[o.id];
+            return (
+              <div key={o.id} style={{padding:"8px 0",borderBottom:"1px solid #12122a",opacity:wyl?0.45:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <input type="checkbox" checked={!wyl} onChange={()=>setWylaczone(w=>({...w,[o.id]:!w[o.id]}))}/>
+                  <span style={{fontSize:13,color:"var(--text)",fontWeight:"bold",flex:1,minWidth:120}}>{o.nazwa}</span>
+                  <span style={{fontSize:11,color:"#0c6"}}>+{d.nowe.length} kart</span>
+                  <span style={{fontSize:11,color:d.usuniete.length?"#f55":"#555"}}>−{d.usuniete.length} kart</span>
+                  <span style={{fontSize:11,color:"#87CEEB"}}>+{d.dupNowe.length} dup.</span>
+                  <span style={{fontSize:11,color:"#888"}}>−{d.dupUsuniete.length} dup.</span>
+                  <button onClick={()=>setSzczegoly(szczegoly===o.id?null:o.id)} style={{fontSize:10,padding:"2px 8px",background:"none",border:"1px solid #444",borderRadius:4,color:"#aaa",cursor:"pointer"}}>{szczegoly===o.id?"ukryj":"szczegóły"}</button>
+                </div>
+                {(o.brakuje.length > 0 || o.doSprawdzenia.length > 0) && (
+                  <div style={{fontSize:10,color:"#fa0",marginTop:3,marginLeft:24}}>
+                    {o.brakuje.length > 0 && <>Niezeskanowane talie: {o.brakuje.join(", ")}. </>}
+                    {o.doSprawdzenia.length > 0 && <>Do sprawdzenia (pominięte): {o.doSprawdzenia.map(x=>x.nazwa).join(", ")}.</>}
+                  </div>
+                )}
+                {szczegoly === o.id && (
+                  <div style={{fontSize:11,color:"#aaa",marginTop:6,marginLeft:24,lineHeight:1.6}}>
+                    {[["Nowe karty",d.nowe,"#0c6"],["Karty do usunięcia",d.usuniete,"#f55"],["Nowe duplikaty",d.dupNowe,"#87CEEB"],["Znikające duplikaty",d.dupUsuniete,"#888"]].map(([t,l,k])=> l.length>0 && (
+                      <div key={t} style={{marginBottom:4}}><b style={{color:k}}>{t} ({l.length}):</b> {l.slice(0,60).join(" · ")}{l.length>60?" …":""}</div>
+                    ))}
+                    {o.zm.length===0 && <div>Brak różnic względem aplikacji.</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <button onClick={zastosuj} disabled={stosuje || sumaZmian===0} style={{...btn("0,200,100"),width:"100%",marginTop:12,opacity:(stosuje||sumaZmian===0)?0.5:1}}>
+            {stosuje ? "⏳ Zapisuję..." : sumaZmian===0 ? "Brak zmian do zapisania" : `✅ Zapisz ${sumaZmian} zmian (${wybrane.length} osób)`}
+          </button>
         </div>
       )}
     </div>
