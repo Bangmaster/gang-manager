@@ -256,6 +256,56 @@ function SzczegolyGangu({ gang, isAdmin, onUsunSnapshot, onUsunGang, onOznaczNas
   );
 }
 
+// ---------- pojedynki: miejsce 1 vs miejsce 1, 2 vs 2... ----------
+function Pojedynki({ nasz, rywal, odTs }) {
+  const sn = (g) => L.posortowane(g);
+  const ostN = sn(nasz).slice(-1)[0], ostR = sn(rywal).slice(-1)[0];
+  if (!ostN || !ostR) return null;
+  const rank = (s) => [...(s.gracze || [])].sort((a, b) => b.l - a.l);
+  const start = (g) => { const x = sn(g); if (!odTs) return x.length > 1 ? x[0] : null; return x.find((y) => y.ts >= odTs) || null; };
+  const sN = start(nasz), sR = start(rywal);
+  const pN = sN && sN.ts < ostN.ts ? rank(sN) : null;
+  const pR = sR && sR.ts < ostR.ts ? rank(sR) : null;
+  const a = rank(ostN), b = rank(ostR);
+  const n = Math.max(a.length, b.length);
+  const wiersze = [];
+  for (let i = 0; i < n; i++) {
+    const x = a[i], y = b[i];
+    wiersze.push({ i: i + 1, x, y, dx: x && pN && pN[i] ? x.l - pN[i].l : null, dy: y && pR && pR[i] ? y.l - pR[i].l : null });
+  }
+  const wygrane = wiersze.filter((w) => w.x && w.y && w.x.l > w.y.l).length;
+  const przegrane = wiersze.filter((w) => w.x && w.y && w.x.l < w.y.l).length;
+  return (
+    <div style={karta}>
+      <div style={{ fontSize: 13, fontWeight: "bold", color: "var(--accent)", marginBottom: 4 }}>⚔️ Pojedynki: miejsce do miejsca</div>
+      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>
+        {nasz.nazwa} ({fmtData(ostN.ts)}) vs {rywal.nazwa} ({fmtData(ostR.ts)}). Wyżej u nas: <b style={{ color: "#0c6" }}>{wygrane}</b>, wyżej u nich: <b style={{ color: "#f55" }}>{przegrane}</b>.
+        {pN || pR ? " Przyrost „Δ” liczony od początku okresu." : " Przyrost pojawi się po kolejnym zdjęciu stanu."}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <thead><tr style={{ color: "var(--muted)", textAlign: "left" }}><th>#</th><th>My</th><th>Lvl</th><th>Δ</th><th>Oni</th><th>Lvl</th><th>Δ</th><th>Różnica</th></tr></thead>
+          <tbody>
+            {wiersze.map((w) => {
+              const r = w.x && w.y ? w.x.l - w.y.l : null;
+              return (
+                <tr key={w.i} style={{ borderTop: "1px solid #12122a" }}>
+                  <td style={{ padding: "3px 0", color: "#888" }}>{w.i}</td>
+                  <td>{w.x ? w.x.n : "—"}</td><td>{w.x ? fmt(w.x.l) : ""}</td>
+                  <td style={{ color: w.dx == null ? "#555" : kolorDelta(w.dx) }}>{w.dx == null ? "" : znak(w.dx) + fmt(Math.abs(w.dx))}</td>
+                  <td>{w.y ? w.y.n : "—"}</td><td>{w.y ? fmt(w.y.l) : ""}</td>
+                  <td style={{ color: w.dy == null ? "#555" : kolorDelta(w.dy) }}>{w.dy == null ? "" : znak(w.dy) + fmt(Math.abs(w.dy))}</td>
+                  <td style={{ color: r == null ? "#555" : kolorDelta(r), fontWeight: "bold" }}>{r == null ? "" : znak(r) + fmt(Math.abs(r))}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function GangiView({ isAdmin }) {
   const [gangi, setGangi] = useState({});
   const [pliki, setPliki] = useState([]);
@@ -266,6 +316,7 @@ export default function GangiView({ isAdmin }) {
   const [okresOd, setOkresOd] = useState("");
   const [wzgledne, setWzgledne] = useState(true);
   const [otwarty, setOtwarty] = useState(null);
+  const [rywalId, setRywalId] = useState("");
 
   useEffect(() => subscribePorownanie(setGangi), []);
 
@@ -438,6 +489,19 @@ export default function GangiView({ isAdmin }) {
             </div>
             <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>{wzgledne ? "Wykres „wzrost %” pokazuje tempo względem startu okresu — pozwala uczciwie porównać gangi o bardzo różnej mocy." : "Wykres „moc” pokazuje bezwzględną siłę gangów."}</div>
           </div>
+
+          {nasz && lista.length > 1 && (
+            <>
+              <div style={{ ...karta, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>Porównaj nasz gang 1:1 z: </span>
+                <select value={rywalId} onChange={(e) => setRywalId(e.target.value)} style={pole}>
+                  <option value="">— wybierz gang —</option>
+                  {lista.filter((g) => !g.nasz).map((g) => <option key={g.id} value={g.id}>{g.nazwa}</option>)}
+                </select>
+              </div>
+              {rywalId && gangi[rywalId] && <Pojedynki nasz={nasz.g} rywal={gangi[rywalId]} odTs={odTs} />}
+            </>
+          )}
 
           {otwarty && gangi[otwarty] && (
             <div style={karta}>
