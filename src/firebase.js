@@ -753,3 +753,34 @@ export async function zapiszKartyHurtem(zmiany) {
     return false;
   }
 }
+
+// === PORÓWNANIE GANGÓW (zdjęcia stanu obcych gangów i naszego) ===
+// Osobny dokument, żeby nie rozpychać gang/main (limit 1 MB na dokument).
+const POROWNANIE_DOC = doc(db, "gang", "porownanie");
+
+export function subscribePorownanie(callback) {
+  return onSnapshot(POROWNANIE_DOC, (snap) => {
+    callback(snap.exists() ? (snap.data().gangi || {}) : {});
+  }, (err) => console.error("Błąd subskrypcji porównania gangów:", err));
+}
+
+export async function zapiszGangPorownanie(gang) {
+  try {
+    // zapis jednego gangu; tablica snapshotów jest zastępowana w całości
+    await setDoc(POROWNANIE_DOC, { gangi: { [gang.id]: gang } }, { merge: true });
+    return true;
+  } catch (e) {
+    console.error("Błąd zapisu porównania gangów:", e);
+    return false;
+  }
+}
+
+export async function usunGangPorownanie(id) {
+  try {
+    await updateDoc(POROWNANIE_DOC, new FieldPath("gangi", id), deleteField());
+    return true;
+  } catch (e) {
+    console.error("Błąd usuwania gangu z porównania:", e);
+    return false;
+  }
+}

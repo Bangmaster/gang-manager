@@ -2649,3 +2649,7 @@ Pisz konkretnie, z nickami, bez lania wody. Styl rzeczowy ale może być z lekki
     </div>
   );
 }
+
+
+// Eksporty pomocnicze dla widoku porównania gangów (GangiView.js)
+export { wolajGeminiObraz, nastepnyKlucz };

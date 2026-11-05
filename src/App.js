@@ -5,6 +5,7 @@ import "./gangStyles.css";
 import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, zapiszKartyHurtem, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, loadEventData, setEventCardField, setEventStructure, subscribeEventData } from "./firebase"; // eslint-disable-line no-unused-vars
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
+import GangiView from "./GangiView";
 import { analyzeDeckStructure } from "./gemini";
 
 // Page Visibility API — zapobiega lagowi przy powrocie do karty
@@ -919,6 +920,7 @@ function App() {
     ...(isAdmin?[
       {id:"wynik",label:"⚡ Generuj"},
       {id:"wynikV3",label:"🧠 Generuj V3"},
+      {id:"gangi",label:"📈 Gangi"},
       {id:"ocr",label:"📸 OCR talii"},
       {id:"edycja",label:"⚙️ Talie"},
       {id:"edycja_event",label:"🎉 Talie EVENT"},
@@ -1112,6 +1114,7 @@ function App() {
         />}
         {zakładka==="chat"&&<GangChat zalogowany={zalogowany} czlonkowie={dane.czlonkowie}/>}
 
+        {zakładka==="gangi"&&isAdmin&&<GangiView isAdmin={isAdmin}/>}
         {zakładka==="walki"&&<WalkiView
           czlonkowie={dane.czlonkowie} walki={dane.walki||[]}
           zapiszWalki={(now)=>zapiszStrukture("walki",now)}
