@@ -306,6 +306,52 @@ function Pojedynki({ nasz, rywal, odTs }) {
   );
 }
 
+// ---------- krzywa dzwonowa poziomów w gangu ----------
+function KrzywaDzwonowa({ gang }) {
+  const [wybrany, setWybrany] = useState("");
+  const s = L.posortowane(gang);
+  const ost = s[s.length - 1];
+  const gracze = ost ? ost.gracze || [] : [];
+  if (gracze.length < 3) return null;
+  const lv = gracze.map((g) => g.l);
+  const sr = lv.reduce((a, b) => a + b, 0) / lv.length;
+  const sd = Math.sqrt(lv.reduce((a, b) => a + (b - sr) ** 2, 0) / lv.length) || 1;
+  const W = 640, H = 220, P = 24;
+  const xmin = sr - 3.2 * sd, xmax = sr + 3.2 * sd;
+  const sx = (v) => P + ((v - xmin) / (xmax - xmin)) * (W - 2 * P);
+  const gest = (v) => Math.exp(-0.5 * ((v - sr) / sd) ** 2);
+  const sy = (g) => H - 34 - g * (H - 70);
+  const pkt = [];
+  for (let i = 0; i <= 80; i++) { const v = xmin + ((xmax - xmin) * i) / 80; pkt.push(`${sx(v)},${sy(gest(v))}`); }
+  const sel = gracze.find((g) => g.n === wybrany);
+  const z = sel ? (sel.l - sr) / sd : null;
+  const wyzej = sel ? gracze.filter((g) => g.l < sel.l).length : 0;
+  const opis = z == null ? "" : z > 1.5 ? "🚀 daleko ponad średnią gangu" : z > 0.5 ? "💪 powyżej średniej" : z > -0.5 ? "😐 idealnie w środku dzwonu" : z > -1.5 ? "🐌 poniżej średniej" : "🦥 ogon rozkładu";
+  return (
+    <div style={karta}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: "bold", color: "var(--accent)" }}>🔔 Krzywa dzwonowa</div>
+        <select value={wybrany} onChange={(e) => setWybrany(e.target.value)} style={pole}>
+          <option value="">— wybierz gracza —</option>
+          {gracze.map((g) => <option key={g.n} value={g.n}>{g.n}</option>)}
+        </select>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        <polyline fill="rgba(255,215,0,0.12)" stroke="#ffd700" strokeWidth="2.5" points={`${sx(xmin)},${sy(0)} ${pkt.join(" ")} ${sx(xmax)},${sy(0)}`} />
+        <line x1={sx(sr)} x2={sx(sr)} y1={sy(1)} y2={sy(0)} stroke="#888" strokeDasharray="4 3" />
+        <text x={sx(sr)} y={H - 6} fill="#888" fontSize="10" textAnchor="middle">średnia {fmt(sr)}</text>
+        {gracze.map((g, i) => <circle key={i} cx={sx(g.l)} cy={sy(0) - 6 - (i % 3) * 8} r="4" fill={g.n === wybrany ? "#ff4d6d" : "#4db8ff"} opacity={g.n === wybrany ? 1 : 0.7} />)}
+        {sel && <text x={Math.min(Math.max(sx(sel.l), 60), W - 60)} y={sy(gest(sel.l)) - 8} fill="#ff4d6d" fontSize="12" fontWeight="bold" textAnchor="middle">{sel.n}</text>}
+      </svg>
+      {sel ? (
+        <div style={{ fontSize: 12, marginTop: 6 }}>
+          <b>{sel.n}</b>: lvl {fmt(sel.l)}, odchylenie od średniej {z >= 0 ? "+" : ""}{z.toFixed(2)} σ, wyprzedza {wyzej} z {gracze.length - 1} osób — {opis}
+        </div>
+      ) : <div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>Wybierz zastępcę z listy, żeby zobaczyć, gdzie siedzi na dzwonie 😄</div>}
+    </div>
+  );
+}
+
 export default function GangiView({ isAdmin }) {
   const [gangi, setGangi] = useState({});
   const [pliki, setPliki] = useState([]);
@@ -502,6 +548,7 @@ export default function GangiView({ isAdmin }) {
               {rywalId && gangi[rywalId] && <Pojedynki nasz={nasz.g} rywal={gangi[rywalId]} odTs={odTs} />}
             </>
           )}
+          {nasz && <KrzywaDzwonowa gang={nasz.g} />}
 
           {otwarty && gangi[otwarty] && (
             <div style={karta}>
