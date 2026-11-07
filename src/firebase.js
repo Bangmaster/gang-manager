@@ -203,11 +203,11 @@ export async function saveEventData(data) {
 
 export async function setEventCardField(typ, key, value) {
   try {
-    const fieldPath = `${typ}.${key}`;
+    const fieldPath = new FieldPath(typ, key);
     if (value === null) {
-      await updateDoc(EVENT_DOC, { [fieldPath]: deleteField() });
+      await updateDoc(EVENT_DOC, fieldPath, deleteField());
     } else {
-      await updateDoc(EVENT_DOC, { [fieldPath]: value });
+      await updateDoc(EVENT_DOC, fieldPath, value);
     }
     return true;
   } catch(e) {
@@ -419,11 +419,11 @@ export async function przywrocAutoBackup(backupId) {
 // Zaznacz lub odznacz pojedynczą kartę (atomowa operacja — nie nadpisuje innych zmian)
 export async function setCardField(typ, key, value) {
   try {
-    const fieldPath = `${typ}.${key}`;
+    const fieldPath = new FieldPath(typ, key);
     if (value === null) {
-      await updateDoc(GANG_DOC, { [fieldPath]: deleteField() });
+      await updateDoc(GANG_DOC, fieldPath, deleteField());
     } else {
-      await updateDoc(GANG_DOC, { [fieldPath]: value });
+      await updateDoc(GANG_DOC, fieldPath, value);
     }
     return true;
   } catch (e) {
