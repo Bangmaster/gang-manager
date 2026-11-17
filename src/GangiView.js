@@ -204,15 +204,22 @@ function PodgladStanu({ podglad, setPodglad, gangi, onZapisz, onAnuluj, zapisuje
 }
 
 // ---------- szczegóły jednego gangu ----------
-function SzczegolyGangu({ gang, isAdmin, onUsunSnapshot, onUsunGang, onOznaczNasz }) {
+function SzczegolyGangu({ gang, odTs, isAdmin, onUsunSnapshot, onUsunGang, onOznaczNasz }) {
+  const [tryb, setTryb] = useState("okres");
   const s = L.posortowane(gang);
   const ostatni = s[s.length - 1];
-  const poprz = s.length > 1 ? s[s.length - 2] : null;
+  const wOkresie = s.filter((x) => odTs == null || x.ts >= odTs);
+  // „okres”: od pierwszego zdjęcia w wybranym okresie do ostatniego; „ostatni”: tylko dwa ostatnie zdjęcia
+  const poprz = tryb === "okres" && wOkresie.length > 1 ? wOkresie[0] : s.length > 1 ? s[s.length - 2] : null;
   const roznica = ostatni && poprz ? L.porownaj(poprz, ostatni) : null;
   return (
     <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 10, marginTop: 8 }}>
       {roznica ? (
         <div style={{ fontSize: 12, marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            <button onClick={() => setTryb("okres")} style={{ ...przycisk("150,150,150"), padding: "4px 10px", opacity: tryb === "okres" ? 1 : 0.5 }}>cały okres</button>
+            <button onClick={() => setTryb("ostatni")} style={{ ...przycisk("150,150,150"), padding: "4px 10px", opacity: tryb === "ostatni" ? 1 : 0.5 }}>ostatni krok</button>
+          </div>
           <div style={{ marginBottom: 6 }}>
             Zmiana {fmtData(poprz.ts)} → {fmtData(ostatni.ts)}: moc <b style={{ color: kolorDelta(roznica.deltaMoc) }}>{znak(roznica.deltaMoc)}{fmt(Math.abs(roznica.deltaMoc))}</b>
           </div>
@@ -572,7 +579,7 @@ export default function GangiView({ isAdmin }) {
           {otwarty && gangi[otwarty] && (
             <div style={karta}>
               <div style={{ fontSize: 13, fontWeight: "bold", color: "var(--accent)" }}>{gangi[otwarty].nasz ? "⭐ " : ""}{gangi[otwarty].nazwa}</div>
-              <SzczegolyGangu gang={gangi[otwarty]} isAdmin={isAdmin}
+              <SzczegolyGangu gang={gangi[otwarty]} odTs={odTs} isAdmin={isAdmin}
                 onUsunSnapshot={(data) => usunSnapshot(gangi[otwarty], data)}
                 onUsunGang={() => usunGang(gangi[otwarty])}
                 onOznaczNasz={() => oznaczNasz(gangi[otwarty])} />
