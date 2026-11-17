@@ -214,6 +214,78 @@ export function serieDoWykresu(gang, odTs, wzgledne) {
   return punkty.map((p, i) => ({ ts: p.ts, wartosc: i === 0 && p.wartosc === 0 ? 0 : (p.wartosc - baza) / baza * 100 }));
 }
 
+// ---------- wzrost "organiczny" (odporny na rotację i zmiany miejsc) ----------
+// Liczony wyłącznie z przyrostów poziomów graczy, których da się PEWNIE dopasować między kolejnymi
+// zdjęciami stanu (po nicku). Nowi i odchodzący gracze nie są wzrostem — pokazujemy ich osobno jako rotację.
+// Wzrost procentowy składa się krok po kroku (każdy krok względem mocy na jego początku), więc zmiany składu
+// gangu nie zniekształcają wyniku.
+function odKtorego(gang, odTs) {
+  const s = posortowane(gang);
+  if (odTs == null) return s;
+  const i = s.findIndex((x) => x.ts >= odTs);
+  return i < 0 ? [] : s.slice(i);
+}
+
+export function krokiOrganiczne(gang, odTs) {
+  const s = odKtorego(gang, odTs);
+  const kroki = [];
+  for (let i = 1; i < s.length; i++) {
+    const r = porownaj(s[i - 1], s[i]);
+    const pewne = r.zmiany.filter((z) => z.pewne && z.delta >= 0);
+    const org = pewne.reduce((t, z) => t + z.delta, 0);
+    const baza = mocSnapshotu(s[i - 1]);
+    kroki.push({
+      od: s[i - 1].ts, do: s[i].ts, org, baza, pct: baza ? org / baza * 100 : 0,
+      nowi: r.nowi.length, odeszli: r.odeszli.length,
+      mocNowych: r.nowi.reduce((t, x) => t + x.l, 0), mocOdeszlych: r.odeszli.reduce((t, x) => t + x.l, 0),
+      deltaMoc: r.deltaMoc,
+    });
+  }
+  return kroki;
+}
+
+export function wzrostOrganiczny(gang, odTs) {
+  const kroki = krokiOrganiczne(gang, odTs);
+  if (!kroki.length) return null;
+  const od = kroki[0].od, do_ = kroki[kroki.length - 1].do;
+  const dni = (do_ - od) / DZIEN;
+  const delta = kroki.reduce((t, k) => t + k.org, 0);
+  const wspolczynnik = kroki.reduce((t, k) => t * (1 + k.pct / 100), 1);
+  const pct = (wspolczynnik - 1) * 100;
+  return {
+    od, do: do_, dni, delta, pct, naTydzien: dni > 0 ? delta / dni * 7 : 0,
+    pctNaTydzien: dni > 0 ? (Math.pow(wspolczynnik, 7 / dni) - 1) * 100 : 0,
+    nowi: kroki.reduce((t, k) => t + k.nowi, 0), odeszli: kroki.reduce((t, k) => t + k.odeszli, 0),
+    mocNowych: kroki.reduce((t, k) => t + k.mocNowych, 0), mocOdeszlych: kroki.reduce((t, k) => t + k.mocOdeszlych, 0),
+    deltaMoc: kroki.reduce((t, k) => t + k.deltaMoc, 0),
+  };
+}
+
+// wykres wzrostu organicznego: skumulowany % od początku okresu
+export function serieOrganiczna(gang, odTs) {
+  const kroki = krokiOrganiczne(gang, odTs);
+  if (!kroki.length) return [];
+  let wsp = 1;
+  const punkty = [{ ts: kroki[0].od, wartosc: 0 }];
+  kroki.forEach((k) => { wsp *= 1 + k.pct / 100; punkty.push({ ts: k.do, wartosc: (wsp - 1) * 100 }); });
+  return punkty;
+}
+
+// przyrost każdego gracza (po tożsamości, nie po miejscu) między początkiem okresu a ostatnim zdjęciem
+// zwraca mapę znormalizowany nick -> {delta, pewne, miejsceStart}
+export function przyrostyGraczy(gang, odTs) {
+  const s = odKtorego(gang, odTs);
+  if (s.length < 2) return null;
+  const pierwszy = s[0], ostatni = s[s.length - 1];
+  const r = porownaj(pierwszy, ostatni);
+  const mapa = {};
+  r.zmiany.forEach((z) => { mapa[normNazwa(z.nick)] = { delta: z.delta, pewne: z.pewne, bylo: z.bylo }; });
+  const poz = {};
+  [...(pierwszy.gracze || [])].sort((a, b) => b.l - a.l).forEach((g, i) => { poz[normNazwa(g.n)] = i + 1; });
+  r.zmiany.forEach((z) => { const k = normNazwa(z.nick); const p = poz[normNazwa(z.nickPoprzedni)]; if (mapa[k]) mapa[k].miejsceStart = p; });
+  return { mapa, od: pierwszy.ts, do: ostatni.ts, nowi: r.nowi.map((x) => normNazwa(x.n)) };
+}
+
 // dopasowanie gangu po nazwie (do wskazania istniejącego gangu przy nowym screenie)
 export function znajdzGang(gangi, nazwa) {
   const lista = Object.values(gangi || {});

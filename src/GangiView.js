@@ -257,30 +257,48 @@ function SzczegolyGangu({ gang, isAdmin, onUsunSnapshot, onUsunGang, onOznaczNas
 }
 
 // ---------- pojedynki: miejsce 1 vs miejsce 1, 2 vs 2... ----------
+// Pary tworzy aktualne miejsce w rankingu (wg poziomu). Przyrost „Δ” należy do OSOBY (dopasowanej po nicku
+// między zdjęciami stanu), a nie do miejsca — dzięki temu zamiana miejsc i rotacja nie psują wyniku.
 function Pojedynki({ nasz, rywal, odTs }) {
   const sn = (g) => L.posortowane(g);
   const ostN = sn(nasz).slice(-1)[0], ostR = sn(rywal).slice(-1)[0];
   if (!ostN || !ostR) return null;
   const rank = (s) => [...(s.gracze || [])].sort((a, b) => b.l - a.l);
-  const start = (g) => { const x = sn(g); if (!odTs) return x.length > 1 ? x[0] : null; return x.find((y) => y.ts >= odTs) || null; };
-  const sN = start(nasz), sR = start(rywal);
-  const pN = sN && sN.ts < ostN.ts ? rank(sN) : null;
-  const pR = sR && sR.ts < ostR.ts ? rank(sR) : null;
+  const prN = L.przyrostyGraczy(nasz, odTs), prR = L.przyrostyGraczy(rywal, odTs);
   const a = rank(ostN), b = rank(ostR);
   const n = Math.max(a.length, b.length);
+  const info = (g, pr) => {
+    if (!g) return null;
+    if (!pr) return { delta: null, ruch: 0, nowy: false, pewne: true };
+    const k = L.normNazwa(g.n);
+    const m = pr.mapa[k];
+    if (m) return { delta: m.delta, ruch: 0, miejsceStart: m.miejsceStart, nowy: false, pewne: m.pewne };
+    return { delta: null, ruch: 0, nowy: pr.nowi.includes(k), pewne: true };
+  };
   const wiersze = [];
   for (let i = 0; i < n; i++) {
     const x = a[i], y = b[i];
-    wiersze.push({ i: i + 1, x, y, dx: x && pN && pN[i] ? x.l - pN[i].l : null, dy: y && pR && pR[i] ? y.l - pR[i].l : null });
+    const ix = info(x, prN), iy = info(y, prR);
+    if (ix && ix.miejsceStart) ix.ruch = ix.miejsceStart - (i + 1);
+    if (iy && iy.miejsceStart) iy.ruch = iy.miejsceStart - (i + 1);
+    wiersze.push({ i: i + 1, x, y, ix, iy });
   }
   const wygrane = wiersze.filter((w) => w.x && w.y && w.x.l > w.y.l).length;
   const przegrane = wiersze.filter((w) => w.x && w.y && w.x.l < w.y.l).length;
+  const komorka = (ii) => {
+    if (!ii) return null;
+    if (ii.nowy) return <span style={{ color: "#4db8ff" }}>nowy</span>;
+    if (ii.delta == null) return null;
+    return <span style={{ color: kolorDelta(ii.delta) }}>{znak(ii.delta)}{fmt(Math.abs(ii.delta))}{ii.pewne ? "" : " ?"}</span>;
+  };
+  const ruch = (ii) => (ii && ii.ruch > 0 ? <span title={`awans o ${ii.ruch} w rankingu od początku okresu`} style={{ color: "#0c6" }}> ▲{ii.ruch}</span> : ii && ii.ruch < 0 ? <span title={`spadek o ${-ii.ruch} w rankingu od początku okresu`} style={{ color: "#f55" }}> ▼{-ii.ruch}</span> : null);
+  const maDane = (prN && prN.od < ostN.ts) || (prR && prR.od < ostR.ts);
   return (
     <div style={karta}>
       <div style={{ fontSize: 13, fontWeight: "bold", color: "var(--accent)", marginBottom: 4 }}>⚔️ Pojedynki: miejsce do miejsca</div>
       <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>
         {nasz.nazwa} ({fmtData(ostN.ts)}) vs {rywal.nazwa} ({fmtData(ostR.ts)}). Wyżej u nas: <b style={{ color: "#0c6" }}>{wygrane}</b>, wyżej u nich: <b style={{ color: "#f55" }}>{przegrane}</b>.
-        {pN || pR ? " Przyrost „Δ” liczony od początku okresu." : " Przyrost pojawi się po kolejnym zdjęciu stanu."}
+        {maDane ? " „Δ” to przyrost danej osoby od początku okresu (nowi gracze: „nowy”; „?” = niepewne dopasowanie nicku), ▲▼ to zmiana jej miejsca w rankingu." : " Przyrost pojawi się po kolejnym zdjęciu stanu."}
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
@@ -291,10 +309,10 @@ function Pojedynki({ nasz, rywal, odTs }) {
               return (
                 <tr key={w.i} style={{ borderTop: "1px solid #12122a" }}>
                   <td style={{ padding: "3px 0", color: "#888" }}>{w.i}</td>
-                  <td>{w.x ? w.x.n : "—"}</td><td>{w.x ? fmt(w.x.l) : ""}</td>
-                  <td style={{ color: w.dx == null ? "#555" : kolorDelta(w.dx) }}>{w.dx == null ? "" : znak(w.dx) + fmt(Math.abs(w.dx))}</td>
-                  <td>{w.y ? w.y.n : "—"}</td><td>{w.y ? fmt(w.y.l) : ""}</td>
-                  <td style={{ color: w.dy == null ? "#555" : kolorDelta(w.dy) }}>{w.dy == null ? "" : znak(w.dy) + fmt(Math.abs(w.dy))}</td>
+                  <td>{w.x ? w.x.n : "—"}{ruch(w.ix)}</td><td>{w.x ? fmt(w.x.l) : ""}</td>
+                  <td>{komorka(w.ix)}</td>
+                  <td>{w.y ? w.y.n : "—"}{ruch(w.iy)}</td><td>{w.y ? fmt(w.y.l) : ""}</td>
+                  <td>{komorka(w.iy)}</td>
                   <td style={{ color: r == null ? "#555" : kolorDelta(r), fontWeight: "bold" }}>{r == null ? "" : znak(r) + fmt(Math.abs(r))}</td>
                 </tr>
               );
@@ -373,15 +391,15 @@ export default function GangiView({ isAdmin }) {
   const wiersze = useMemo(() => lista.map((g, i) => {
     const s = L.posortowane(g);
     const ost = s[s.length - 1];
-    return { g, kolor: g.nasz ? NASZ_KOLOR : KOLORY[i % KOLORY.length], moc: ost ? L.mocSnapshotu(ost) : null, ostTs: ost?.ts, zdjec: s.length, w: L.wzrostOkresu(g, odTs), czlonkow: ost ? (ost.gracze || []).length : 0 };
+    return { g, kolor: g.nasz ? NASZ_KOLOR : KOLORY[i % KOLORY.length], moc: ost ? L.mocSnapshotu(ost) : null, ostTs: ost?.ts, zdjec: s.length, w: L.wzrostOrganiczny(g, odTs), czlonkow: ost ? (ost.gracze || []).length : 0 };
   }).sort((a, b) => (b.moc || 0) - (a.moc || 0)), [lista, odTs]);
 
-  const serie = useMemo(() => wiersze.map((w) => ({ id: w.g.id, nasz: w.g.nasz, kolor: w.kolor, nazwa: w.g.nazwa, punkty: L.serieDoWykresu(w.g, odTs, wzgledne) })).filter((s) => s.punkty.length > 0), [wiersze, odTs, wzgledne]);
+  const serie = useMemo(() => wiersze.map((w) => ({ id: w.g.id, nasz: w.g.nasz, kolor: w.kolor, nazwa: w.g.nazwa, punkty: wzgledne ? L.serieOrganiczna(w.g, odTs) : L.serieDoWykresu(w.g, odTs, false) })).filter((s) => s.punkty.length > 0), [wiersze, odTs, wzgledne]);
 
   const nasz = wiersze.find((w) => w.g.nasz);
   const rywale = wiersze.filter((w) => !w.g.nasz && w.w);
-  const sredniaRywali = rywale.length ? rywale.reduce((s, w) => s + w.w.pct, 0) / rywale.length : null;
-  const ranking = nasz?.w ? [...wiersze].filter((w) => w.w).sort((a, b) => b.w.pct - a.w.pct) : [];
+  const sredniaRywali = rywale.length ? rywale.reduce((s, w) => s + w.w.pctNaTydzien, 0) / rywale.length : null;
+  const ranking = nasz?.w ? [...wiersze].filter((w) => w.w).sort((a, b) => b.w.pctNaTydzien - a.w.pctNaTydzien) : [];
   const miejsceTempa = nasz?.w ? ranking.findIndex((w) => w.g.nasz) + 1 : null;
 
   const analizuj = async () => {
@@ -491,8 +509,8 @@ export default function GangiView({ isAdmin }) {
             </div>
             {nasz?.w && (
               <div style={{ fontSize: 12, lineHeight: 1.7, marginBottom: 10, padding: 10, background: "rgba(255,215,0,0.07)", borderRadius: 8 }}>
-                ⭐ <b>My:</b> {znak(nasz.w.delta)}{fmt(Math.abs(nasz.w.delta))} ({znak(nasz.w.pct)}{Math.abs(nasz.w.pct).toFixed(2)}%), ok. {fmt(nasz.w.naTydzien)} na tydzień
-                {sredniaRywali != null && <> · średnia rywali: {znak(sredniaRywali)}{Math.abs(sredniaRywali).toFixed(2)}% ({nasz.w.pct >= sredniaRywali ? "rośniemy szybciej o " : "rośniemy wolniej o "}<b style={{ color: nasz.w.pct >= sredniaRywali ? "#0c6" : "#f55" }}>{Math.abs(nasz.w.pct - sredniaRywali).toFixed(2)} p.p.</b>)</>}
+                ⭐ <b>My:</b> {znak(nasz.w.delta)}{fmt(Math.abs(nasz.w.delta))} lvl od graczy, którzy są w gangu cały czas ({znak(nasz.w.pct)}{Math.abs(nasz.w.pct).toFixed(2)}%), ok. {fmt(nasz.w.naTydzien)} na tydzień ({nasz.w.pctNaTydzien.toFixed(2)}% / tydz.)
+                {sredniaRywali != null && <> · średnia rywali: {sredniaRywali.toFixed(2)}% / tydz. ({nasz.w.pctNaTydzien >= sredniaRywali ? "rośniemy szybciej o " : "rośniemy wolniej o "}<b style={{ color: nasz.w.pctNaTydzien >= sredniaRywali ? "#0c6" : "#f55" }}>{Math.abs(nasz.w.pctNaTydzien - sredniaRywali).toFixed(2)} p.p. tygodniowo</b>)</>}
                 {miejsceTempa ? <> · tempo wzrostu: miejsce <b>{miejsceTempa}</b> z {ranking.length}</> : null}
               </div>
             )}
@@ -500,7 +518,7 @@ export default function GangiView({ isAdmin }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ color: "var(--muted)", textAlign: "left", fontSize: 11 }}>
-                    <th style={{ padding: "4px 0" }}>Gang</th><th>Moc</th><th>Przyrost</th><th>%</th><th>/ tydz.</th><th>Zdjęć</th><th>Ostatnie</th>
+                    <th style={{ padding: "4px 0" }}>Gang</th><th>Moc</th><th>Przyrost</th><th>%</th><th>/ tydz.</th><th>Rotacja</th><th>Zdjęć</th><th>Ostatnie</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -511,6 +529,7 @@ export default function GangiView({ isAdmin }) {
                       <td style={{ color: w.w ? kolorDelta(w.w.delta) : "#555" }}>{w.w ? `${znak(w.w.delta)}${fmt(Math.abs(w.w.delta))}` : "—"}</td>
                       <td style={{ color: w.w ? kolorDelta(w.w.pct) : "#555" }}>{w.w ? `${znak(w.w.pct)}${Math.abs(w.w.pct).toFixed(2)}%` : "—"}</td>
                       <td>{w.w ? fmt(w.w.naTydzien) : "—"}</td>
+                      <td title={w.w ? `Nowi: ${w.w.nowi} (łącznie ${fmt(w.w.mocNowych)} lvl), odeszli: ${w.w.odeszli} (${fmt(w.w.mocOdeszlych)} lvl). Zmiana całkowitej mocy: ${znak(w.w.deltaMoc)}${fmt(Math.abs(w.w.deltaMoc))}` : ""} style={{ color: "#888" }}>{w.w ? (w.w.nowi || w.w.odeszli ? `+${w.w.nowi}/−${w.w.odeszli}` : "—") : "—"}</td>
                       <td>{w.zdjec}</td>
                       <td style={{ color: "#888" }}>{w.ostTs ? fmtData(w.ostTs) : ""}</td>
                     </tr>
@@ -518,7 +537,7 @@ export default function GangiView({ isAdmin }) {
                 </tbody>
               </table>
             </div>
-            <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>Przyrost liczony od początku okresu (przy braku zdjęcia dokładnie w tym dniu — z interpolacji między zdjęciami) do ostatniego zdjęcia danego gangu. „/ tydz.” przelicza różne rozstawy zdjęć na wspólną skalę.</div>
+            <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>Przyrost to suma wzrostu poziomów graczy, których aplikacja pewnie rozpoznaje między kolejnymi zdjęciami (po nicku) — nowi i odchodzący gracze NIE są liczeni jako wzrost, widać ich w kolumnie „Rotacja” (najedź/kliknij, by zobaczyć szczegóły). Okres liczy się od pierwszego zdjęcia z wybranej daty. „/ tydz.” przelicza różne odstępy między zdjęciami na wspólną skalę, a porównanie z rywalami używa % tygodniowo.</div>
           </div>
 
           <div style={karta}>
@@ -533,7 +552,7 @@ export default function GangiView({ isAdmin }) {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 6, fontSize: 11 }}>
               {serie.map((s) => <span key={s.id} style={{ color: s.kolor }}>● {s.nasz ? "⭐ " : ""}{s.nazwa}</span>)}
             </div>
-            <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>{wzgledne ? "Wykres „wzrost %” pokazuje tempo względem startu okresu — pozwala uczciwie porównać gangi o bardzo różnej mocy." : "Wykres „moc” pokazuje bezwzględną siłę gangów."}</div>
+            <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>{wzgledne ? "Wykres „wzrost %” pokazuje skumulowany wzrost organiczny od początku okresu (bez rotacji składu) — pozwala uczciwie porównać gangi o bardzo różnej mocy." : "Wykres „moc” pokazuje bezwzględną siłę gangów."}</div>
           </div>
 
           {nasz && lista.length > 1 && (
