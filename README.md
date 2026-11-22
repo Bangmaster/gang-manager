@@ -9,12 +9,6 @@ Aplikacja do zarządzania wymianami kart w gangu w grze The Gang.
 3. Kliknij "Deploy"
 4. Gotowe — dostaniesz link typu `gang-manager.vercel.app`
 
-## Logowanie
-
-- **Admin:** login `admin`, hasło `Twojastara00`
-- **Zastępca:** login `zastepca`, hasło `Twojastara00`
-- **Członek:** dowolny nick (min 2 znaki), bez hasła
-
 ## Baza danych
 
 Aplikacja zapisuje dane w Firebase Firestore (projekt `gang-wymiana`).
