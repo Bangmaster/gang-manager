@@ -92,7 +92,7 @@ const DOMYSLNE = { niskoRatio: 0.6, bardzoNiskoRatio: 0.35, wysokoRatio: 1.15, k
  *  lacznaWalka: liczba walk branych pod uwagę           (tryb europa)
  *  karty: {nazwa: {krag, procent}}
  */
-export function zbudujRaport({ tryb, czlonkowie, przyrosty = {}, obrazenia = {}, lacznaWalka = 0, karty = {}, prog = {} }) {
+export function zbudujRaport({ tryb, czlonkowie, przyrosty = {}, obrazenia = {}, lacznaWalka = 0, karty = {}, prog = {}, heist = false }) {
   const P = { ...DOMYSLNE, ...prog };
   const nazwy = (czlonkowie || []).map((c) => c.nazwa);
   const glowna = {};
@@ -104,6 +104,7 @@ export function zbudujRaport({ tryb, czlonkowie, przyrosty = {}, obrazenia = {},
   const postep = {};
   nazwy.forEach((n) => { const k = karty[n]; if (k) postep[n] = Math.max(0, (k.krag || 1) - 1) + (k.procent || 0) / 100; });
   const medKarty = mediana(Object.values(postep));
+  const medKrag = Math.round(mediana(Object.values(karty).map((k) => k.krag || 1)));
 
   const wiersze = nazwy.map((n) => {
     const g = glowna[n];
@@ -118,8 +119,8 @@ export function zbudujRaport({ tryb, czlonkowie, przyrosty = {}, obrazenia = {},
     }
     if (tryb === "europa" && lacznaWalka >= 3 && udzial != null && udzial < P.minUdzial) flagi.push({ typ: "odstaje", tekst: `obecny w ${obrazenia[n].uczestnictwa} z ${lacznaWalka} walk` });
     if (tryb === "europa" && lacznaWalka >= 3 && !obrazenia[n]) flagi.push({ typ: "slabo", tekst: `brak w ostatnich ${lacznaWalka} walkach` });
-    if (odchylKart != null && odchylKart <= -P.kartyDeficyt) flagi.push({ typ: "karty", tekst: `karty: ${(-odchylKart).toFixed(1)} kręgu za medianą (K${k.krag}, ${k.procent}%)` });
-    return { nazwa: n, glowna: g ?? null, ratio, udzial, karty: k ? { krag: k.krag || 1, procent: k.procent || 0, postep: postep[n], odchylenie: odchylKart } : null, flagi };
+    if (odchylKart != null && odchylKart <= -P.kartyDeficyt) flagi.push({ typ: "karty", tekst: `karty: ${(-odchylKart).toFixed(1)} kręgu za medianą (K${k.krag}, ${k.diamRazem ? `💎 ${k.diamPos}/${k.diamRazem}` : k.procent + "%"})` });
+    return { nazwa: n, glowna: g ?? null, ratio, udzial, karty: k ? { krag: k.krag || 1, procent: k.procent || 0, diamPos: k.diamPos ?? null, diamRazem: k.diamRazem ?? null, postep: postep[n], odchylenie: odchylKart } : null, flagi };
   });
 
   const zDanymi = wiersze.filter((w) => w.glowna != null && w.glowna > 0 && w.ratio != null);
@@ -127,7 +128,7 @@ export function zbudujRaport({ tryb, czlonkowie, przyrosty = {}, obrazenia = {},
   const kartyTop = wiersze.filter((w) => w.karty && w.karty.odchylenie != null && w.karty.odchylenie >= P.kartyPochwala).sort((a, b) => b.karty.odchylenie - a.karty.odchylenie).slice(0, 2);
   const upomnienia = wiersze.filter((w) => w.flagi.length).sort((a, b) => b.flagi.length - a.flagi.length || (a.ratio ?? 9) - (b.ratio ?? 9));
   const bezDanych = wiersze.filter((w) => w.glowna == null && !(tryb === "europa" && lacznaWalka >= 3));
-  return { tryb, wiersze, pochwaly, kartyTop, upomnienia, bezDanych, medGlowna, medKarty, lacznaWalka };
+  return { tryb, wiersze, pochwaly, kartyTop, upomnienia, bezDanych, medGlowna, medKarty, medKrag, lacznaWalka, heist };
 }
 
 const fmt = (n) => Math.round(n).toLocaleString("pl-PL");
@@ -152,5 +153,125 @@ export function tekstRaportu(r, opis = "") {
     L.push("", "✅ Nikt nie odstaje — dobra robota!");
   }
   L.push("", "Mediana gangu: " + (r.tryb === "azja" ? `+${fmt(r.medGlowna)} lvl` : `${fmt(r.medGlowna)} obr. na walkę`));
+  return L.join("\n");
+}
+
+// ---------- opisy w naszym stylu (czarny humor, lekki pojazd po ambicji) ----------
+const haszuj = (s) => String(s).split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+const wybierz = (tab, klucz) => tab[haszuj(klucz) % tab.length];
+
+export function opisHumor(w, r) {
+  const n = w.nazwa;
+  const azja = r.tryb === "azja";
+  const wart = w.glowna == null ? null : azja ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`;
+  const proc = w.ratio == null ? null : Math.round(w.ratio * 100);
+  const czesci = [];
+  const slabo = w.flagi.some((f) => f.typ === "slabo");
+  const odstaje = w.flagi.some((f) => f.typ === "odstaje");
+  const k = w.karty;
+  const kartyZle = w.flagi.some((f) => f.typ === "karty");
+
+  if (w.glowna != null && w.glowna === 0 && azja) {
+    czesci.push(wybierz([
+      `${n}: 0 lvl. Stabilność godna nekrologu. Ktoś sprawdzi, czy w ogóle jeszcze gra?`,
+      `${n}: 0 lvl. Poziom nie drgnął ani razu. Linia EKG poziomów wygląda tak samo jak u denata.`,
+      `${n}: 0 lvl w całym okresie. To już nie lenistwo, to styl życia.`,
+    ], n + "z"));
+  } else if (slabo && w.ratio != null) {
+    czesci.push(wybierz(azja ? [
+      `${n}: ${wart}, czyli ${proc}% mediany. Rośnie tak szybko, że mech na kamieniu zrobiłby większy progres.`,
+      `${n}: ${wart} (${proc}% mediany). Gra czy trzyma aplikację otwartą, żeby ekran nie zasnął?`,
+      `${n}: ${wart}. Ambicja na poziomie lampki nocnej: świeci, ale nikomu to nie pomaga.`,
+    ] : [
+      `${n}: ${wart}, czyli ${proc}% mediany. Bije z taką siłą, że przeciwnik pewnie myślał, że to masaż.`,
+      `${n}: ${wart} (${proc}% mediany). Wchodzi do walki jak na wycieczkę — zwiedza, robi zdjęcia, nic nie niszczy.`,
+      `${n}: ${wart}. Obrażenia tak niskie, że bossowi się nawet pasek życia nie zorientował.`,
+    ], n + "s"));
+  } else if (odstaje && w.ratio != null) {
+    czesci.push(wybierz(azja ? [
+      `${n}: ${wart} (${proc}% mediany). Idzie do przodu, ale w tempie żałoby.`,
+      `${n}: ${wart}, ${proc}% mediany. Reszta dawno w drodze, a tu jeszcze trwa szukanie mapy.`,
+    ] : [
+      `${n}: ${wart} (${proc}% mediany). Ma potencjał. Głęboko. Pod ziemią.`,
+      `${n}: ${wart}, ${proc}% mediany. Walczy z taką pasją, jakby ktoś kazał.`,
+    ], n + "o"));
+  }
+  const fl = w.flagi.find((f) => /obecny w|brak w ostatnich/.test(f.tekst));
+  if (fl) {
+    czesci.push(wybierz([
+      `${n} — ${fl.tekst}. Wpada jak teściowa: rzadko, bez zapowiedzi i nikt się nie cieszy.`,
+      `${n} — ${fl.tekst}. Szukamy świadków, ktokolwiek widział?`,
+      `${n} — ${fl.tekst}. Gang to nie hotel, niech ktoś to przekaże.`,
+    ], n + "f"));
+  }
+  if (kartyZle && k) {
+    const diam = k.diamRazem ? ` (💎 ${k.diamPos}/${k.diamRazem})` : "";
+    const wszyscy = r.medKrag > k.krag ? `Gang siedzi głównie w K${r.medKrag}, a ${n} w K${k.krag}${diam}` : `K${k.krag}${diam}`;
+    const linia = wybierz([
+      `${n}: ${wszyscy}. Reszta już zbiera od nowa, a tu ktoś dopiero próbuje zrozumieć, czym jest paczka.`,
+      `${n}: ${wszyscy}. Złote same wpadają, a diamenty trzeba chcieć. Tu chyba nikt nie chciał.`,
+      `${n}: ${wszyscy}. Ktoś pokazał, że karty można otwierać? Bo na razie wygląda, jakby były tylko do oglądania.`,
+    ], n + "k");
+    czesci.push(r.heist ? `${linia} W Card Heist z paczki z nową diamentową lecą DWIE karty, a ${n} dalej zostaje w tyle. Tego nie da się zrobić przypadkiem — trzeba się naprawdę postarać.` : linia);
+  }
+  if (czesci.length >= 3) czesci.push(wybierz([`Podsumowując: odstaje wszędzie. Jeśli to taktyka, jest bardzo odważna.`, `Komplet punktów ujemnych. Gratulacje za konsekwencję.`], n + "c"));
+  // nick tylko na początku całego opisu, nie przy każdym zdaniu
+  const pref = new RegExp("^" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "( —|:) ");
+  return czesci.map((c, i) => (i === 0 ? c : c.replace(pref, ""))).join(" ");
+}
+
+export function opisPochwaly(w, r, miejsce) {
+  const n = w.nazwa;
+  const azja = r.tryb === "azja";
+  const wart = azja ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`;
+  const p = Math.round(w.ratio * 100);
+  const teksty = miejsce === 0 ? (azja ? [
+    `${n}: ${wart} (${p}% mediany). Ktoś tu najwyraźniej nie ma życia towarzyskiego i dobrze, gang dziękuje za poświęcenie.`,
+    `${n}: ${wart}. Taki progres to albo pasja, albo ucieczka od rzeczywistości. Gang nie pyta, tylko zbiera owoce.`,
+  ] : [
+    `${n}: ${wart} (${p}% mediany). Wiadomo, kto robi robotę. Reszta robi tło.`,
+    `${n}: ${wart}. Boss po walce prosi o zwolnienie lekarskie.`,
+  ]) : (azja ? [
+    `${n}: ${wart} (${p}% mediany). Solidnie. Tak się rośnie, a nie „wchodzę na chwilę”.`,
+    `${n}: ${wart}. Widać ambicję. Reszta może patrzeć i brać przykład, najlepiej z zazdrością.`,
+  ] : [
+    `${n}: ${wart} (${p}% mediany). Walczy, a nie tylko kibicuje. Szacunek.`,
+    `${n}: ${wart}. Takich w gangu trzymamy, resztę da się negocjować.`,
+  ]);
+  return wybierz(teksty, n + miejsce);
+}
+
+export function opisKartPochwala(w) {
+  const k = w.karty;
+  return wybierz([
+    `${w.nazwa} (K${k.krag}${k.diamRazem ? `, 💎 ${k.diamPos}/${k.diamRazem}` : ""}): zbiera karty, jakby od tego zależało życie. Reszta gangu niech się zawstydzi.`,
+    `${w.nazwa} (K${k.krag}${k.diamRazem ? `, 💎 ${k.diamPos}/${k.diamRazem}` : ""}): diamenty same przychodzą. Pytanie, co im się mówi.`,
+  ], w.nazwa + "kp");
+}
+
+export function tekstHumor(r, opis = "") {
+  const L = [];
+  L.push(`📋 RAPORT GANGU${opis ? " (" + opis + ")" : ""}`);
+  L.push(r.tryb === "azja" ? "Tryb: lvlowanie. Rośniemy albo gnijemy." : "Tryb: liga. Liczą się obrażenia, a nie dobre chęci.");
+  if (r.heist) L.push("🔥 Trwa Card Heist: więcej kart w paczkach i podwójne diamenty z nowej karty. Wymówki nie przyjmowane.");
+  if (r.pochwaly.length) {
+    L.push("", "🏆 CHWAŁA NAJLEPSZYM:");
+    r.pochwaly.forEach((w, i) => L.push(`${["🥇", "🥈", "🥉"][i]} ${opisPochwaly(w, r, i)}`));
+  }
+  if (r.kartyTop.length) {
+    L.push("", "🃏 KARTY — jest ktoś, kto się stara:");
+    r.kartyTop.forEach((w) => L.push(`• ${opisKartPochwala(w)}`));
+  }
+  if (r.upomnienia.length) {
+    L.push("", "💀 WALL OF SHAME (kto odstaje i dlaczego):");
+    r.upomnienia.forEach((w) => L.push(`• ${opisHumor(w, r)}`));
+    L.push("", wybierz([
+      "Zero obrazy. Po prostu mierzymy. Liczby nie kłamią, w przeciwieństwie do wymówek.",
+      "Jeśli ktoś się znalazł na liście i chce się wybronić: najlepsza obrona to nowy wynik w następnym raporcie.",
+      "Nikt nie jest skreślony. Jeszcze. Następny raport za tydzień, ruszcie się.",
+    ], String(r.upomnienia.length)));
+  } else {
+    L.push("", "✅ Nikt nie odstaje. Podejrzanie dobrze. Kto za tym stoi?");
+  }
   return L.join("\n");
 }

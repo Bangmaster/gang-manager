@@ -21,28 +21,43 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
   const [tryb, setTryb] = useState(() => odczyt("raport_tryb", "azja"));
   const [dni, setDni] = useState(() => Number(odczyt("raport_dni", "14")));
   const [skopiowano, setSkopiowano] = useState(false);
+  const [heist, setHeist] = useState(() => odczyt("raport_heist", "0") === "1");
+  const [humor, setHumor] = useState(() => odczyt("raport_humor", "1") === "1");
 
   const ustawTryb = (t) => { setTryb(t); zapis("raport_tryb", t); };
 
   const dane = useMemo(() => {
-    const karty = obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty);
+    const bazowe = obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty);
+    // najważniejsze są diamentowe (złote zbierają się same), więc postęp w kręgu liczymy z diamentów
+    const karty = {};
+    czlonkowie.forEach((c) => {
+      const b = bazowe[c.nazwa || c.id];
+      if (!b) return;
+      let razem = 0, pos = 0;
+      talie.forEach((t) => (t.karty || []).forEach((k) => {
+        if (k.typ !== "diamentowa") return;
+        razem++;
+        if (posiadane[`${c.id}_${t.id}_${k.nazwa}`]) pos++;
+      }));
+      karty[c.nazwa || c.id] = razem > 0 ? { krag: b.krag, procent: Math.round((pos / razem) * 100), diamPos: pos, diamRazem: razem } : { krag: b.krag, procent: b.procent };
+    });
     const { wybrane, od, do: doTs } = R.walkiZOkresu(walki, dni);
     const okres = od != null ? { od, do: doTs } : null;
     if (tryb === "azja") {
       const { delty: przyrosty, szczegoly } = R.przyrostyZWalk(walki, czlonkowie, dni ? od : null);
       const ile = Object.keys(przyrosty).length;
-      return { raport: R.zbudujRaport({ tryb, czlonkowie, przyrosty, karty }), szczegoly, okres, ileWalk: wybrane.length, brak: !walki.length ? "Brak zapisanych walk." : ile < 3 ? "Za mało danych o poziomach graczy w walkach z tego okresu (potrzebne są poziomy zapisane przy co najmniej dwóch walkach). Wybierz dłuższy okres." : null };
+      return { raport: R.zbudujRaport({ tryb, czlonkowie, przyrosty, karty, heist }), szczegoly, okres, ileWalk: wybrane.length, brak: !walki.length ? "Brak zapisanych walk." : ile < 3 ? "Za mało danych o poziomach graczy w walkach z tego okresu (potrzebne są poziomy zapisane przy co najmniej dwóch walkach). Wybierz dłuższy okres." : null };
     }
     const pod = wybrane.length ? obliczPodsumowanieSezonu(wybrane, czlonkowie) : null;
     const obrazenia = {};
     (pod?.wszyscy || []).forEach((g) => { obrazenia[g.nazwa] = { lacznie: g.obrazeniaLacznie, uczestnictwa: g.uczestnictwa, srednia: g.uczestnictwa ? g.obrazeniaLacznie / g.uczestnictwa : 0 }; });
-    return { raport: R.zbudujRaport({ tryb, czlonkowie, obrazenia, lacznaWalka: wybrane.length, karty }), okres, ileWalk: wybrane.length, brak: !wybrane.length ? "Brak walk w wybranym okresie." : null };
-  }, [tryb, czlonkowie, talie, posiadane, duplikaty, walki, dni]);
+    return { raport: R.zbudujRaport({ tryb, czlonkowie, obrazenia, lacznaWalka: wybrane.length, karty, heist }), okres, ileWalk: wybrane.length, brak: !wybrane.length ? "Brak walk w wybranym okresie." : null };
+  }, [tryb, czlonkowie, talie, posiadane, duplikaty, walki, dni, heist]);
 
   const { raport, okres, brak } = dane;
   const szczegoly = dane.szczegoly || {};
   const opis = okres ? `${new Date(okres.od).toLocaleDateString("pl-PL")} – ${new Date(okres.do).toLocaleDateString("pl-PL")}, ${dane.ileWalk} walk` : "";
-  const tekst = R.tekstRaportu(raport, opis);
+  const tekst = humor ? R.tekstHumor(raport, opis) : R.tekstRaportu(raport, opis);
 
   const kopiuj = async () => {
     try { await navigator.clipboard.writeText(tekst); setSkopiowano(true); setTimeout(() => setSkopiowano(false), 2000); }
@@ -64,6 +79,10 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
           <button onClick={() => ustawTryb("azja")} style={{ ...przycisk("255,215,0"), opacity: tryb === "azja" ? 1 : 0.45 }}>🌏 Lvlujemy (serwer azjatycki)</button>
           <button onClick={() => ustawTryb("europa")} style={{ ...przycisk("77,184,255"), opacity: tryb === "europa" ? 1 : 0.45 }}>🇪🇺 Liga (serwer europejski)</button>
         </div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 8 }}>
+          <label style={{ fontSize: 12, color: "#ff8a3d", cursor: "pointer" }}><input type="checkbox" checked={heist} onChange={(e) => { setHeist(e.target.checked); zapis("raport_heist", e.target.checked ? "1" : "0"); }} /> 🔥 Trwa Card Heist (ostrzejsze uwagi o kartach)</label>
+          <label style={{ fontSize: 12, color: "#c792ea", cursor: "pointer" }}><input type="checkbox" checked={humor} onChange={(e) => { setHumor(e.target.checked); zapis("raport_humor", e.target.checked ? "1" : "0"); }} /> 😈 Opisy z humorem</label>
+        </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>Okres (od ostatniej walki wstecz):</span>
           {[[7, "7 dni"], [14, "14 dni"], [30, "30 dni"], [0, "cały sezon"]].map(([d, t]) => (
@@ -81,19 +100,19 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: "bold", color: "#0c6", marginBottom: 4 }}>🏆 Najlepsi</div>
                 {raport.pochwaly.map((w, i) => (
-                  <div key={w.nazwa} style={{ fontSize: 13, padding: "2px 0" }}>{["🥇", "🥈", "🥉"][i]} <b>{w.nazwa}</b> — {tryb === "azja" ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`} <span style={{ color: "#888", fontSize: 11 }}>({Math.round(w.ratio * 100)}% mediany)</span></div>
+                  <div key={w.nazwa} style={{ fontSize: 13, padding: "2px 0" }}>{["🥇", "🥈", "🥉"][i]} {humor ? R.opisPochwaly(w, raport, i) : <><b>{w.nazwa}</b> — {tryb === "azja" ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`} <span style={{ color: "#888", fontSize: 11 }}>({Math.round(w.ratio * 100)}% mediany)</span></>}</div>
                 ))}
               </div>
             )}
             {raport.kartyTop.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: "bold", color: "#0c6", marginBottom: 4 }}>🃏 Karty — brawo</div>
-                {raport.kartyTop.map((w) => <div key={w.nazwa} style={{ fontSize: 13 }}>• <b>{w.nazwa}</b> <span style={{ color: "#888", fontSize: 11 }}>(K{w.karty.krag}, {w.karty.procent}%)</span></div>)}
+                {raport.kartyTop.map((w) => <div key={w.nazwa} style={{ fontSize: 13 }}>• {humor ? R.opisKartPochwala(w) : <><b>{w.nazwa}</b> <span style={{ color: "#888", fontSize: 11 }}>(K{w.karty.krag}, {w.karty.diamRazem ? `💎 ${w.karty.diamPos}/${w.karty.diamRazem}` : `${w.karty.procent}%`})</span></>}</div>)}
               </div>
             )}
             <div style={{ fontSize: 13, fontWeight: "bold", color: raport.upomnienia.length ? "#fa0" : "#0c6", marginBottom: 4 }}>{raport.upomnienia.length ? "⚠️ Do poprawy" : "✅ Nikt nie odstaje"}</div>
             {raport.upomnienia.map((w) => (
-              <div key={w.nazwa} style={{ fontSize: 12, padding: "2px 0" }}>• <b>{w.nazwa}</b>: {w.flagi.map((f) => f.tekst).join("; ")}</div>
+              <div key={w.nazwa} style={{ fontSize: 12, padding: "3px 0", lineHeight: 1.5 }}>• {humor ? R.opisHumor(w, raport) : <><b>{w.nazwa}</b>: {w.flagi.map((f) => f.tekst).join("; ")}</>}</div>
             ))}
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
               <button onClick={kopiuj} style={przycisk("0,200,100")}>{skopiowano ? "✅ Skopiowano" : "📋 Kopiuj raport (tekst do czatu)"}</button>
@@ -113,14 +132,14 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
                       <td>{wartosc(w)}{tryb === "azja" && szczegoly[w.nazwa] && <div style={{ fontSize: 10, color: "#777" }}>{szczegoly[w.nazwa].od} → {szczegoly[w.nazwa].do} <span title="data ostatniego poziomu zapisanego przy walce">({new Date(szczegoly[w.nazwa].tDo).toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit" })})</span></div>}</td>
                       <td style={{ color: kolorRatio(w.ratio), fontWeight: "bold" }}>{w.ratio == null ? "—" : `${Math.round(w.ratio * 100)}%`}</td>
                       {tryb === "europa" && <td>{w.udzial == null ? "—" : `${Math.round(w.udzial * raport.lacznaWalka)}/${raport.lacznaWalka}`}</td>}
-                      <td style={{ color: w.karty && w.karty.odchylenie <= -0.75 ? "#fa0" : "var(--text)" }}>{w.karty ? `K${w.karty.krag} · ${w.karty.procent}%` : "—"}</td>
+                      <td style={{ color: w.karty && w.karty.odchylenie <= -0.75 ? "#fa0" : "var(--text)" }}>{w.karty ? `K${w.karty.krag} · ${w.karty.diamRazem ? `💎 ${w.karty.diamPos}/${w.karty.diamRazem}` : w.karty.procent + "%"}` : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div style={{ fontSize: 10, color: "#555", marginTop: 8, lineHeight: 1.6 }}>
-              „% med.” to wynik względem mediany gangu. Poniżej 60% = odstaje, poniżej 35% = mocno odstaje. Karty: ocena liczy zamknięte kręgi plus postęp w obecnym kręgu, więc ktoś tuż po zamknięciu kręgu nie jest karany. Osoby bez danych (np. nowe) nie są oceniane.
+              „% med.” to wynik względem mediany gangu. Poniżej 60% = odstaje, poniżej 35% = mocno odstaje. Karty: ocena liczy zamknięte kręgi plus diamentowe karty w obecnym kręgu (złote zbierają się same), więc ktoś tuż po zamknięciu kręgu nie jest karany. Osoby bez danych (np. nowe) nie są oceniane.
             </div>
           </div>
         </>
