@@ -17,30 +17,38 @@ function zapis(klucz, v) {
   try { localStorage.setItem(klucz, v); } catch (e) { /* brak dostępu do pamięci przeglądarki — nic się nie dzieje */ }
 }
 
+// Karty członków: krąg + diamentowe (najważniejsze) i złote. Zwraca {karty, zlote}.
+function zbierzKarty(czlonkowie, talie, posiadane, duplikaty) {
+  const bazowe = obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty);
+  const karty = {}, zlote = {};
+  czlonkowie.forEach((c) => {
+    const b = bazowe[c.nazwa || c.id];
+    if (!b) return;
+    let razem = 0, pos = 0, zRazem = 0, zPos = 0;
+    talie.forEach((t) => (t.karty || []).forEach((k) => {
+      const mam = !!posiadane[`${c.id}_${t.id}_${k.nazwa}`];
+      if (k.typ === "diamentowa") { razem++; if (mam) pos++; }
+      else if (k.typ === "złota") { zRazem++; if (mam) zPos++; }
+    }));
+    karty[c.nazwa || c.id] = razem > 0 ? { krag: b.krag, procent: Math.round((pos / razem) * 100), diamPos: pos, diamRazem: razem } : { krag: b.krag, procent: b.procent };
+    if (zRazem > 0) zlote[c.nazwa || c.id] = { pos: zPos, razem: zRazem };
+  });
+  return { karty, zlote };
+}
+
 export default function RaportView({ czlonkowie = [], walki = [], talie = [], posiadane = {}, duplikaty = {} }) {
   const [tryb, setTryb] = useState(() => odczyt("raport_tryb", "azja"));
   const [dni, setDni] = useState(() => Number(odczyt("raport_dni", "14")));
   const [skopiowano, setSkopiowano] = useState(false);
   const [heist, setHeist] = useState(() => Math.max(0, parseInt(odczyt("raport_heist_n", "0"), 10) || 0));
+  const [wybranyCzlonek, setWybranyCzlonek] = useState("");
+  const [skopiowanoInd, setSkopiowanoInd] = useState("");
   const [humor, setHumor] = useState(() => odczyt("raport_humor", "1") === "1");
 
   const ustawTryb = (t) => { setTryb(t); zapis("raport_tryb", t); };
 
   const dane = useMemo(() => {
-    const bazowe = obliczDaneKartowe(czlonkowie, talie, posiadane, duplikaty);
-    // najważniejsze są diamentowe (złote zbierają się same), więc postęp w kręgu liczymy z diamentów
-    const karty = {};
-    czlonkowie.forEach((c) => {
-      const b = bazowe[c.nazwa || c.id];
-      if (!b) return;
-      let razem = 0, pos = 0;
-      talie.forEach((t) => (t.karty || []).forEach((k) => {
-        if (k.typ !== "diamentowa") return;
-        razem++;
-        if (posiadane[`${c.id}_${t.id}_${k.nazwa}`]) pos++;
-      }));
-      karty[c.nazwa || c.id] = razem > 0 ? { krag: b.krag, procent: Math.round((pos / razem) * 100), diamPos: pos, diamRazem: razem } : { krag: b.krag, procent: b.procent };
-    });
+    const karty = zbierzKarty(czlonkowie, talie, posiadane, duplikaty).karty;
     const { wybrane, od, do: doTs } = R.walkiZOkresu(walki, dni);
     const okres = od != null ? { od, do: doTs } : null;
     if (tryb === "azja") {
@@ -54,6 +62,23 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
     return { raport: R.zbudujRaport({ tryb, czlonkowie, obrazenia, lacznaWalka: wybrane.length, karty, heist }), okres, ileWalk: wybrane.length, brak: !wybrane.length ? "Brak walk w wybranym okresie." : null };
   }, [tryb, czlonkowie, talie, posiadane, duplikaty, walki, dni, heist]);
 
+  const indyw = useMemo(() => {
+    const { karty, zlote } = zbierzKarty(czlonkowie, talie, posiadane, duplikaty);
+    const { wybrane, od } = R.walkiZOkresu(walki, dni);
+    const { delty: przyrosty, szczegoly: szczLvl } = R.przyrostyZWalk(walki, czlonkowie, dni ? od : null);
+    const pod = wybrane.length ? obliczPodsumowanieSezonu(wybrane, czlonkowie) : null;
+    const obrazenia = {}, maxObr = {}, lacznieObr = {};
+    (pod?.wszyscy || []).forEach((g) => {
+      obrazenia[g.nazwa] = { lacznie: g.obrazeniaLacznie, uczestnictwa: g.uczestnictwa, srednia: g.uczestnictwa ? g.obrazeniaLacznie / g.uczestnictwa : 0 };
+      lacznieObr[g.nazwa] = g.obrazeniaLacznie;
+      maxObr[g.nazwa] = (g.historiaObr || []).reduce((m, h) => (h.obr > m ? h.obr : m), 0);
+    });
+    const rA = R.zbudujRaport({ tryb: "azja", czlonkowie, przyrosty, karty, heist });
+    const rE = R.zbudujRaport({ tryb: "europa", czlonkowie, obrazenia, lacznaWalka: wybrane.length, karty, heist });
+    const profile = R.zbudujProfile({ rA, rE, szczegolyLvl: szczLvl, dodatki: { maxObr, lacznieObr, zlote }, heist });
+    return { profile, opisyInd: R.opisyIndywidualne(profile, rA, rE) };
+  }, [czlonkowie, talie, posiadane, duplikaty, walki, dni, heist]);
+
   const { raport, okres, brak } = dane;
   const szczegoly = dane.szczegoly || {};
   const opis = okres ? `${new Date(okres.od).toLocaleDateString("pl-PL")} – ${new Date(okres.do).toLocaleDateString("pl-PL")}, ${dane.ileWalk} walk` : "";
@@ -64,6 +89,30 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
     try { await navigator.clipboard.writeText(tekst); setSkopiowano(true); setTimeout(() => setSkopiowano(false), 2000); }
     catch (e) { window.prompt("Skopiuj raport (Ctrl+C):", tekst); }
   };
+
+  const kopiujInd = async (klucz, tekstInd) => {
+    try { await navigator.clipboard.writeText(tekstInd); setSkopiowanoInd(klucz); setTimeout(() => setSkopiowanoInd(""), 2000); }
+    catch (e) { window.prompt("Skopiuj raport (Ctrl+C):", tekstInd); }
+  };
+  const tekstOsoby = (p) => R.tekstIndywidualny(p, indyw.opisyInd[p.nazwa], opis, humor);
+  const profileLista = [...indyw.profile].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+  const wybraneProfile = wybranyCzlonek === "__wszyscy" ? profileLista : profileLista.filter((p) => p.nazwa === wybranyCzlonek);
+  const kartaOsoby = (p) => (
+    <div key={p.nazwa} style={{ background: "rgba(0,0,0,0.2)", border: "1px solid #ffffff14", borderRadius: 8, padding: 12, marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 14, fontWeight: "bold" }}>{R.ikonaTier(p.tier)} {p.nazwa} <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>({R.etykietaTier(p.tier)})</span></div>
+        <button onClick={() => kopiujInd(p.nazwa, tekstOsoby(p))} style={przycisk("0,200,100")}>{skopiowanoInd === p.nazwa ? "✅ Skopiowano" : "📋 Kopiuj"}</button>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {R.faktyProfilu(p).map((f, i) => <div key={i} style={{ fontSize: 12, padding: "2px 0" }}>{f.ikona} {f.tekst}</div>)}
+      </div>
+      {humor && (indyw.opisyInd[p.nazwa] || []).length > 0 && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #ffffff10" }}>
+          {indyw.opisyInd[p.nazwa].map((l, i) => <div key={i} style={{ fontSize: 12, lineHeight: 1.55, padding: "2px 0", color: i === indyw.opisyInd[p.nazwa].length - 1 ? "#c792ea" : "var(--text)" }}>{l}</div>)}
+        </div>
+      )}
+    </div>
+  );
 
   const wartosc = (w) => (w.glowna == null ? "—" : tryb === "azja" ? `+${fmt(w.glowna)}` : fmt(w.glowna));
   const wiersze = [...raport.wiersze].sort((a, b) => (b.glowna ?? -1) - (a.glowna ?? -1));
@@ -150,6 +199,20 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
           </div>
         </>
       )}
+
+      <div style={karta}>
+        <div style={{ fontSize: 13, fontWeight: "bold", color: "var(--accent)", marginBottom: 6 }}>👤 Raporty indywidualne</div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, lineHeight: 1.6 }}>Wszystkie dane jednej osoby naraz (poziomy, obrażenia, obecność, karty, miejsca w gangu) z opisem w naszym stylu. Okres i liczba Card Heistów jak w raporcie wyżej.</div>
+        <select value={wybranyCzlonek} onChange={(e) => setWybranyCzlonek(e.target.value)} style={{ padding: "6px 8px", background: "var(--card-solid)", border: "1px solid #333", borderRadius: 6, color: "var(--text)", fontSize: 12, width: "100%", boxSizing: "border-box" }}>
+          <option value="">— wybierz osobę —</option>
+          <option value="__wszyscy">👥 Wszyscy (od najlepszych)</option>
+          {[...indyw.profile].sort((a, b) => a.nazwa.localeCompare(b.nazwa, "pl")).map((p) => <option key={p.nazwa} value={p.nazwa}>{p.nazwa}</option>)}
+        </select>
+        {wybranyCzlonek === "__wszyscy" && (
+          <button onClick={() => kopiujInd("__wszyscy", profileLista.map(tekstOsoby).join("\n\n"))} style={{ ...przycisk("0,200,100"), marginTop: 8 }}>{skopiowanoInd === "__wszyscy" ? "✅ Skopiowano" : "📋 Kopiuj wszystkie raporty"}</button>
+        )}
+        {wybraneProfile.map(kartaOsoby)}
+      </div>
     </div>
   );
 }

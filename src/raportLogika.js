@@ -231,7 +231,7 @@ const POOLE = {
     "{n}: {u}. Wychodzi na to, że wolny wybór kończy się tam, gdzie zaczyna się gang.",
     "{n}: {u} walk. Konto aktywne, osoba okazjonalna.",
     "{n}: obecność {u}. Gang zaczyna się już łączyć w pary bez tej osoby.",
-    "{n}: {u} walk. Powiedzieć, że jest zaangażowany, to zbyt duża uprzejmość.",
+    "{n}: {u} walk. Nazwać to zaangażowaniem to zbyt duża uprzejmość.",
   ],
   brakWalk: [
     "{n}: ani śladu w ostatnich {l} walkach. Szukamy świadków, ktokolwiek widział?",
@@ -412,5 +412,186 @@ export function tekstHumor(r, opis = "") {
   } else {
     L.push("", "✅ Nikt nie odstaje. Podejrzanie dobrze. Kto za tym stoi?");
   }
+  return L.join("\n");
+}
+
+// ---------- raporty indywidualne: wszystkie dane jednej osoby + opis w naszym stylu ----------
+Object.assign(POOLE, {
+  otwGwiazda: [
+    "{n} to w tym gangu zjawisko: wyniki takie, że reszta może tylko udawać, że też coś robi.",
+    "{n} gra w tej lidze, w której reszta dopiero wyrabia kartę członkowską.",
+    "{n} ma w tym raporcie tyle plusów, że księgowy by się pogubił.",
+    "{n}: jeśli gang ma twarz, to dzisiaj wygląda właśnie tak.",
+  ],
+  otwSolid: [
+    "{n} trzyma się środka stawki. Nie wstyd, ale i nie powód do pomnika.",
+    "{n} jest w tym gangu jak dobrze wypieczona bułka: nikt nie narzeka, nikt nie zachwyca.",
+    "{n} robi swoje. Bez fajerwerków, bez skandali, za to z regularnością, o której reszta może pomarzyć.",
+    "{n}: średnia ocena „przyzwoicie”. W tym gangu to już awans.",
+  ],
+  otwOdstaje: [
+    "{n} jest w tej tabeli tam, gdzie zwykle ląduje nadzieja.",
+    "{n} to ten typ gracza, o którym gang mówi „jeszcze się rozkręca”. Od dłuższego czasu.",
+    "{n}: wyniki wskazują na ambicje, które chwilowo są na urlopie.",
+    "{n} ma potencjał. Jak wiele rzeczy w życiu: głównie w teorii.",
+  ],
+  otwOgon: [
+    "{n}: ogon gangu. W tym raporcie to już nie punkt, tylko całe zagadnienie.",
+    "{n} ma wyniki, o których zwykle mówi się szeptem i z pochylonymi głowami.",
+    "{n}: statystyki były wyrozumiałe jak mogły, ale ile można.",
+    "{n} to dowód, że w grze zespołowej da się grać solo, i to tak, żeby nikt nie zauważył.",
+  ],
+  srLvl: [
+    "{n}: poziomy rosną w tempie, które nikogo nie zachwyca i nikogo nie boli.",
+    "{n}: lvl w normie gangu. Normalność ma swoje uroki, głównie nudne.",
+    "{n}: progres poziomów solidny jak umowa o pracę: stabilnie i bez emocji.",
+  ],
+  srDmg: [
+    "{n}: obrażenia przeciętne. Boss ani się nie śmieje, ani nie płacze.",
+    "{n}: wynik w walkach taki, jaki trzeba, żeby nikt nie zadawał pytań.",
+    "{n}: obrażenia jak z podręcznika: dokładnie tyle, ile wypada.",
+  ],
+  srKarty: [
+    "{n}: z kartami jest tak, że nikt się nie spodziewa niespodzianek.",
+    "{n}: kolekcja kart na poziomie reszty gangu. Ani to wstyd, ani to chluba.",
+    "{n}: karty w normie. Dla kogoś, kto ma jeszcze wolne paczki, to dobry znak.",
+  ],
+  frekwDobra: [
+    "{n}: obecność na walkach wzorowa. Wiadomo, że można na tę osobę liczyć, o ile nie liczy się wyłącznie na obrażenia.",
+    "{n}: nie opuszcza walk. Albo wielkie zaangażowanie, albo brak innych planów.",
+    "{n}: frekwencja jak na szkolnym apelu przed świętem: wszyscy są, bo ktoś patrzy.",
+  ],
+  radaLvl: [
+    "Plan na tydzień: wejść do gry, kliknąć coś, co daje poziomy, powtórzyć.",
+    "Rada: lvl same się nie podniosą, chociaż aplikacja wyraźnie próbuje je podnieść.",
+    "Prosty plan: więcej godzin w grze, mniej godzin w planowaniu tych godzin.",
+  ],
+  radaDmg: [
+    "Plan na następną walkę: pojawić się, kliknąć, zadać obrażenia. Kolejność obowiązkowa.",
+    "Rada: obrażenia da się zwiększyć, podobno wystarczy robić to, co robią inni.",
+    "Prosty plan: mniej obserwowania bossa, więcej zadawania mu bólu.",
+  ],
+  radaObec: [
+    "Plan: być na walce. Nic więcej. Tak, tyle wystarczy na początek.",
+    "Rada: kalendarz przypomnień i budzik robią cuda. Sprawdzone na innych.",
+    "Prosty plan: wpaść na walkę, zanim boss zacznie pytać, kim jesteś.",
+  ],
+  radaKarty: [
+    "Plan: otwierać paczki, a diamenty zostawić tam, gdzie je znaleziono, czyli w paczce, która ma być otwarta.",
+    "Rada: pierwsza nowa diamentowa w paczce wystarczy, żeby załapać bakcyla. Potem już samo idzie.",
+    "Prosty plan: żadnego odkładania paczek na później. Później bywa za późno.",
+  ],
+  radaOk: [
+    "Plan: jechać dalej, nic nie psuć, od czasu do czasu zaskoczyć.",
+    "Rada: wszystko gra. Szkoda tylko, że nikt nie dostanie za to medalu.",
+  ],
+});
+
+const bezNicku = (t, n) => {
+  const esc = n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let x = t.replace(new RegExp("^" + esc + " \\((.*?)\\):\\s"), "Karty ($1): ");
+  x = x.replace(new RegExp("^" + esc + "(\\s—|:)\\s"), "");
+  return x.charAt(0).toUpperCase() + x.slice(1);
+};
+const miejsceW = (wiersze, nazwa, pole) => {
+  const lst = wiersze.filter((w) => w[pole] != null).sort((a, b) => b[pole] - a[pole]);
+  const i = lst.findIndex((w) => w.nazwa === nazwa);
+  return i < 0 ? null : { m: i + 1, N: lst.length };
+};
+
+/**
+ * Buduje profil każdego członka: wyniki z obu trybów naraz (poziomy, obrażenia, obecność, karty) + miejsca w gangu.
+ * rA = zbudujRaport({tryb:"azja"...}), rE = zbudujRaport({tryb:"europa"...}),
+ * szczegolyLvl = {nazwa:{od,do}}, dodatki = {maxObr:{nazwa:n}, lacznieObr:{nazwa:n}, zlote:{nazwa:{pos,razem}}}
+ */
+export function zbudujProfile({ rA, rE, szczegolyLvl = {}, dodatki = {}, heist = 0 }) {
+  const mapaE = Object.fromEntries(rE.wiersze.map((w) => [w.nazwa, w]));
+  const wynik = rA.wiersze.map((a) => {
+    const e = mapaE[a.nazwa] || {};
+    const lvl = a.glowna != null ? { delta: a.glowna, ratio: a.ratio, od: szczegolyLvl[a.nazwa]?.od ?? null, do: szczegolyLvl[a.nazwa]?.do ?? null, miejsce: miejsceW(rA.wiersze, a.nazwa, "glowna") } : null;
+    const dmg = e.glowna != null ? { srednia: e.glowna, ratio: e.ratio, udzial: e.udzial, walk: e.udzial != null ? Math.round(e.udzial * rE.lacznaWalka) : null, lacznaWalka: rE.lacznaWalka, lacznie: dodatki.lacznieObr?.[a.nazwa] ?? null, max: dodatki.maxObr?.[a.nazwa] ?? null, miejsce: miejsceW(rE.wiersze, a.nazwa, "glowna") } : null;
+    const karty = a.karty ? { ...a.karty, zlote: dodatki.zlote?.[a.nazwa] || null, miejsce: (() => { const l = rA.wiersze.filter((w) => w.karty && w.karty.postep != null).sort((x, y) => y.karty.postep - x.karty.postep); const i = l.findIndex((w) => w.nazwa === a.nazwa); return i < 0 ? null : { m: i + 1, N: l.length }; })() } : null;
+    // siła każdego obszaru względem gangu (0 = dokładnie mediana), do wskazania najmocniejszej i najsłabszej strony
+    const sily = [];
+    if (lvl && lvl.ratio != null) sily.push({ typ: "lvl", v: lvl.ratio - 1 });
+    if (dmg && dmg.ratio != null) sily.push({ typ: "dmg", v: dmg.ratio - 1 });
+    if (dmg && dmg.udzial != null && rE.lacznaWalka >= 3) sily.push({ typ: "obec", v: dmg.udzial - 0.8 });
+    else if (!dmg && rE.lacznaWalka >= 3) sily.push({ typ: "obec", v: -1 });
+    if (karty && karty.odchylenie != null) sily.push({ typ: "karty", v: karty.odchylenie / 2 });
+    const wyniki = sily.map((s) => (s.typ === "obec" ? 1 + s.v : 1 + s.v));
+    const score = wyniki.length ? wyniki.reduce((x, y) => x + Math.max(0, Math.min(2, y)), 0) / wyniki.length : null;
+    const tier = score == null ? null : score >= 1.15 ? "gwiazda" : score >= 0.85 ? "solid" : score >= 0.55 ? "odstaje" : "ogon";
+    const sort = [...sily].sort((x, y) => y.v - x.v);
+    return { nazwa: a.nazwa, lvl, dmg, karty, flagiA: a.flagi, flagiE: (e.flagi || []), score, tier, najmocniejsza: sort[0] || null, najslabsza: sort.length ? sort[sort.length - 1] : null, heist };
+  });
+  return wynik;
+}
+
+const fmtL = (n) => (n == null ? "—" : Math.round(n).toLocaleString("pl-PL"));
+
+export function faktyProfilu(p) {
+  const f = [];
+  if (p.lvl) f.push({ ikona: "📈", tekst: `Poziomy: ${p.lvl.od != null ? `${fmtL(p.lvl.od)} → ${fmtL(p.lvl.do)} ` : ""}(+${fmtL(p.lvl.delta)})${p.lvl.ratio != null ? `, ${Math.round(p.lvl.ratio * 100)}% mediany` : ""}${p.lvl.miejsce ? `, miejsce ${p.lvl.miejsce.m}/${p.lvl.miejsce.N}` : ""}` });
+  else f.push({ ikona: "📈", tekst: "Poziomy: brak danych w tym okresie" });
+  if (p.dmg) f.push({ ikona: "⚔️", tekst: `Walki: śr. ${fmtL(p.dmg.srednia)} obrażeń${p.dmg.lacznie != null ? `, razem ${fmtL(p.dmg.lacznie)}` : ""}${p.dmg.max != null ? `, rekord ${fmtL(p.dmg.max)}` : ""}${p.dmg.walk != null ? `, obecność ${p.dmg.walk}/${p.dmg.lacznaWalka}` : ""}${p.dmg.miejsce ? `, miejsce ${p.dmg.miejsce.m}/${p.dmg.miejsce.N}` : ""}` });
+  else f.push({ ikona: "⚔️", tekst: `Walki: brak udziału w ${p.dmg === null && p.flagiE.length ? "ostatnich walkach" : "tym okresie"}` });
+  if (p.karty) f.push({ ikona: "🃏", tekst: `Karty: K${p.karty.krag}${p.karty.diamRazem ? `, 💎 ${p.karty.diamPos}/${p.karty.diamRazem}` : ""}${p.karty.zlote ? `, złote ${p.karty.zlote.pos}/${p.karty.zlote.razem}` : ""}${p.karty.miejsce ? `, miejsce ${p.karty.miejsce.m}/${p.karty.miejsce.N}` : ""}` });
+  return f;
+}
+
+// Opisy wszystkich członków naraz — szablony nie powtarzają się między osobami.
+export function opisyIndywidualne(profile, rA, rE) {
+  const uzyte = new Set();
+  const medKrag = rA.medKrag;
+  const wynik = {};
+  profile.forEach((p) => {
+    const n = p.nazwa;
+    const dA = dane({ nazwa: n, glowna: p.lvl?.delta ?? null, ratio: p.lvl?.ratio ?? null, karty: p.karty, flagi: [] }, rA);
+    const dE = dane({ nazwa: n, glowna: p.dmg?.srednia ?? null, ratio: p.dmg?.ratio ?? null, udzial: p.dmg?.udzial ?? null, karty: p.karty, flagi: [] }, rE);
+    const linie = [];
+    if (p.tier) linie.push(podstaw(unikat({ gwiazda: "otwGwiazda", solid: "otwSolid", odstaje: "otwOdstaje", ogon: "otwOgon" }[p.tier], n, uzyte), { n }));
+    // poziomy
+    if (p.lvl) {
+      const r = p.lvl.ratio;
+      const pula = p.lvl.delta === 0 ? "lvlZero" : r == null ? null : r >= 1.15 ? (p.lvl.miejsce?.m === 1 ? "pochTop" : "pochDobry") : r < 0.35 ? "lvlSlabo" : r < 0.6 ? "lvlOdstaje" : "srLvl";
+      if (pula) linie.push(bezNicku(podstaw(unikat(pula, n + "L", uzyte), { ...dA, w: `+${fmtL(p.lvl.delta)} lvl` }), n));
+    }
+    // walki
+    if (p.dmg) {
+      const r = p.dmg.ratio;
+      const pula = r == null ? null : r >= 1.15 ? "pochDobry" : r < 0.35 ? "dmgSlabo" : r < 0.6 ? "dmgOdstaje" : "srDmg";
+      if (pula) linie.push(bezNicku(podstaw(unikat(pula, n + "D", uzyte), { ...dE, w: `śr. ${fmtL(p.dmg.srednia)} obrażeń` }), n));
+      const jestObecnosc = p.flagiE.find((f) => /obecny w/.test(f.tekst));
+      if (jestObecnosc) linie.push(bezNicku(podstaw(unikat("obecnosc", n + "O", uzyte), dE), n));
+      else if (p.dmg.udzial != null && p.dmg.udzial >= 0.9 && rE.lacznaWalka >= 3) linie.push(bezNicku(podstaw(unikat("frekwDobra", n + "F", uzyte), dE), n));
+    } else if (rE.lacznaWalka >= 3) {
+      linie.push(bezNicku(podstaw(unikat("brakWalk", n + "B", uzyte), dE), n));
+    }
+    // karty
+    if (p.karty) {
+      const odch = p.karty.odchylenie;
+      let pula = null;
+      if (p.flagiA.some((f) => f.typ === "karty")) pula = p.heist > 0 ? "kartyHeist" : p.karty.krag < medKrag ? "kartyDalej" : "kartyBlisko";
+      else if (odch != null && odch >= 0.5) pula = "pochKarty";
+      else pula = "srKarty";
+      linie.push(bezNicku(podstaw(unikat(pula, n + "K", uzyte), dA), n));
+    }
+    // rada: dotyczy najsłabszej strony
+    const slab = p.najslabsza;
+    const radaPula = !slab || slab.v >= 0 ? "radaOk" : { lvl: "radaLvl", dmg: "radaDmg", obec: "radaObec", karty: "radaKarty" }[slab.typ];
+    linie.push(unikat(radaPula, n + "R", uzyte));
+    wynik[n] = linie;
+  });
+  return wynik;
+}
+
+const IKONY_TIER = { gwiazda: "🌟", solid: "👍", odstaje: "⚠️", ogon: "💀" };
+export const etykietaTier = (t) => (t ? { gwiazda: "gwiazda gangu", solid: "solidna średnia", odstaje: "odstaje", ogon: "ogon gangu" }[t] : "brak danych");
+export const ikonaTier = (t) => IKONY_TIER[t] || "❔";
+
+export function tekstIndywidualny(p, linie, opis = "", humor = true) {
+  const L = [`👤 RAPORT: ${p.nazwa} ${ikonaTier(p.tier)} (${etykietaTier(p.tier)})${opis ? " — " + opis : ""}`];
+  faktyProfilu(p).forEach((f) => L.push(`${f.ikona} ${f.tekst}`));
+  if (humor && linie && linie.length) { L.push(""); linie.forEach((x) => L.push(x)); }
   return L.join("\n");
 }
