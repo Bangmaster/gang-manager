@@ -92,7 +92,7 @@ const DOMYSLNE = { niskoRatio: 0.6, bardzoNiskoRatio: 0.35, wysokoRatio: 1.15, k
  *  lacznaWalka: liczba walk branych pod uwagę           (tryb europa)
  *  karty: {nazwa: {krag, procent}}
  */
-export function zbudujRaport({ tryb, czlonkowie, przyrosty = {}, obrazenia = {}, lacznaWalka = 0, karty = {}, prog = {}, heist = false }) {
+export function zbudujRaport({ tryb, czlonkowie, przyrosty = {}, obrazenia = {}, lacznaWalka = 0, karty = {}, prog = {}, heist = 0 }) {
   const P = { ...DOMYSLNE, ...prog };
   const nazwy = (czlonkowie || []).map((c) => c.nazwa);
   const glowna = {};
@@ -157,119 +157,258 @@ export function tekstRaportu(r, opis = "") {
 }
 
 // ---------- opisy w naszym stylu (czarny humor, lekki pojazd po ambicji) ----------
+// Każda osoba dostaje inny tekst (w obrębie jednego raportu żaden szablon się nie powtarza), a główne zdanie
+// dotyczy tego, co ma NAJGORSZE. Teksty są neutralne co do płci. Placeholdery: {n} nick, {w} wynik, {p} % mediany,
+// {med} mediana, {roz} różnica do mediany, {kr}/{mk} krąg osoby / mediana, {d} diamenty, {brak} brakujące diamenty,
+// {hs} „3 Card Heisty”, {u} obecność „3 z 10”, {l} liczba walk.
 const haszuj = (s) => String(s).split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-const wybierz = (tab, klucz) => tab[haszuj(klucz) % tab.length];
-
-export function opisHumor(w, r) {
-  const n = w.nazwa;
+const POOLE = {
+  lvlZero: [
+    "{n}: 0 lvl w całym okresie. To już nie lenistwo, to styl życia.",
+    "{n}: 0 lvl. Stabilność godna nekrologu. Ktoś sprawdzi, czy w ogóle jeszcze gra?",
+    "{n}: poziom ani drgnął, a mediana gangu to {med}. Linia EKG poziomów wygląda tu jak u denata.",
+    "{n}: 0 lvl. Można by zamrozić konto i nikt nie zauważy różnicy.",
+    "{n}: zero. Gang rośnie o {med} lvl na głowę, a tu wiecznie ten sam wynik. To wygląda na zasadę, nie na pecha.",
+    "{n}: 0 lvl. Gra się zainstalowała, ale chyba jeszcze się nie uruchomiła.",
+  ],
+  lvlSlabo: [
+    "{n}: {w}, czyli {p}% mediany ({med}). Rośnie tak szybko, że mech na kamieniu zrobiłby większy progres.",
+    "{n}: {w} przy medianie {med}. Gra, czy trzyma aplikację otwartą, żeby ekran nie zasnął?",
+    "{n}: {w}. Ambicja na poziomie lampki nocnej: świeci, ale nikomu to nie pomaga.",
+    "{n}: {w} ({p}% mediany). Poziomy rosną tu z prędkością urzędu skarbowego w piątek po 14.",
+    "{n}: {w}, {roz}. Matematyka jest bezlitosna, w przeciwieństwie do gangu, który jeszcze nic nie powiedział.",
+    "{n}: {w} przy medianie {med}. Tempo godne ślimaka z kontuzją.",
+    "{n}: {w}, {p}% normy. Gang liczy na rozwój, a tu ciągle faza wstępna.",
+    "{n}: {w}. Statystycznie to błąd pomiaru, praktycznie to wizytówka.",
+    "{n}: {w}, {p}% mediany. Gdyby poziomy były wzrostem, to byłby to wzrost bonsai.",
+    "{n}: {w} przy medianie {med}. Do pełni gry brakuje jeszcze samej gry.",
+    "{n}: {w}. Poziom podnosi się tu jak most zwodzony: raz na jakiś czas i z wielkim hałasem, a efektu brak.",
+    "{n}: {w} ({p}% mediany). Wynik, który można pomylić z zerem po zaokrągleniu.",
+  ],
+  lvlOdstaje: [
+    "{n}: {w} ({p}% mediany). Idzie do przodu, ale w tempie żałoby.",
+    "{n}: {w}, {roz} niż mediana. Reszta dawno w drodze, a tu jeszcze trwa szukanie mapy.",
+    "{n}: {w}, czyli {p}% mediany. Potencjał jest. Głęboko. Pod ziemią.",
+    "{n}: {w} przy medianie {med}. Gra na pół gwizdka, a gwizdek też na pół.",
+    "{n}: {w} ({p}%). Połowa wysiłku to jeszcze nie połowa sukcesu, to po prostu połowa.",
+    "{n}: {w}, {roz}. Ambicja w trybie oszczędzania baterii.",
+    "{n}: {w} przy medianie {med}. Zaangażowanie jak w grupie na WhatsAppie: obecny, ale nic z tego nie wynika.",
+    "{n}: {w} ({p}% mediany). Wysiłek widać, tylko trzeba przyjść z lupą.",
+    "{n}: {w}, {roz}. Wszyscy w gangu zdążyli zrobić pół kółka więcej.",
+    "{n}: {w}. Tempo spaceru po deszczu, bez parasola i bez celu.",
+  ],
+  dmgSlabo: [
+    "{n}: {w}, czyli {p}% mediany ({med}). Bije z taką siłą, że przeciwnik pewnie myślał, że to masaż.",
+    "{n}: {w} przy medianie {med}. Wchodzi do walki jak na wycieczkę: zwiedza, robi zdjęcia, nic nie niszczy.",
+    "{n}: {w}. Obrażenia tak niskie, że bossowi się pasek życia nie zorientował.",
+    "{n}: {w} ({p}% mediany). Walczy z gracją tancerza i skutecznością tancerza.",
+    "{n}: {w}, {roz}. Gdyby obrażenia były pieniędzmi, trzeba by zrobić zrzutkę.",
+    "{n}: {w}. Najgroźniejsze, co tu poleciało, to zażenowanie.",
+    "{n}: {w} przy medianie {med}. Boss wysłał podziękowania za wyrozumiałość.",
+    "{n}: {w}, {p}% normy. Pojawia się w walce, jakby ktoś kazał, a nikt nie sprawdza, czy robi.",
+    "{n}: {w} ({p}% mediany). Bossowi chyba bardziej przeszkadzały muchy.",
+    "{n}: {w} przy medianie {med}. Obrażenia policzone z pewnością, ale chyba tylko z grzeczności.",
+    "{n}: {w}, {roz}. Walka w tym wydaniu to forma terapii dla bossa.",
+    "{n}: {w}. W pełni zaangażowany w idee, mniej w obrażenia.",
+  ],
+  dmgOdstaje: [
+    "{n}: {w} ({p}% mediany). Walczy z taką pasją, jakby ktoś kazał.",
+    "{n}: {w}, {roz} niż mediana. Ma potencjał, ale chyba trzyma go na czarną godzinę, która nie nadchodzi.",
+    "{n}: {w} przy medianie {med}. Boss kiwa głową z politowaniem, ale nie z uznaniem.",
+    "{n}: {w}, czyli {p}% normy. Bardziej widz niż uczestnik.",
+    "{n}: {w}. Ambicja na poziomie przeciętnego poniedziałku.",
+    "{n}: {w} przy medianie {med}. Nie tragedia, ale gang czeka na ambicję, a ona jeszcze się nie spakowała.",
+    "{n}: {w}, {p}% mediany. Dokłada się do walki jak do zrzutki na prezent: symbolicznie.",
+    "{n}: {w}. Bije regularnie, tylko że łagodnie.",
+  ],
+  obecnosc: [
+    "{n}: obecność {u} walk. Wpada jak teściowa: rzadko, bez zapowiedzi i nikt się nie cieszy.",
+    "{n}: {u} walk. Gang to nie hotel, niech ktoś to przekaże.",
+    "{n}: był na {u} walk. Reszta zdążyła się zżyć z samym bossem.",
+    "{n}: {u} walk. Frekwencja jak na zebraniu wspólnoty w sylwestra.",
+    "{n}: tylko {u} walk. Można by zgłosić zaginięcie, ale kto by zauważył?",
+    "{n}: {u} walk. Walki odbywały się też w Twojej obecności, tylko że fizycznie byłeś gdzie indziej.",
+    "{n}: {u}. Wychodzi na to, że wolny wybór kończy się tam, gdzie zaczyna się gang.",
+    "{n}: {u} walk. Konto aktywne, osoba okazjonalna.",
+    "{n}: obecność {u}. Gang zaczyna się już łączyć w pary bez tej osoby.",
+    "{n}: {u} walk. Powiedzieć, że jest zaangażowany, to zbyt duża uprzejmość.",
+  ],
+  brakWalk: [
+    "{n}: ani śladu w ostatnich {l} walkach. Szukamy świadków, ktokolwiek widział?",
+    "{n}: 0 z {l} walk. Gang robi się kompaktowy, a tu ktoś zniknął jak wypłata.",
+    "{n}: nie ma w żadnej z ostatnich {l} walk. Czy konto jeszcze oddycha?",
+    "{n}: pusto w {l} ostatnich walkach. Można by tu zrobić ognisko pamięci.",
+    "{n}: {l} walk bez nicku w zestawieniu. Lista płac dalej na niego czeka, a on na nic.",
+  ],
+  kartyDalej: [
+    "{n}: K{kr} przy medianie gangu K{mk} i tylko {d} 💎. Reszta już zbiera od nowa, a tu ktoś dopiero próbuje zrozumieć, czym jest paczka.",
+    "{n}: K{kr} gdy gang siedzi w K{mk}, {d} 💎. Złote same wpadają, a diamenty trzeba chcieć. Chyba nikt nie chciał.",
+    "{n}: tylko {d} 💎 i K{kr} wobec K{mk} reszty. Ktoś pokazał, że karty można otwierać? Bo na razie wyglądają na ozdobę ekranu.",
+    "{n}: {d} 💎, K{kr}. Gang już w K{mk}, a tu jeszcze rozgrzewka z pierwszym kręgiem.",
+    "{n}: K{kr} kontra K{mk} całej reszty. Brakuje {brak} diamentów. To nie pech, to niezłe zaangażowanie w brak zaangażowania.",
+    "{n}: {d} 💎 w K{kr}. Gang poszedł do K{mk}, a tu dalej zbieranie plastikowych wiadereczek.",
+    "{n}: K{kr}, {d} 💎, brakuje {brak}. Pozostali już zaczynają nowy krąg, a tu jeszcze oglądanie instrukcji.",
+    "{n}: K{kr} (mediana K{mk}), {d} 💎. Z talii zbieranych kart zostały tu głównie wspomnienia.",
+    "{n}: K{kr} wobec K{mk} gangu i {d} 💎. Paczki chyba leżą nieotwarte jak prezent od kogoś, kogo się nie lubi.",
+    "{n}: {d} 💎 w K{kr}, a gang już w K{mk}. Diamenty szukają tu kogoś, kto je zbierze, i na razie bez skutku.",
+    "{n}: K{kr}, {d} 💎, brakuje {brak}. Ktoś tu zamknął krąg w głowie, a w grze jeszcze nie.",
+    "{n}: K{kr} przy K{mk} reszty. Po tylu tygodniach to już nie opóźnienie, to alternatywna linia czasowa.",
+    "{n}: {d} 💎 i K{kr}. Do poziomu reszty ({mk}) zostało dużo, ale kto by liczył.",
+    "{n}: K{kr} gdy inni w K{mk}. Z kolekcji kart zbiera głównie okazje do żartów.",
+  ],
+  kartyBlisko: [
+    "{n}: {d} 💎 w K{kr}, brakuje {brak}. Ten sam krąg co reszta, tylko że reszta ma więcej diamentów. Przypadek?",
+    "{n}: w K{kr} tylko {d} 💎. Diament jest cierpliwy, ale ma limit.",
+    "{n}: {d} 💎, a gang ma więcej. Brakuje {brak} sztuk, nie oczekujemy cudów, tylko paczek.",
+    "{n}: K{kr}, {d} 💎. Brak diamentów to nie wyrok, ale kierunek jest niepokojący.",
+    "{n}: {d} 💎 w K{kr}, brakuje {brak}. Do reszty gangu jeszcze nie daleko, ale kierunek podejrzany.",
+    "{n}: K{kr}, {d} 💎. Poniżej mediany, ale wciąż w zasięgu wzroku. Dla kogoś, kto wie, gdzie patrzeć.",
+    "{n}: {d} 💎. Reszta zrobiła krok do przodu, a tu poszła krótka przerwa na kawę.",
+    "{n}: w K{kr} brakuje {brak} 💎. Diament nie ucieka, ale zaczyna się niecierpliwić.",
+  ],
+  kartyHeist: [
+    "{n}: K{kr} (mediana K{mk}), {d} 💎. Przez {hs} z paczki z nową diamentową leciały dwie karty, a tu efekt, jakby paczek nie otwierano.",
+    "{n}: {d} 💎 mimo {hs}. Przy podwójnych diamentach da się nie dać rady tylko przy dużej determinacji.",
+    "{n}: brakuje {brak} 💎 po {hs}. To nie jest brak szczęścia, to konsekwentny brak działania.",
+    "{n}: {hs} za nami, a tu {d} 💎 i K{kr} wobec K{mk} reszty. Ktoś umówił się z paczkami, że ich nie otworzy.",
+    "{n}: po {hs} wynik to {d} 💎. Przy tylu okazjach to już osiągnięcie.",
+    "{n}: K{kr} przy medianie K{mk}, mimo {hs}. Gang dostał dwa razy więcej diamentów, a ktoś dwa razy mniej chciał.",
+    "{n}: {d} 💎 w K{kr} przy {hs}. Przy podwójnych diamentach tak niski wynik to już statystyczny ewenement.",
+    "{n}: K{kr} (mediana K{mk}), brakuje {brak} 💎. {hs}, a tu wynik jak na wydarzeniu poświęconym czemuś zupełnie innemu.",
+    "{n}: {hs} i tylko {d} 💎. Paczki były dwa razy hojniejsze, a efekt dwa razy mniejszy.",
+    "{n}: {d} 💎 w K{kr}, gang w K{mk}. Przy {hs} to musiał być bardzo konsekwentny sposób unikania paczek.",
+    "{n}: po {hs} wynik {d} 💎 i K{kr}. Ktoś zdecydował się dać szansę wszystkim paczkom z wyjątkiem tych w grze.",
+    "{n}: {hs} minęło, a tu dalej {d} 💎. Wydarzenie dla kolekcjonerów przeszło obok jak tramwaj o 23.",
+    "{n}: K{kr} wobec K{mk}, brakuje {brak} 💎 mimo {hs}. Takiej wytrwałości w nicnierobieniu nie spotyka się często.",
+    "{n}: {d} 💎 przy {hs}. Z darmowej okazji zrobiono sztukę odmawiania.",
+  ],
+  dod: [
+    "Do kompletu: {x}.",
+    "Na deser: {x}.",
+    "I jeszcze: {x}.",
+    "Plus: {x}.",
+    "Dorzućmy: {x}.",
+    "Bonus: {x}.",
+    "Nie zapominajmy: {x}.",
+    "A przy okazji: {x}.",
+  ],
+  komplet: [
+    "Odstaje wszędzie. Jeśli to taktyka, jest bardzo odważna.",
+    "Komplet punktów ujemnych. Gratulacje za konsekwencję.",
+    "Wynik we wszystkich kategoriach: jest szansa tylko w górę.",
+    "Pełen pakiet. Ktoś tu naprawdę poszedł na całość.",
+  ],
+  pochTop: [
+    "{n}: {w} ({p}% mediany). Ktoś tu najwyraźniej nie ma życia towarzyskiego i dobrze, gang dziękuje za poświęcenie.",
+    "{n}: {w}. Taki progres to albo pasja, albo ucieczka od rzeczywistości. Gang nie pyta, tylko zbiera owoce.",
+    "{n}: {w} ({p}% mediany). Wiadomo, kto robi robotę. Reszta robi tło.",
+    "{n}: {w}. Boss po walce prosi o zwolnienie lekarskie.",
+    "{n}: {w}, {p}% mediany. Reszta gangu może tu patrzeć, najlepiej ze wstydem.",
+  ],
+  pochDobry: [
+    "{n}: {w} ({p}% mediany). Solidnie. Tak się rośnie, a nie „wchodzę na chwilę”.",
+    "{n}: {w}. Widać ambicję. Reszta niech bierze przykład, najlepiej z zazdrością.",
+    "{n}: {w}, {p}% mediany. Walczy, a nie tylko kibicuje. Szacunek.",
+    "{n}: {w}. Takich w gangu trzymamy, resztę da się negocjować.",
+    "{n}: {w} ({p}% mediany). Dobry wynik i jeszcze nikt nie musiał prosić.",
+    "{n}: {w}. Wynik z gatunku „nikt nie musiał tłumaczyć, ale ktoś musiał się postarać”.",
+  ],
+  pochKarty: [
+    "{n} (K{kr}, 💎 {d}): zbiera karty, jakby od tego zależało życie. Reszta gangu niech się zawstydzi.",
+    "{n} (K{kr}, 💎 {d}): diamenty same przychodzą. Pytanie, co im się mówi.",
+    "{n} (K{kr}, 💎 {d}): z paczek wychodzi to, co trzeba, i to bez narzekania.",
+    "{n} (K{kr}, 💎 {d}): karty są tu zbierane z ambicją, której reszta nie widziała od premiery.",
+    "{n} (K{kr}, 💎 {d}): kolekcja jak z katalogu, a katalog nie ma jeszcze takiej strony.",
+  ],
+  zamkniecie: [
+    "Zero obrazy. Po prostu mierzymy. Liczby nie kłamią, w przeciwieństwie do wymówek.",
+    "Jeśli ktoś się znalazł na liście i chce się wybronić: najlepsza obrona to nowy wynik w następnym raporcie.",
+    "Nikt nie jest skreślony. Jeszcze. Następny raport już się liczy, ruszcie się.",
+    "Opisy dobrane z miłością. Zaręczam, że dane z jeszcze większą.",
+  ],
+};
+const plHeist = (h) => `${h}× Card Heist`;
+const podstaw = (t, d) => t.replace(/\{(\w+)\}/g, (_, k) => (d[k] == null ? "" : d[k]));
+function unikat(nazwaPuli, klucz, uzyte) {
+  const pula = POOLE[nazwaPuli];
+  const start = haszuj(klucz + nazwaPuli) % pula.length;
+  for (let i = 0; i < pula.length; i++) {
+    const idx = (start + i) % pula.length;
+    if (!uzyte.has(nazwaPuli + idx)) { uzyte.add(nazwaPuli + idx); return pula[idx]; }
+  }
+  return pula[start];          // pula wyczerpana — dopuszczamy powtórkę, ale dopiero wtedy
+}
+function dane(w, r) {
   const azja = r.tryb === "azja";
-  const wart = w.glowna == null ? null : azja ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`;
-  const proc = w.ratio == null ? null : Math.round(w.ratio * 100);
-  const czesci = [];
-  const slabo = w.flagi.some((f) => f.typ === "slabo");
-  const odstaje = w.flagi.some((f) => f.typ === "odstaje");
   const k = w.karty;
-  const kartyZle = w.flagi.some((f) => f.typ === "karty");
-
-  if (w.glowna != null && w.glowna === 0 && azja) {
-    czesci.push(wybierz([
-      `${n}: 0 lvl. Stabilność godna nekrologu. Ktoś sprawdzi, czy w ogóle jeszcze gra?`,
-      `${n}: 0 lvl. Poziom nie drgnął ani razu. Linia EKG poziomów wygląda tak samo jak u denata.`,
-      `${n}: 0 lvl w całym okresie. To już nie lenistwo, to styl życia.`,
-    ], n + "z"));
-  } else if (slabo && w.ratio != null) {
-    czesci.push(wybierz(azja ? [
-      `${n}: ${wart}, czyli ${proc}% mediany. Rośnie tak szybko, że mech na kamieniu zrobiłby większy progres.`,
-      `${n}: ${wart} (${proc}% mediany). Gra czy trzyma aplikację otwartą, żeby ekran nie zasnął?`,
-      `${n}: ${wart}. Ambicja na poziomie lampki nocnej: świeci, ale nikomu to nie pomaga.`,
-    ] : [
-      `${n}: ${wart}, czyli ${proc}% mediany. Bije z taką siłą, że przeciwnik pewnie myślał, że to masaż.`,
-      `${n}: ${wart} (${proc}% mediany). Wchodzi do walki jak na wycieczkę — zwiedza, robi zdjęcia, nic nie niszczy.`,
-      `${n}: ${wart}. Obrażenia tak niskie, że bossowi się nawet pasek życia nie zorientował.`,
-    ], n + "s"));
-  } else if (odstaje && w.ratio != null) {
-    czesci.push(wybierz(azja ? [
-      `${n}: ${wart} (${proc}% mediany). Idzie do przodu, ale w tempie żałoby.`,
-      `${n}: ${wart}, ${proc}% mediany. Reszta dawno w drodze, a tu jeszcze trwa szukanie mapy.`,
-    ] : [
-      `${n}: ${wart} (${proc}% mediany). Ma potencjał. Głęboko. Pod ziemią.`,
-      `${n}: ${wart}, ${proc}% mediany. Walczy z taką pasją, jakby ktoś kazał.`,
-    ], n + "o"));
-  }
-  const fl = w.flagi.find((f) => /obecny w|brak w ostatnich/.test(f.tekst));
-  if (fl) {
-    czesci.push(wybierz([
-      `${n} — ${fl.tekst}. Wpada jak teściowa: rzadko, bez zapowiedzi i nikt się nie cieszy.`,
-      `${n} — ${fl.tekst}. Szukamy świadków, ktokolwiek widział?`,
-      `${n} — ${fl.tekst}. Gang to nie hotel, niech ktoś to przekaże.`,
-    ], n + "f"));
-  }
-  if (kartyZle && k) {
-    const diam = k.diamRazem ? ` (💎 ${k.diamPos}/${k.diamRazem})` : "";
-    const wszyscy = r.medKrag > k.krag ? `Gang siedzi głównie w K${r.medKrag}, a ${n} w K${k.krag}${diam}` : `K${k.krag}${diam}`;
-    const linia = wybierz([
-      `${n}: ${wszyscy}. Reszta już zbiera od nowa, a tu ktoś dopiero próbuje zrozumieć, czym jest paczka.`,
-      `${n}: ${wszyscy}. Złote same wpadają, a diamenty trzeba chcieć. Tu chyba nikt nie chciał.`,
-      `${n}: ${wszyscy}. Ktoś pokazał, że karty można otwierać? Bo na razie wygląda, jakby były tylko do oglądania.`,
-    ], n + "k");
-    czesci.push(r.heist ? `${linia} W Card Heist z paczki z nową diamentową lecą DWIE karty, a ${n} dalej zostaje w tyle. Tego nie da się zrobić przypadkiem — trzeba się naprawdę postarać.` : linia);
-  }
-  if (czesci.length >= 3) czesci.push(wybierz([`Podsumowując: odstaje wszędzie. Jeśli to taktyka, jest bardzo odważna.`, `Komplet punktów ujemnych. Gratulacje za konsekwencję.`], n + "c"));
-  // nick tylko na początku całego opisu, nie przy każdym zdaniu
-  const pref = new RegExp("^" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "( —|:) ");
-  return czesci.map((c, i) => (i === 0 ? c : c.replace(pref, ""))).join(" ");
+  return {
+    n: w.nazwa,
+    w: w.glowna == null ? "" : azja ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obrażeń`,
+    p: w.ratio == null ? "" : Math.round(w.ratio * 100),
+    med: azja ? fmt(r.medGlowna) : fmt(r.medGlowna),
+    roz: w.glowna == null ? "" : `${fmt(Math.abs(r.medGlowna - w.glowna))} ${azja ? "lvl" : "obrażeń"} ${w.glowna < r.medGlowna ? "mniej od mediany" : "więcej"}`,
+    kr: k ? k.krag : "", mk: r.medKrag,
+    d: k && k.diamRazem ? `${k.diamPos}/${k.diamRazem}` : k ? `${k.procent}%` : "",
+    brak: k && k.diamRazem ? k.diamRazem - k.diamPos : "",
+    hs: r.heist > 0 ? plHeist(r.heist) : "",
+    u: w.udzial != null ? `${Math.round(w.udzial * r.lacznaWalka)} z ${r.lacznaWalka}` : "",
+    l: r.lacznaWalka,
+  };
 }
 
-export function opisPochwaly(w, r, miejsce) {
-  const n = w.nazwa;
+// Zwraca {upom: {nazwa: tekst}, poch: {nazwa: tekst}, karty: {nazwa: tekst}} — wszystkie opisy raportu, bez powtórek szablonów.
+export function opisyHumoru(r) {
   const azja = r.tryb === "azja";
-  const wart = azja ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`;
-  const p = Math.round(w.ratio * 100);
-  const teksty = miejsce === 0 ? (azja ? [
-    `${n}: ${wart} (${p}% mediany). Ktoś tu najwyraźniej nie ma życia towarzyskiego i dobrze, gang dziękuje za poświęcenie.`,
-    `${n}: ${wart}. Taki progres to albo pasja, albo ucieczka od rzeczywistości. Gang nie pyta, tylko zbiera owoce.`,
-  ] : [
-    `${n}: ${wart} (${p}% mediany). Wiadomo, kto robi robotę. Reszta robi tło.`,
-    `${n}: ${wart}. Boss po walce prosi o zwolnienie lekarskie.`,
-  ]) : (azja ? [
-    `${n}: ${wart} (${p}% mediany). Solidnie. Tak się rośnie, a nie „wchodzę na chwilę”.`,
-    `${n}: ${wart}. Widać ambicję. Reszta może patrzeć i brać przykład, najlepiej z zazdrością.`,
-  ] : [
-    `${n}: ${wart} (${p}% mediany). Walczy, a nie tylko kibicuje. Szacunek.`,
-    `${n}: ${wart}. Takich w gangu trzymamy, resztę da się negocjować.`,
-  ]);
-  return wybierz(teksty, n + miejsce);
-}
-
-export function opisKartPochwala(w) {
-  const k = w.karty;
-  return wybierz([
-    `${w.nazwa} (K${k.krag}${k.diamRazem ? `, 💎 ${k.diamPos}/${k.diamRazem}` : ""}): zbiera karty, jakby od tego zależało życie. Reszta gangu niech się zawstydzi.`,
-    `${w.nazwa} (K${k.krag}${k.diamRazem ? `, 💎 ${k.diamPos}/${k.diamRazem}` : ""}): diamenty same przychodzą. Pytanie, co im się mówi.`,
-  ], w.nazwa + "kp");
+  const uzyte = new Set();
+  const wynik = { upom: {}, poch: {}, karty: {} };
+  r.pochwaly.forEach((w, i) => { wynik.poch[w.nazwa] = podstaw(unikat(i === 0 ? "pochTop" : "pochDobry", w.nazwa, uzyte), dane(w, r)); });
+  r.kartyTop.forEach((w) => { wynik.karty[w.nazwa] = podstaw(unikat("pochKarty", w.nazwa, uzyte), dane(w, r)); });
+  r.upomnienia.forEach((w) => {
+    const d = dane(w, r);
+    // kandydaci: [dotkliwość 0..1, pula, krótki opis na dokładkę]
+    const kand = [];
+    if (w.ratio != null && w.flagi.some((f) => /mediany/.test(f.tekst) && !/karty/.test(f.tekst))) {
+      const slabo = w.flagi.some((f) => f.typ === "slabo");
+      const pula = azja ? (w.glowna === 0 ? "lvlZero" : slabo ? "lvlSlabo" : "lvlOdstaje") : (slabo ? "dmgSlabo" : "dmgOdstaje");
+      kand.push([w.glowna === 0 ? 1.3 : 1 - w.ratio, pula, azja ? `${d.w} (${d.p}% mediany)` : `${d.w} (${d.p}% mediany)`]);
+    }
+    const fo = w.flagi.find((f) => /obecny w/.test(f.tekst));
+    if (fo) kand.push([1 - (w.udzial ?? 0), "obecnosc", `obecność ${d.u} walk`]);
+    if (w.flagi.some((f) => /brak w ostatnich/.test(f.tekst))) kand.push([1, "brakWalk", `ani śladu w ostatnich ${d.l} walkach`]);
+    if (w.flagi.some((f) => f.typ === "karty") && w.karty) {
+      const pula = r.heist > 0 ? "kartyHeist" : w.karty.krag < r.medKrag ? "kartyDalej" : "kartyBlisko";
+      kand.push([Math.min(1.2, (-w.karty.odchylenie / 3) * (1 + 0.2 * (r.heist || 0))), pula, `K${d.kr}, ${d.d} 💎`]);
+    }
+    kand.sort((a, b) => b[0] - a[0]);
+    const czesci = [];
+    kand.forEach(([sev, pula, krotko], i) => {
+      if (i === 0) czesci.push(podstaw(unikat(pula, w.nazwa, uzyte), d));
+      else czesci.push(podstaw(unikat("dod", w.nazwa + i, uzyte), { x: krotko }));
+    });
+    if (kand.length >= 3) czesci.push(unikat("komplet", w.nazwa, uzyte));
+    wynik.upom[w.nazwa] = czesci.join(" ");
+  });
+  return wynik;
 }
 
 export function tekstHumor(r, opis = "") {
+  const o = opisyHumoru(r);
   const L = [];
   L.push(`📋 RAPORT GANGU${opis ? " (" + opis + ")" : ""}`);
   L.push(r.tryb === "azja" ? "Tryb: lvlowanie. Rośniemy albo gnijemy." : "Tryb: liga. Liczą się obrażenia, a nie dobre chęci.");
-  if (r.heist) L.push("🔥 Trwa Card Heist: więcej kart w paczkach i podwójne diamenty z nowej karty. Wymówki nie przyjmowane.");
+  if (r.heist > 0) L.push(`🔥 Card Heistów w okresie: ${r.heist}. Z każdej paczki z nową diamentową lecą 2 karty. Wymówki nie przyjmowane.`);
   if (r.pochwaly.length) {
     L.push("", "🏆 CHWAŁA NAJLEPSZYM:");
-    r.pochwaly.forEach((w, i) => L.push(`${["🥇", "🥈", "🥉"][i]} ${opisPochwaly(w, r, i)}`));
+    r.pochwaly.forEach((w, i) => L.push(`${["🥇", "🥈", "🥉"][i]} ${o.poch[w.nazwa]}`));
   }
   if (r.kartyTop.length) {
-    L.push("", "🃏 KARTY — jest ktoś, kto się stara:");
-    r.kartyTop.forEach((w) => L.push(`• ${opisKartPochwala(w)}`));
+    L.push("", "🃏 KARTY: jest ktoś, kto się stara:");
+    r.kartyTop.forEach((w) => L.push(`• ${o.karty[w.nazwa]}`));
   }
   if (r.upomnienia.length) {
     L.push("", "💀 WALL OF SHAME (kto odstaje i dlaczego):");
-    r.upomnienia.forEach((w) => L.push(`• ${opisHumor(w, r)}`));
-    L.push("", wybierz([
-      "Zero obrazy. Po prostu mierzymy. Liczby nie kłamią, w przeciwieństwie do wymówek.",
-      "Jeśli ktoś się znalazł na liście i chce się wybronić: najlepsza obrona to nowy wynik w następnym raporcie.",
-      "Nikt nie jest skreślony. Jeszcze. Następny raport za tydzień, ruszcie się.",
-    ], String(r.upomnienia.length)));
+    r.upomnienia.forEach((w) => L.push(`• ${o.upom[w.nazwa]}`));
+    L.push("", POOLE.zamkniecie[haszuj(String(r.upomnienia.length)) % POOLE.zamkniecie.length]);
   } else {
     L.push("", "✅ Nikt nie odstaje. Podejrzanie dobrze. Kto za tym stoi?");
   }

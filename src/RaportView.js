@@ -21,7 +21,7 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
   const [tryb, setTryb] = useState(() => odczyt("raport_tryb", "azja"));
   const [dni, setDni] = useState(() => Number(odczyt("raport_dni", "14")));
   const [skopiowano, setSkopiowano] = useState(false);
-  const [heist, setHeist] = useState(() => odczyt("raport_heist", "0") === "1");
+  const [heist, setHeist] = useState(() => Math.max(0, parseInt(odczyt("raport_heist_n", "0"), 10) || 0));
   const [humor, setHumor] = useState(() => odczyt("raport_humor", "1") === "1");
 
   const ustawTryb = (t) => { setTryb(t); zapis("raport_tryb", t); };
@@ -57,6 +57,7 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
   const { raport, okres, brak } = dane;
   const szczegoly = dane.szczegoly || {};
   const opis = okres ? `${new Date(okres.od).toLocaleDateString("pl-PL")} – ${new Date(okres.do).toLocaleDateString("pl-PL")}, ${dane.ileWalk} walk` : "";
+  const opisy = useMemo(() => R.opisyHumoru(raport), [raport]);
   const tekst = humor ? R.tekstHumor(raport, opis) : R.tekstRaportu(raport, opis);
 
   const kopiuj = async () => {
@@ -80,7 +81,12 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
           <button onClick={() => ustawTryb("europa")} style={{ ...przycisk("77,184,255"), opacity: tryb === "europa" ? 1 : 0.45 }}>🇪🇺 Liga (serwer europejski)</button>
         </div>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 8 }}>
-          <label style={{ fontSize: 12, color: "#ff8a3d", cursor: "pointer" }}><input type="checkbox" checked={heist} onChange={(e) => { setHeist(e.target.checked); zapis("raport_heist", e.target.checked ? "1" : "0"); }} /> 🔥 Trwa Card Heist (ostrzejsze uwagi o kartach)</label>
+          <span style={{ fontSize: 12, color: "#ff8a3d", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            🔥 Card Heistów w okresie:
+            <button onClick={() => { const n = Math.max(0, heist - 1); setHeist(n); zapis("raport_heist_n", String(n)); }} style={{ ...przycisk("255,138,61"), padding: "2px 10px" }}>−</button>
+            <b style={{ minWidth: 16, textAlign: "center" }}>{heist}</b>
+            <button onClick={() => { const n = Math.min(20, heist + 1); setHeist(n); zapis("raport_heist_n", String(n)); }} style={{ ...przycisk("255,138,61"), padding: "2px 10px" }}>+</button>
+          </span>
           <label style={{ fontSize: 12, color: "#c792ea", cursor: "pointer" }}><input type="checkbox" checked={humor} onChange={(e) => { setHumor(e.target.checked); zapis("raport_humor", e.target.checked ? "1" : "0"); }} /> 😈 Opisy z humorem</label>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -100,19 +106,19 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: "bold", color: "#0c6", marginBottom: 4 }}>🏆 Najlepsi</div>
                 {raport.pochwaly.map((w, i) => (
-                  <div key={w.nazwa} style={{ fontSize: 13, padding: "2px 0" }}>{["🥇", "🥈", "🥉"][i]} {humor ? R.opisPochwaly(w, raport, i) : <><b>{w.nazwa}</b> — {tryb === "azja" ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`} <span style={{ color: "#888", fontSize: 11 }}>({Math.round(w.ratio * 100)}% mediany)</span></>}</div>
+                  <div key={w.nazwa} style={{ fontSize: 13, padding: "2px 0" }}>{["🥇", "🥈", "🥉"][i]} {humor ? opisy.poch[w.nazwa] : <><b>{w.nazwa}</b> — {tryb === "azja" ? `+${fmt(w.glowna)} lvl` : `śr. ${fmt(w.glowna)} obr.`} <span style={{ color: "#888", fontSize: 11 }}>({Math.round(w.ratio * 100)}% mediany)</span></>}</div>
                 ))}
               </div>
             )}
             {raport.kartyTop.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: "bold", color: "#0c6", marginBottom: 4 }}>🃏 Karty — brawo</div>
-                {raport.kartyTop.map((w) => <div key={w.nazwa} style={{ fontSize: 13 }}>• {humor ? R.opisKartPochwala(w) : <><b>{w.nazwa}</b> <span style={{ color: "#888", fontSize: 11 }}>(K{w.karty.krag}, {w.karty.diamRazem ? `💎 ${w.karty.diamPos}/${w.karty.diamRazem}` : `${w.karty.procent}%`})</span></>}</div>)}
+                {raport.kartyTop.map((w) => <div key={w.nazwa} style={{ fontSize: 13 }}>• {humor ? opisy.karty[w.nazwa] : <><b>{w.nazwa}</b> <span style={{ color: "#888", fontSize: 11 }}>(K{w.karty.krag}, {w.karty.diamRazem ? `💎 ${w.karty.diamPos}/${w.karty.diamRazem}` : `${w.karty.procent}%`})</span></>}</div>)}
               </div>
             )}
             <div style={{ fontSize: 13, fontWeight: "bold", color: raport.upomnienia.length ? "#fa0" : "#0c6", marginBottom: 4 }}>{raport.upomnienia.length ? "⚠️ Do poprawy" : "✅ Nikt nie odstaje"}</div>
             {raport.upomnienia.map((w) => (
-              <div key={w.nazwa} style={{ fontSize: 12, padding: "3px 0", lineHeight: 1.5 }}>• {humor ? R.opisHumor(w, raport) : <><b>{w.nazwa}</b>: {w.flagi.map((f) => f.tekst).join("; ")}</>}</div>
+              <div key={w.nazwa} style={{ fontSize: 12, padding: "3px 0", lineHeight: 1.5 }}>• {humor ? opisy.upom[w.nazwa] : <><b>{w.nazwa}</b>: {w.flagi.map((f) => f.tekst).join("; ")}</>}</div>
             ))}
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
               <button onClick={kopiuj} style={przycisk("0,200,100")}>{skopiowano ? "✅ Skopiowano" : "📋 Kopiuj raport (tekst do czatu)"}</button>
