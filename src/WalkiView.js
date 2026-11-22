@@ -2652,4 +2652,4 @@ Pisz konkretnie, z nickami, bez lania wody. Styl rzeczowy ale może być z lekki
 
 
 // Eksporty pomocnicze dla widoku porównania gangów (GangiView.js)
-export { wolajGeminiObraz, nastepnyKlucz };
+export { wolajGeminiObraz, nastepnyKlucz, obliczPodsumowanieSezonu, obliczDaneKartowe };
