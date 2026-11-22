@@ -48,32 +48,37 @@ export function walkiZOkresu(walki, dni) {
   return { wybrane: z.filter((x) => x.t >= od).map((x) => x.w), od, do: doTs };
 }
 
-// Przyrost poziomu każdego gracza w okresie, z poziomów zapisanych przy walkach (poziomAkt / poziom).
-// Punkt startowy: ostatni znany poziom sprzed okresu (jeśli jest), inaczej pierwszy w okresie.
+// Przyrost poziomu każdego gracza w okresie, z poziomów zapisanych przy walkach (poziomAkt / poziom) — tak samo jak
+// „Progres lvl” w podsumowaniu sezonu (pierwszy → ostatni poziom). Punkt startowy: ostatni znany poziom sprzed okresu
+// (jeśli jest), inaczej pierwszy w okresie. Zwraca {delty: {nazwa: przyrost}, szczegoly: {nazwa: {od, do, tOd, tDo, punkty}}}.
 export function przyrostyZWalk(walki, czlonkowie, odTs) {
   const punkty = {};
-  (walki || []).forEach((w) => {
+  const nazwyCzl = (czlonkowie || []).map((x) => x.nazwa);
+  (walki || []).forEach((w, idx) => {
     const t = ts(w.data);
     if (t == null) return;
-    (w.gracze || []).forEach((g) => {
+    const wWalce = {};      // jeden wpis na gracza w walce (ten sam gracz może być na dwóch screenach)
+    (w.gracze || []).forEach((g) => { if (!wWalce[g.nazwa] || (g.poziomAkt || g.poziom || 0) > (wWalce[g.nazwa].poziomAkt || wWalce[g.nazwa].poziom || 0)) wWalce[g.nazwa] = g; });
+    Object.values(wWalce).forEach((g) => {
       const lvl = g.poziomAkt || g.poziom;
       if (!lvl) return;
-      const c = dopasujDoCzlonkow(g.nazwa, czlonkowie) || ((czlonkowie || []).some((x) => x.nazwa === g.nazwa) ? g.nazwa : null);
+      const c = nazwyCzl.includes(g.nazwa) ? g.nazwa : dopasujDoCzlonkow(g.nazwa, czlonkowie);
       if (!c) return;
-      (punkty[c] = punkty[c] || []).push({ t, lvl });
+      (punkty[c] = punkty[c] || []).push({ t, lvl, idx });
     });
   });
-  const wynik = {};
+  const delty = {}, szczegoly = {};
   Object.entries(punkty).forEach(([c, arr]) => {
-    arr.sort((a, b) => a.t - b.t);
+    arr.sort((a, b) => a.t - b.t || a.idx - b.idx);
     const koniec = arr[arr.length - 1];
     const przed = odTs == null ? [] : arr.filter((x) => x.t < odTs);
     const wOkr = odTs == null ? arr : arr.filter((x) => x.t >= odTs);
     const start = przed.length ? przed[przed.length - 1] : wOkr[0];
-    if (!start || start.t === koniec.t || koniec.t < (odTs ?? 0)) return;
-    wynik[c] = Math.max(0, koniec.lvl - start.lvl);
+    if (!start || (start.t === koniec.t && start.idx === koniec.idx) || koniec.t < (odTs ?? 0)) return;
+    delty[c] = Math.max(0, koniec.lvl - start.lvl);
+    szczegoly[c] = { od: start.lvl, do: koniec.lvl, tOd: start.t, tDo: koniec.t, punkty: arr.length };
   });
-  return wynik;
+  return { delty, szczegoly };
 }
 
 const DOMYSLNE = { niskoRatio: 0.6, bardzoNiskoRatio: 0.35, wysokoRatio: 1.15, kartyDeficyt: 0.75, kartyPochwala: 0.5, minUdzial: 0.5 };

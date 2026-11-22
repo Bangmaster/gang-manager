@@ -29,9 +29,9 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
     const { wybrane, od, do: doTs } = R.walkiZOkresu(walki, dni);
     const okres = od != null ? { od, do: doTs } : null;
     if (tryb === "azja") {
-      const przyrosty = R.przyrostyZWalk(walki, czlonkowie, dni ? od : null);
+      const { delty: przyrosty, szczegoly } = R.przyrostyZWalk(walki, czlonkowie, dni ? od : null);
       const ile = Object.keys(przyrosty).length;
-      return { raport: R.zbudujRaport({ tryb, czlonkowie, przyrosty, karty }), okres, ileWalk: wybrane.length, brak: !walki.length ? "Brak zapisanych walk." : ile < 3 ? "Za mało danych o poziomach graczy w walkach z tego okresu (potrzebne są poziomy zapisane przy co najmniej dwóch walkach). Wybierz dłuższy okres." : null };
+      return { raport: R.zbudujRaport({ tryb, czlonkowie, przyrosty, karty }), szczegoly, okres, ileWalk: wybrane.length, brak: !walki.length ? "Brak zapisanych walk." : ile < 3 ? "Za mało danych o poziomach graczy w walkach z tego okresu (potrzebne są poziomy zapisane przy co najmniej dwóch walkach). Wybierz dłuższy okres." : null };
     }
     const pod = wybrane.length ? obliczPodsumowanieSezonu(wybrane, czlonkowie) : null;
     const obrazenia = {};
@@ -40,6 +40,7 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
   }, [tryb, czlonkowie, talie, posiadane, duplikaty, walki, dni]);
 
   const { raport, okres, brak } = dane;
+  const szczegoly = dane.szczegoly || {};
   const opis = okres ? `${new Date(okres.od).toLocaleDateString("pl-PL")} – ${new Date(okres.do).toLocaleDateString("pl-PL")}, ${dane.ileWalk} walk` : "";
   const tekst = R.tekstRaportu(raport, opis);
 
@@ -109,7 +110,7 @@ export default function RaportView({ czlonkowie = [], walki = [], talie = [], po
                   {wiersze.map((w) => (
                     <tr key={w.nazwa} style={{ borderTop: "1px solid #12122a" }}>
                       <td style={{ padding: "5px 0" }}>{w.nazwa}</td>
-                      <td>{wartosc(w)}</td>
+                      <td>{wartosc(w)}{tryb === "azja" && szczegoly[w.nazwa] && <div style={{ fontSize: 10, color: "#777" }}>{szczegoly[w.nazwa].od} → {szczegoly[w.nazwa].do} <span title="data ostatniego poziomu zapisanego przy walce">({new Date(szczegoly[w.nazwa].tDo).toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit" })})</span></div>}</td>
                       <td style={{ color: kolorRatio(w.ratio), fontWeight: "bold" }}>{w.ratio == null ? "—" : `${Math.round(w.ratio * 100)}%`}</td>
                       {tryb === "europa" && <td>{w.udzial == null ? "—" : `${Math.round(w.udzial * raport.lacznaWalka)}/${raport.lacznaWalka}`}</td>}
                       <td style={{ color: w.karty && w.karty.odchylenie <= -0.75 ? "#fa0" : "var(--text)" }}>{w.karty ? `K${w.karty.krag} · ${w.karty.procent}%` : "—"}</td>
