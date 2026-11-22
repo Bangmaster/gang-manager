@@ -37,6 +37,45 @@ export function przyrostyDlaCzlonkow(przyrostyGraczyMapa, nickiOryginalne, czlon
   return wynik;
 }
 
+const ts = (d) => { const t = new Date(d).getTime(); return Number.isNaN(t) ? null : t; };
+
+// Walki z ostatnich `dni` dni liczonych od NAJNOWSZEJ walki (0 = wszystkie). Zwraca {wybrane, od, do}.
+export function walkiZOkresu(walki, dni) {
+  const z = (walki || []).map((w) => ({ w, t: ts(w.data) })).filter((x) => x.t != null);
+  if (!z.length) return { wybrane: [], od: null, do: null };
+  const doTs = Math.max(...z.map((x) => x.t));
+  const od = dni ? doTs - dni * 86400000 : Math.min(...z.map((x) => x.t));
+  return { wybrane: z.filter((x) => x.t >= od).map((x) => x.w), od, do: doTs };
+}
+
+// Przyrost poziomu każdego gracza w okresie, z poziomów zapisanych przy walkach (poziomAkt / poziom).
+// Punkt startowy: ostatni znany poziom sprzed okresu (jeśli jest), inaczej pierwszy w okresie.
+export function przyrostyZWalk(walki, czlonkowie, odTs) {
+  const punkty = {};
+  (walki || []).forEach((w) => {
+    const t = ts(w.data);
+    if (t == null) return;
+    (w.gracze || []).forEach((g) => {
+      const lvl = g.poziomAkt || g.poziom;
+      if (!lvl) return;
+      const c = dopasujDoCzlonkow(g.nazwa, czlonkowie) || ((czlonkowie || []).some((x) => x.nazwa === g.nazwa) ? g.nazwa : null);
+      if (!c) return;
+      (punkty[c] = punkty[c] || []).push({ t, lvl });
+    });
+  });
+  const wynik = {};
+  Object.entries(punkty).forEach(([c, arr]) => {
+    arr.sort((a, b) => a.t - b.t);
+    const koniec = arr[arr.length - 1];
+    const przed = odTs == null ? [] : arr.filter((x) => x.t < odTs);
+    const wOkr = odTs == null ? arr : arr.filter((x) => x.t >= odTs);
+    const start = przed.length ? przed[przed.length - 1] : wOkr[0];
+    if (!start || start.t === koniec.t || koniec.t < (odTs ?? 0)) return;
+    wynik[c] = Math.max(0, koniec.lvl - start.lvl);
+  });
+  return wynik;
+}
+
 const DOMYSLNE = { niskoRatio: 0.6, bardzoNiskoRatio: 0.35, wysokoRatio: 1.15, kartyDeficyt: 0.75, kartyPochwala: 0.5, minUdzial: 0.5 };
 
 /**
