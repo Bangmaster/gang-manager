@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, startTransition } from "re
 
 import { createPortal } from "react-dom";
 import "./gangStyles.css";
-import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, zapiszKartyHurtem, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, loadEventData, setEventCardField, setEventStructure, subscribeEventData } from "./firebase"; // eslint-disable-line no-unused-vars
+import { loadGangData, saveGangData, subscribeGangData, setCardField, setStructure, ustawPotwierdzenie, ustawWymianyAktywnej, setOnline, setOffline, subscribeOnline, zapiszKalendarz, subscribeKalendarz, zapiszLog, subscribeLogi, getFingerprint, pobierzFingerprinty, zapiszFingerprint, zapiszHistorieWymian, pobierzHistorieWymian, subscribeHistoria, obliczLicznikOtrzymanych, zablokujUrządzenie, odblokujUrządzenie, pobierzZablokowane, subscribeZablokowane, zapiszArchiwumWalk, subscribeArchiwumWalk, zapiszWiadomosc, subscribeChat, pobierzPelnyBackup, przywrocPelnyBackup, zapiszAutoBackup, zapiszKartyHurtem, pobierzListeBackupow, przywrocAutoBackup, zapiszPin, sprawdzPin, maPin, resetujPin, pobierzStatusyPinow, registerFCMToken, unregisterFCMToken, onForegroundMessage, loadEventData, setEventCardField, setEventStructure, subscribeEventData } from "./firebase"; // eslint-disable-line no-unused-vars
 import OcrView from "./OcrView";
 import WalkiView from "./WalkiView";
 import GangiView from "./GangiView";
@@ -817,6 +817,32 @@ function App() {
   };
 
   // Zapis strukturalny (talie, członkowie)
+  const zapiszPotwierdzenie = async (nick, wartosc) => {
+    setStatusZapisu("⏳ Zapisywanie...");
+    const ok = await ustawPotwierdzenie(nick, wartosc);
+    if (ok === "brak") {
+      setStatusZapisu("");
+      alert("Ta wymiana została już zamknięta lub zmieniona przez admina.");
+      return false;
+    }
+    if (ok !== true) {
+      setStatusZapisu("❌ Błąd");
+      alert("❌ Nie udało się zapisać potwierdzenia (brak internetu?). Spróbuj jeszcze raz — dopóki nie zobaczysz zielonego „POTWIERDZONA”, wymiana NIE jest zapisana.");
+      return false;
+    }
+    setStatusZapisu("✓ Zapisano");
+    setTimeout(() => setStatusZapisu(""), 1200);
+    return true;
+  };
+
+  const zapiszWymianyAkt = async (wymiany, resetNick) => {
+    setStatusZapisu("⏳ Zapisywanie...");
+    const ok = await ustawWymianyAktywnej(wymiany, resetNick);
+    setStatusZapisu(ok === true ? "✓ Zapisano" : "❌ Błąd");
+    setTimeout(() => setStatusZapisu(""), 1200);
+    return ok === true;
+  };
+
   const zapiszStrukture = async (pole, wartosc) => {
     setStatusZapisu("⏳ Zapisywanie...");
     const ok = await setStructure(pole, wartosc);
@@ -1112,6 +1138,8 @@ function App() {
           typWymiany={typWymiany}
           isAdmin={isAdmin}
           zapiszAktywna={(w)=>zapiszStrukture("aktywnaWymiana",w)}
+          zapiszPotwierdzenie={zapiszPotwierdzenie}
+          zapiszWymianyAkt={zapiszWymianyAkt}
           zapiszKarte={typWymiany==="event" ? zapiszKarteEvent : zapiszKarte}
         />}
         {zakładka==="chat"&&<GangChat zalogowany={zalogowany} czlonkowie={dane.czlonkowie}/>}
@@ -3590,7 +3618,7 @@ function DuplikatyView({talie,czlonkowie,duplikaty}) {
   );
 }
 
-function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszKarte}) {
+function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,duplikaty,typWymiany,isAdmin,zapiszAktywna,zapiszPotwierdzenie,zapiszWymianyAkt,zapiszKarte}) {
   const [zamykanie,setZamykanie]=useState(false);
   const [podmienIdx,setPodmienIdx]=useState(null);
   const [streak, setStreak] = useState(0);
@@ -3646,11 +3674,11 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
 
   const potwierdz=async()=>{
     zapiszAutoBackup("potwierdzenie");
-    // Efekty
+    // 1. Oznacz jako potwierdzone (tylko moje pole) — efekty dopiero po udanym zapisie
+    const zapisano = await zapiszPotwierdzenie(mojNick,true);
+    if(!zapisano) return;
     playSound("success");
     launchConfetti(2000);
-    // 1. Oznacz jako potwierdzone
-    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[mojNick]:true}});
 
     // 2. Automatycznie zaznacz kartę jako posiadaną przez odbiorcę w danych gangu
     if(mojePozycje&&zapiszKarte){
@@ -3668,7 +3696,8 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
     }
   };
   const potwierdzeZaKogos=async(nadawca,wartoscPotw)=>{
-    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[nadawca]:wartoscPotw}});
+    const zapisano = await zapiszPotwierdzenie(nadawca,wartoscPotw);
+    if(!zapisano) return;
     // Jeśli admin potwierdza (nie cofa) — zaznacz kartę w danych gangu
     if(wartoscPotw&&zapiszKarte){
       const wymianyNadawcy=poNadawcach[nadawca]||[];
@@ -3686,7 +3715,7 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
     }
   };
   const cofnijPotwierdzenie=async()=>{
-    await zapiszAktywna({...aktywnaWymiana,potwierdzone:{...potwierdzone,[mojNick]:false}});
+    await zapiszPotwierdzenie(mojNick,false);
   };
 
   const zamknijWymiane=async()=>{
@@ -3768,15 +3797,14 @@ function AktywnaWymiana({aktywnaWymiana,zalogowany,czlonkowie,talie,posiadane,du
   const podmienWymiane=async(staryIdx,nowaWymiana)=>{
     const noweWymiany=[...wymiany];
     noweWymiany[staryIdx]={...nowaWymiana};
-    // Resetuj potwierdzenie dawcy bo musi wysłać inną kartę
-    const nowePotwierdzone={...potwierdzone,[nowaWymiana.od]:false};
-    await zapiszAktywna({...aktywnaWymiana,wymiany:noweWymiany,potwierdzone:nowePotwierdzone});
+    // Resetuj potwierdzenie dawcy bo musi wysłać inną kartę (zapis tylko tych pól)
+    await zapiszWymianyAkt(noweWymiany,nowaWymiana.od);
     setPodmienIdx(null);
   };
 
   const usunWymiane=async(idx)=>{
     const noweWymiany=wymiany.filter((_,i)=>i!==idx);
-    await zapiszAktywna({...aktywnaWymiana,wymiany:noweWymiany});
+    await zapiszWymianyAkt(noweWymiany);
     if(podmienIdx===idx) setPodmienIdx(null);
   };
 

@@ -458,6 +458,41 @@ export async function setStructure(pole, wartosc) {
   }
 }
 
+// Zapis POJEDYNCZEGO potwierdzenia wymiany (tylko jedno pole mapy, nie cały obiekt aktywnej wymiany).
+// Dzięki temu dwie osoby potwierdzające w tym samym czasie nie nadpisują sobie nawzajem flag.
+// Zapisuje też znacznik czasu potwierdzenia (potwierdzoneTs).
+export async function ustawPotwierdzenie(nick, wartosc) {
+  try {
+    const snap = await getDoc(GANG_DOC);
+    if (!snap.exists() || !snap.data().aktywnaWymiana) return "brak";
+    await updateDoc(
+      GANG_DOC,
+      new FieldPath("aktywnaWymiana", "potwierdzone", nick), !!wartosc,
+      new FieldPath("aktywnaWymiana", "potwierdzoneTs", nick), Date.now()
+    );
+    return true;
+  } catch (e) {
+    console.error("Błąd zapisu potwierdzenia:", e);
+    return false;
+  }
+}
+
+// Zmiana samej listy wymian (podmiana/usunięcie pozycji) bez ruszania potwierdzeń.
+// resetNick — opcjonalnie nick dawcy, któremu zerujemy potwierdzenie (np. po podmianie karty).
+export async function ustawWymianyAktywnej(wymiany, resetNick) {
+  try {
+    const snap = await getDoc(GANG_DOC);
+    if (!snap.exists() || !snap.data().aktywnaWymiana) return "brak";
+    const args = [new FieldPath("aktywnaWymiana", "wymiany"), wymiany];
+    if (resetNick) args.push(new FieldPath("aktywnaWymiana", "potwierdzone", resetNick), false);
+    await updateDoc(GANG_DOC, ...args);
+    return true;
+  } catch (e) {
+    console.error("Błąd zapisu wymian:", e);
+    return false;
+  }
+}
+
 export function subscribeGangData(callback) {
   return onSnapshot(GANG_DOC, (snap) => {
     if (snap.exists()) zapamietajRewizje("gang", snap.data());
